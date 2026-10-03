@@ -96,6 +96,7 @@ class CachedProvider:
         self.prompt_version = prompt_version
         self.name = inner.name
         self.model = inner.model
+        self.embed_model: str = getattr(inner, "embed_model", inner.model)
 
     def complete_json(
         self,

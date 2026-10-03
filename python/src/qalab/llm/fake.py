@@ -45,10 +45,12 @@ class FakeProvider:
         script: list[str] | None = None,
     ) -> None:
         self.model = model
+        self.embed_model = model
         self.invalid_json_times = invalid_json_times
         self.overrides = overrides or {}
         self.script = list(script or [])
         self.calls: list[dict[str, Any]] = []  # every request, for assertions
+        self.embed_calls: list[list[str]] = []
 
     def complete_json(
         self,
@@ -108,6 +110,7 @@ class FakeProvider:
 
     def embed(self, texts: list[str]) -> np.ndarray:
         """Hashed bag-of-words: each word adds 1 to a bucket chosen by its sha1 hash."""
+        self.embed_calls.append(list(texts))
         matrix = np.zeros((len(texts), EMBED_DIM), dtype=np.float32)
         for row, text in enumerate(texts):
             for word in _WORD.findall(text.lower()):

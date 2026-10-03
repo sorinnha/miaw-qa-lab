@@ -1,43 +1,58 @@
 # Core build progress (foundation + AI core)
 
-Hand-over notes for whoever continues (human or model). Branch: `core-foundation`.
-Scope of this session: spec 02 items §1 (loader), §7 (context), §8 (LLM report), §9 (providers), §10 (RAG),
-plus the pydantic models. Clustering/ranking (§2–§6) and outputs (§11) belong to M2 and are NOT built here.
+Hand-over notes for whoever continues (human or model). Branch: `core-foundation` (pushed; no PR yet).
+Scope of this session: spec 02 §1 (loader), §3 (stacks), §7 (context), §8 (LLM report), §9 (providers),
+§10 (RAG), plus the pydantic models. Items were built in the order below; each has its own commit.
+
+Run checks: `. .venv/bin/activate && ruff check python && ruff format --check python && pytest python -q`
+(98 passed, 2 xfailed = the open YOU WRITE tests).
 
 ## Done
 
-- Repo layout fixed (nested folder moved to the root).
-- `python/pyproject.toml`: spec 02 dependencies, ruff (E F I B UP, 100 cols), pytest.
-- `qalab.models`: `Event`, `Run`, `BugReport`, `LLMBugDraft` (+ payload models) mirroring `schemas/`.
-  `qalab.models.schemas` compiles the JSON Schemas (Draft 2020-12, format checked).
-- `qalab.io.runs`: discover runs, stream + validate events, skip and record bad lines, sort by seq,
-  `suspected_crash` when `ended_at` is missing. Never opens `labels.json`.
-- `qalab.config`: `qalab.toml` loader with spec §12 defaults.
-- `qalab.cli`: `qalab validate <run_dir>...`.
-- Tests: `tests/models/test_contracts.py`, `tests/io/test_runs.py`.
+1. **Foundation** — `python/pyproject.toml` (spec 02 deps, ruff E/F/I/B/UP @100 cols, pytest),
+   `qalab.models` (`Event`, `Run`, `BugReport`, `LLMBugDraft`; `models.schemas` compiles the JSON
+   Schemas), `qalab.io.runs` (`load_run`, `iter_events`, `validate_run`, `discover_runs`; invalid lines
+   recorded, `suspected_crash`, never opens `labels.json`), `qalab.config` (qalab.toml defaults),
+   `qalab validate` CLI. Tests: `tests/models/test_contracts.py`, `tests/io/test_runs.py`.
+2. **Providers (§9)** — `qalab.llm`: `LLMProvider`/`LLMResult`/`LLMOutputError`, `FakeProvider`
+   (invalid-JSON mode, `overrides`, `script`, hashed embeddings, call recording), `OllamaProvider`
+   (`/api/chat` + `format`, `/api/embed`), `LLMCache` + `CachedProvider` (sha256 key, latency/token
+   logging), `make_provider()`. Tests: `tests/llm/` (Ollama via `httpx.MockTransport`).
+3. **Cluster → context (§3, §4–7)** — `triage.stack` (frame regex, app-frame filter), `triage.cluster`
+   (`Cluster`/`ClusterMember`: the shape M2 must produce, D-009), `triage.context.build_context`
+   (C/E/A/L/D/CODE, 10k budget, trim E→L→D, `resolve("E2")` → `EventRef`). Fixture clusters from
+   `samples/sample_run`: `tests/triage/fixtures.py`.
+4. **LLM report (§8)** — `triage.prompts` (loads `prompts/triage_v1.md`, version `triage-v1`),
+   `triage.report_template`, `triage.report_llm.generate_report` (≤ 1 + max_retries, error fed back,
+   every grounding check → `review_reasons`, template fallback with `needs_review`). Every report
+   validates against `bug_report.schema.json`. Tests: `tests/triage/test_report.py`.
+5. **RAG (§10)** — `rag.chunk`, `rag.index` (npz cache per file+model, batches of 32),
+   `rag.retrieve` (`cosine_top_k` **YOU WRITE stub**, `EmbeddingRetriever`, `TfidfRetriever`,
+   `build_query`, `make_retriever`), `rag.code_context`. Tests: `tests/rag/`.
 
-- `qalab.llm`: `LLMProvider` protocol + `LLMResult`; `FakeProvider` (invalid-JSON mode, overrides,
-  script, hashed bag-of-words embeddings); `OllamaProvider` (`/api/chat` with `format` schema,
-  `/api/embed`); `LLMCache` (SQLite) + `CachedProvider` (cache + latency/token logging);
-  `make_provider()`. Tests: `tests/llm/`.
+Decisions logged: D-007 … D-011 in `docs/DECISIONS.md`. Module map added to `docs/ARCHITECTURE.md`.
 
-- `qalab.triage.stack`: spec §3 frame regex, `Frame`, app-frame filter (built early: §7/§10 need it).
-- `qalab.triage.cluster`: `Cluster` + `ClusterMember`, the shape M2 must produce (D-009).
-- `qalab.triage.context`: `build_context()` → `ClusterContext` (C/E/A/L/D/CODE, 10k-char budget,
-  trim E→L→D, `resolve("E2")` → `EventRef`, `to_prompt_vars()` for the Jinja prompt).
-  Fixture clusters: `tests/triage/fixtures.py`.
+## Next (not started)
 
-- `qalab.triage.prompts`: loads `prompts/triage_v1.md` (version from its comment, system/user split).
-- `qalab.triage.report_template`: template report (title form, A-list steps, `expected=unknown`).
-- `qalab.triage.report_llm`: `generate_report()` = prompt → `request_draft()` (≤ 1 + max_retries,
-  error fed back) → `ground_draft()` (every §8 check → `review_reasons`) → `BugReport`;
-  template fallback with `needs_review`. Tests: `tests/triage/test_report.py`.
-
-## Next
-
-- Item 5: §10 RAG (`rag/chunk.py`, `index.py`, `retrieve.py` with YOU WRITE `cosine_top_k`,
-  TF-IDF retriever, `code_context.py`).
+- **M2 core:** `triage/normalize.py` (YOU WRITE `normalize_message` + the spec §2 table tests),
+  `signature.py`, `cluster.py` variants (union-find, DBSCAN cells), `rank.py` — all producing
+  `triage.cluster.Cluster` as documented in D-009.
+- **Pipeline + outputs (§11):** `triage/pipeline.py` wiring loader → clusters → `build_context`
+  (docs via `rag.make_retriever`, code via `rag.code_context.code_context_for`) → `generate_report`;
+  `io/writers.py`, `report/markdown.py`, `jira_csv.py`, `html.py`; CLI `triage run|clusters`,
+  `report html`; `triage_meta.json` (sum `generator.*` + `LLMCache.hits`), `validation_report.json`
+  (`ValidationReport.to_dict()`).
+- **Leakage + smoke tests** from spec 02 (need the pipeline).
+- Hosted providers (`gemini`, `openai`, `anthropic`) are stubs in `make_provider` (raise).
+- `models/labels.py`, `models/visual.py` (spec 03) not written; `labels.json` is schema-checked by
+  `qalab validate` only.
+- YOU WRITE open: `rag/retrieve.py::cosine_top_k` (tests xfail until Sora writes it).
 
 ## Open questions
 
-- None yet.
+- Which embedding model name to default to for Ollama (`make_provider` uses `nomic-embed-text`;
+  decide on the PC in M0/ENVIRONMENT.md and move it to `qalab.toml [llm] embed_model`).
+- The sample run has one run only, so `runs_affected > 1` and the crash multiplier paths are covered
+  by copied fixtures, not real data; M2's rank tests must add the copied-run fixture the spec asks for.
+- Branch naming: CLAUDE.md wants one branch per milestone; this session spans M0/M2/M3 pieces, so it
+  uses `core-foundation`. Rename or split when opening the PR if preferred.
