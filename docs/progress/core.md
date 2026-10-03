@@ -21,9 +21,15 @@ plus the pydantic models. Clustering/ranking (§2–§6) and outputs (§11) belo
   `/api/embed`); `LLMCache` (SQLite) + `CachedProvider` (cache + latency/token logging);
   `make_provider()`. Tests: `tests/llm/`.
 
+- `qalab.triage.stack`: spec §3 frame regex, `Frame`, app-frame filter (built early: §7/§10 need it).
+- `qalab.triage.cluster`: `Cluster` + `ClusterMember`, the shape M2 must produce (D-009).
+- `qalab.triage.context`: `build_context()` → `ClusterContext` (C/E/A/L/D/CODE, 10k-char budget,
+  trim E→L→D, `resolve("E2")` → `EventRef`, `to_prompt_vars()` for the Jinja prompt).
+  Fixture clusters: `tests/triage/fixtures.py`.
+
 ## Next
 
-- Item 3: typed `Cluster` (spec §4–6 shape) and the §7 context builder.
+- Item 4: §8 `report_llm.py` + `report_template.py` (prompt, retries, grounding checks).
 
 ## Open questions
 

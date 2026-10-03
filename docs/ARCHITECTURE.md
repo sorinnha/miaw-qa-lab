@@ -52,4 +52,20 @@ Claude Code keeps this page current, and adds a proper diagram image in M7.
 4. **Measure.** Seeded bugs give ground truth; every claim in the README comes from an eval script.
 5. **Local by default.** Unreleased game data stays on the machine unless the user chooses otherwise.
 
+## Python module boundaries (triage side)
+
+```
+io.runs.load_run ──► LoadedRun{run, events sorted by seq, report}
+      │
+      ▼  (M2: normalize → stack → signature → cluster → rank)
+triage.cluster.Cluster ──► triage.context.build_context ──► ClusterContext (E/A/L/D ids)
+      │                        ▲ docs: rag.retrieve            │
+      │                        ▲ code: rag.code_context        ▼
+      │                                     triage.report_llm (prompt → provider → grounding)
+      │                                     triage.report_template (fallback, --provider none)
+      ▼                                                        │
+models.bug.BugReport ◄─────────────────────────────────────────┘
+llm: base.LLMProvider ← fake | ollama (| hosted later); cache.CachedProvider wraps them all.
+```
+
 See `docs/DECISIONS.md` for the reasoning behind specific choices.
