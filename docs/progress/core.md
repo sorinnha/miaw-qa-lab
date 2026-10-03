@@ -47,8 +47,8 @@ Until `normalize_message` exists, `qalab triage run` raises `NotImplementedError
 - **M3 close-out (PC):** Sora writes `cosine_top_k`; a real Ollama run on the sample with
   `--docs docs/sandbox_design.md`; check evidence resolves and steps cite actions; tag v0.1.0 (ask first).
 - **Not built / deferred:** hosted providers (`llm/gemini.py`, `openai_.py`, `anthropic_.py`); streaming
-  pipeline for 100k events (D-014); `qalab eval` (M5); `.github/workflows/python-ci.yml` (spec 04, M0/M7
-  scope; add the `--cov` step there); README demo GIF and measured numbers (M5/M7).
+  pipeline for 100k events (D-014); `qalab eval` (M5); README demo GIF and measured numbers (M5/M7).
+  CI (`.github/workflows/python-ci.yml`, with `--cov`) was added on the M0 branch.
 
 ## Open questions
 
