@@ -4,10 +4,18 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   python:
     name: python (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      # Windows runners pipe stdout as cp1252; UTF-8 mode keeps rich output and the smoke
+      # script's decoding identical on both OSes.
+      PYTHONUTF8: "1"
     strategy:
       fail-fast: false
       matrix:
@@ -24,11 +32,20 @@ jobs:
       - name: Install
         run: pip install -e "./python[dev]"
 
+      - name: CLI entry point
+        run: qalab --help
+
+      # scripts/ is linted with the same config as the package (spec 04 names only python/;
+      # see docs/DECISIONS.md D-016).
       - name: Lint
-        run: ruff check python
+        run: |
+          ruff check python
+          ruff check scripts --config python/pyproject.toml
 
       - name: Format
-        run: ruff format --check python
+        run: |
+          ruff format --check python
+          ruff format --check scripts --config python/pyproject.toml
 
       - name: Tests
         run: pytest python -q --cov=qalab --cov-report=xml --cov-report=term

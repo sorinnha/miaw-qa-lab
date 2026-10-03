@@ -77,5 +77,11 @@ One entry per real choice: what we decided, why, what else we considered, and wh
 
 ## D-015 · 2026-10-03 · CI smoke step tolerates an open YOU WRITE task (M0)
 - **Why:** spec 04 runs `qalab triage run samples/sample_run --provider fake` in CI, but that path calls `normalize_message`, which is Sora's YOU WRITE task. Failing CI on a learning task that is open by design would hide real regressions behind a permanently red badge.
-- **How:** `scripts/ci_smoke.py` (Python, so the same file runs on the Windows and Ubuntu runners) validates the sample run, runs triage with the fake provider, accepts exit 0 or 3 and checks that `bugs.json` and `report.html` exist. If the run stops on `NotImplementedError("YOU WRITE")` it prints a GitHub `::warning::` and exits 0. Any other failure is red.
+- **How:** `scripts/ci_smoke.py` (Python, so the same file runs on the Windows and Ubuntu runners) validates the sample run, runs spec 04's triage command with the fake provider (no `--docs`, so only `normalize_message` gates it), accepts exit 0 or 3 and checks that freshly written `bugs.json` and `report.html` exist. If the run stops with the traceback line `NotImplementedError: YOU WRITE` it prints a GitHub `::warning::` and exits 0. Any other failure, or a hang past 5 minutes, is red.
 - **Consequences:** the first PR after Sora writes `normalize_message` turns the warning into a real smoke test with no CI change. `pytest` stays strict: wrong answers in YOU WRITE tests still fail (xfail only accepts `NotImplementedError`).
+
+## D-016 · 2026-10-03 · CI details beyond spec 04 (M0)
+- **Lint scope:** ruff also checks `scripts/` with `--config python/pyproject.toml` (a separate command: with `--config` from the repo root, the package's `src` paths resolve wrongly), so the smoke script and Sora's `hello_events.py` follow the same rules (100 cols, E/F/I/B/UP) as the package. Spec 04 names only `python/`.
+- **UTF-8 on Windows:** the job sets `PYTHONUTF8=1`. Windows runners pipe stdout as cp1252, and rich output containing non-ASCII characters would raise `UnicodeEncodeError`. The CLI's own summary line now uses `->` as well.
+- **Hygiene:** `permissions: contents: read`, `timeout-minutes: 15`, and a `qalab --help` step that proves the console-script entry point installs on both OSes.
+- **hello_events scope:** both `count_events` and `main` are stubs, so the YOU WRITE task is the full ~25-line script PLAN.md describes; the expected output is pinned in its docstring and test.

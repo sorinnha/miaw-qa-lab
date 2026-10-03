@@ -31,6 +31,13 @@ def _invoke(args: list[str]) -> Result:
     return result
 
 
+def test_help_lists_the_commands() -> None:
+    result = runner.invoke(app, ["--help"])
+    assert result.exit_code == 0
+    for command in ("validate", "triage", "report"):
+        assert command in result.output
+
+
 def test_validate_sample_run() -> None:
     result = runner.invoke(app, ["validate", str(SAMPLE_RUN)])
     assert result.exit_code == 0, result.output

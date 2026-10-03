@@ -46,7 +46,7 @@ def test_counts_match_the_sample_run() -> None:
     assert dict(per_kind) == expected_kind
     assert dict(per_level) == expected_level
     assert sum(per_kind.values()) == 38
-    assert per_kind["log"] == 11 and per_level["warning"] == 3
+    assert per_kind["log"] == 12 and per_level["warning"] == 3
 
 
 @pytest.mark.youwrite
@@ -57,10 +57,33 @@ def test_blank_lines_are_skipped(tmp_path: Path) -> None:
     assert dict(per_kind) == {"metric": 1, "log": 1} and dict(per_level) == {"error": 1}
 
 
+EXPECTED_OUTPUT = """\
+kind   action       9
+kind   detector     2
+kind   log         12
+kind   marker       5
+kind   metric       5
+kind   screenshot   5
+level  error        4
+level  exception    4
+level  info         1
+level  warning      3
+"""
+
+
 @pytest.mark.youwrite
-def test_main_prints_sorted_tables(capsys: pytest.CaptureFixture[str]) -> None:
+def test_main_prints_the_documented_tables(capsys: pytest.CaptureFixture[str]) -> None:
     assert _load_script().main([str(SAMPLE_EVENTS)]) == 0
-    lines = capsys.readouterr().out.splitlines()
-    kinds = [line.split()[1] for line in lines if line.startswith("kind")]
-    assert kinds == sorted(kinds) and "metric" in kinds
-    assert any(line.startswith("level  warning") and line.endswith("3") for line in lines)
+    assert capsys.readouterr().out == EXPECTED_OUTPUT
+
+
+@pytest.mark.youwrite
+def test_main_defaults_to_the_sample_run(capsys: pytest.CaptureFixture[str]) -> None:
+    assert _load_script().main([]) == 0
+    assert capsys.readouterr().out == EXPECTED_OUTPUT
+
+
+def test_docstring_shows_the_real_expected_output() -> None:
+    doc = _load_script().__doc__ or ""
+    for line in EXPECTED_OUTPUT.splitlines():
+        assert f"    {line}\n" in doc, line

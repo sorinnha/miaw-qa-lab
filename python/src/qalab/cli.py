@@ -127,7 +127,7 @@ def triage_run(
         raise typer.Exit(EXIT_ERROR) from exc
     by_priority = result.meta["by_priority"]
     console.print(
-        f"{len(result.reports)} reports from {len(result.clusters)} clusters → {out}  "
+        f"{len(result.reports)} reports from {len(result.clusters)} clusters -> {out}  "
         + "  ".join(f"{p}={n}" for p, n in by_priority.items())
     )
     raise typer.Exit(result.exit_code)
