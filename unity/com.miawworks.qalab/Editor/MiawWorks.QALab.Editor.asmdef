@@ -1,0 +1,14 @@
+{
+    "name": "MiawWorks.QALab.Editor",
+    "rootNamespace": "MiawWorks.QALab.Editor",
+    "references": ["MiawWorks.QALab"],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

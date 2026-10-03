@@ -1,0 +1,14 @@
+{
+  "name": "com.miawworks.qalab",
+  "displayName": "QA Lab",
+  "version": "0.1.0",
+  "unity": "2022.3",
+  "description": "AI-assisted QA for Unity playtests: writes run folders (events.jsonl, run.json, labels.json) that the qalab Python tools triage into ranked bug reports.",
+  "author": { "name": "Miaw Works" },
+  "license": "MIT",
+  "keywords": ["qa", "testing", "automation", "playtest"],
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1",
+    "com.unity.test-framework": "1.1.33"
+  }
+}
