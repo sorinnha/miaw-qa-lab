@@ -14,8 +14,12 @@ from qalab.rag.index import chunk_only_index
 from qalab.rag.retrieve import make_retriever
 from qalab.report.html import rerender_html
 from qalab.report.jira_csv import COLUMNS
+from qalab.triage.cluster import Cluster
 from qalab.triage.pipeline import TriageOptions, build_meta, make_reports, write_outputs
 from qalab.triage.rank import rank_clusters
+from tests.triage.fixtures import (
+    SAMPLE_RUN as SAMPLE_RUN_DIR,
+)
 from tests.triage.fixtures import (
     SB01_DOORS,
     SB02_INVENTORY,
@@ -42,7 +46,7 @@ ALL = [
 
 
 @pytest.fixture
-def written(tmp_path: Path):
+def written(tmp_path: Path) -> tuple[Path, list[BugReport], list[Cluster]]:
     loaded = load_sample()
     runs = {loaded.run.run_id: loaded}
     clusters = rank_clusters([make_cluster(loaded, seqs) for seqs in ALL], runs)
@@ -58,7 +62,9 @@ def written(tmp_path: Path):
     return options.out, reports, clusters
 
 
-def test_bugs_json_validates_and_is_ordered(written) -> None:
+def test_bugs_json_validates_and_is_ordered(
+    written: tuple[Path, list[BugReport], list[Cluster]],
+) -> None:
     out, reports, clusters = written
     data = json.loads((out / "bugs.json").read_text(encoding="utf-8"))
     assert len(data) == 7 and [d["id"] for d in data] == [f"QAL-{i:04d}" for i in range(1, 8)]
@@ -75,7 +81,7 @@ def test_bugs_json_validates_and_is_ordered(written) -> None:
     assert all(e["seq"] in seqs for d in data for e in d["evidence"])
 
 
-def test_csv_header_and_rows(written) -> None:
+def test_csv_header_and_rows(written: tuple[Path, list[BugReport], list[Cluster]]) -> None:
     out, reports, _ = written
     with (out / "bugs_jira.csv").open(encoding="utf-8", newline="") as f:
         rows = list(csv.reader(f))
@@ -84,7 +90,9 @@ def test_csv_header_and_rows(written) -> None:
     assert rows[1][2] == "Bug" and rows[1][3] == "High" and rows[1][4] == "qalab;log"
 
 
-def test_html_contains_every_bug_and_is_self_contained(written) -> None:
+def test_html_contains_every_bug_and_is_self_contained(
+    written: tuple[Path, list[BugReport], list[Cluster]],
+) -> None:
     out, reports, _ = written
     html = (out / "report.html").read_text(encoding="utf-8")
     for r in reports:
@@ -98,7 +106,9 @@ def test_html_contains_every_bug_and_is_self_contained(written) -> None:
     assert all(r.id in (out / "report.html").read_text(encoding="utf-8") for r in reports)
 
 
-def test_markdown_clusters_meta_and_validation(written) -> None:
+def test_markdown_clusters_meta_and_validation(
+    written: tuple[Path, list[BugReport], list[Cluster]],
+) -> None:
     out, reports, clusters = written
     md = (out / "report.md").read_text(encoding="utf-8")
     assert "| ID | Priority |" in md and all(f"## {r.id}" in md for r in reports)
@@ -140,3 +150,29 @@ def test_max_reports_limits_llm_calls(tmp_path: Path) -> None:
     options = TriageOptions(out=tmp_path, provider="fake", max_reports=2)
     reports = make_reports(clusters, runs, options, provider)
     assert len(reports) == 2 and len(provider.calls) == 2
+
+
+def test_meta_records_cache_hits(tmp_path: Path) -> None:
+    from qalab.llm.factory import make_provider
+
+    loaded = load_sample()
+    runs = {loaded.run.run_id: loaded}
+    clusters = rank_clusters([make_cluster(loaded, SB01_DOORS)], runs)
+    provider = make_provider("fake", cache_path=tmp_path / "llm.sqlite", prompt_version="triage-v1")
+    options = TriageOptions(out=tmp_path, provider="fake")
+    make_reports(clusters, runs, options, provider)
+    reports = make_reports(clusters, runs, options, provider)
+    meta = build_meta(runs, clusters, reports, options, provider, {})
+    assert meta["cache_hits"] == 1 and meta["cache_misses"] == 1
+    assert reports[0].generator.cached is True
+
+
+def test_duplicate_run_ids_are_rejected(tmp_path: Path) -> None:
+    import shutil
+
+    from qalab.triage.pipeline import load_runs
+
+    for name in ("a", "b"):
+        shutil.copytree(SAMPLE_RUN_DIR, tmp_path / name, ignore=shutil.ignore_patterns("shots"))
+    with pytest.raises(ValueError, match="run ids must be unique"):
+        load_runs([tmp_path / "a", tmp_path / "b"])

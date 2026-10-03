@@ -38,3 +38,11 @@ def test_index_is_cached_per_file_and_model(tmp_path: Path) -> None:
     both = build_index([DESIGN_DOC, changed], FakeProvider(), index_dir=tmp_path)
     assert both.reembedded_files == ["changed.md"]
     assert len(both) == len(index) * 2 + 1 and both.matrix.shape[0] == len(both)
+
+
+def test_cache_key_covers_chunk_settings() -> None:
+    from qalab.rag.index import cache_key
+
+    base = cache_key("text", "m", 800, 100)
+    assert cache_key("text", "m", 400, 100) != base and cache_key("text", "m", 800, 50) != base
+    assert cache_key("text", "m", 800, 100) == base

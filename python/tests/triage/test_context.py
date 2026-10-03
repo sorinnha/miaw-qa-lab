@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from qalab.io.runs import LoadedRun
 from qalab.triage.context import (
     DEFAULT_BUDGET_CHARS,
     action_detail,
@@ -28,12 +29,12 @@ class Doc:
 
 
 @pytest.fixture(scope="module")
-def runs():
+def runs() -> dict[str, LoadedRun]:
     loaded = load_sample()
     return {loaded.run.run_id: loaded}
 
 
-def test_actions_are_exactly_those_before_first_occurrence(runs) -> None:
+def test_actions_are_exactly_those_before_first_occurrence(runs: dict[str, LoadedRun]) -> None:
     loaded = next(iter(runs.values()))
     context = build_context(make_cluster(loaded, SB03_ENEMY_REGISTRY), runs)
     assert [a.seq for a in context.actions] == [4, 6, 7, 10, 14, 17]
@@ -55,7 +56,7 @@ def test_actions_are_exactly_those_before_first_occurrence(runs) -> None:
         context.resolve("E9")
 
 
-def test_first_bug_has_no_prior_logs(runs) -> None:
+def test_first_bug_has_no_prior_logs(runs: dict[str, LoadedRun]) -> None:
     loaded = next(iter(runs.values()))
     context = build_context(make_cluster(loaded, SB01_DOORS), runs)
     assert [a.seq for a in context.actions] == [4, 6, 7]
@@ -65,7 +66,7 @@ def test_first_bug_has_no_prior_logs(runs) -> None:
     assert prompt_vars["actions"][0]["id"] == "A1" and '"signature"' in prompt_vars["cluster_json"]
 
 
-def test_detector_cluster_facts_and_screenshots(runs) -> None:
+def test_detector_cluster_facts_and_screenshots(runs: dict[str, LoadedRun]) -> None:
     loaded = next(iter(runs.values()))
     context = build_context(make_cluster(loaded, SB06_FELL), runs)
     assert context.facts["detector"] == "fell_out_of_world"
@@ -76,7 +77,7 @@ def test_detector_cluster_facts_and_screenshots(runs) -> None:
     assert "detector_details" in context.to_prompt_vars()["cluster_json"]
 
 
-def test_evidence_picks_first_last_and_most_different(runs) -> None:
+def test_evidence_picks_first_last_and_most_different(runs: dict[str, LoadedRun]) -> None:
     loaded = next(iter(runs.values()))
     cluster = make_cluster(loaded, SB13_AUDIO)
     items = evidence_items(cluster)
@@ -88,7 +89,7 @@ def test_evidence_picks_first_last_and_most_different(runs) -> None:
     assert 13 in picked and 30 in picked  # audio and combat differ most from inventory
 
 
-def test_docs_and_code_are_mapped_and_capped(runs) -> None:
+def test_docs_and_code_are_mapped_and_capped(runs: dict[str, LoadedRun]) -> None:
     loaded = next(iter(runs.values()))
     docs = [
         Doc(f"sandbox_design.md#h-{i}", "sandbox_design.md", f"H{i}", "x" * 700) for i in range(4)
@@ -101,7 +102,7 @@ def test_docs_and_code_are_mapped_and_capped(runs) -> None:
     assert context.chars <= DEFAULT_BUDGET_CHARS and context.trimmed == {}
 
 
-def test_budget_trims_events_then_logs_then_docs(runs) -> None:
+def test_budget_trims_events_then_logs_then_docs(runs: dict[str, LoadedRun]) -> None:
     loaded = next(iter(runs.values()))
     cluster = make_cluster(loaded, SB03_ENEMY_REGISTRY)
     docs = [Doc(f"d#{i}", "d.md", "H", "y" * 500) for i in range(3)]
@@ -123,9 +124,24 @@ def test_budget_trims_events_then_logs_then_docs(runs) -> None:
     assert len(minimal.events) == 1 and minimal.actions  # E1 and the A list always survive
 
 
-def test_action_detail_prefers_ui_path(runs) -> None:
+def test_action_detail_prefers_ui_path(runs: dict[str, LoadedRun]) -> None:
     loaded = next(iter(runs.values()))
     event = next(e for e in loaded.events if e.kind == "action").model_copy(
         update={"data": {"action": "click", "step": 1, "ui_path": "Canvas/Menu/Play"}}
     )
     assert action_detail(event) == "ui=Canvas/Menu/Play"
+
+
+def test_screenshots_reach_the_prompt_and_crash_flag(runs: dict[str, LoadedRun]) -> None:
+    loaded = next(iter(runs.values()))
+    prompt_vars = build_context(make_cluster(loaded, SB06_FELL), runs).to_prompt_vars()
+    assert prompt_vars["screenshots"] == ["shots/000003.png"]
+    assert "last_before_crash" not in build_context(make_cluster(loaded, [31]), runs).facts
+
+    crashed_run = loaded.run.model_copy(update={"ended_at": None})
+    crashed_loaded = LoadedRun(loaded.run_dir, crashed_run, loaded.events, loaded.report)
+    crashed_runs = {crashed_run.run_id: crashed_loaded}
+    last = build_context(make_cluster(crashed_loaded, [31]), crashed_runs)  # seq 31 = last error
+    assert last.facts["suspected_crash"] is True and last.facts["last_before_crash"] is True
+    earlier = build_context(make_cluster(crashed_loaded, [30]), crashed_runs)
+    assert "last_before_crash" not in earlier.facts

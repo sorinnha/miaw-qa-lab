@@ -13,8 +13,10 @@ from rich.table import Table
 
 from qalab.config import load_config
 from qalab.io.runs import discover_runs, validate_labels_file, validate_run
+from qalab.llm.base import LLMError
 from qalab.llm.factory import make_provider
 from qalab.report.html import rerender_html
+from qalab.triage.cluster import VARIANTS
 from qalab.triage.pipeline import TriageOptions, load_runs, run_triage, triage_clusters
 
 app = typer.Typer(no_args_is_help=True, help="Miaw QA Lab tools.")
@@ -29,6 +31,12 @@ EXIT_ERROR = 2
 EXIT_P1 = 3
 
 ConfigOpt = Annotated[Path | None, typer.Option("--config", help="Path to qalab.toml.")]
+ClusterOpt = Annotated[
+    str, typer.Option("--cluster", help="exact | frame_tfidf | frame_embed | tfidf_only")
+]
+# Errors the CLI reports as exit 2 instead of a traceback (spec 02: 2 = error).
+USER_ERRORS = (FileNotFoundError, ValueError, LLMError)
+
 ProviderOpt = Annotated[
     str | None,
     typer.Option("--provider", help="ollama | gemini | openai | anthropic | fake | none"),
@@ -78,6 +86,8 @@ def _options(
     config_path: Path | None,
 ) -> TriageOptions:
     config = load_config(config_path)
+    if cluster not in VARIANTS:
+        raise ValueError(f"--cluster must be one of {', '.join(VARIANTS)}, not {cluster!r}")
     name = provider or os.environ.get("QALAB_PROVIDER") or config.llm.provider
     return TriageOptions(
         out=out,
@@ -103,18 +113,16 @@ def triage_run(
     ] = None,
     provider: ProviderOpt = None,
     model: Annotated[str | None, typer.Option("--model")] = None,
-    cluster: Annotated[
-        str, typer.Option("--cluster", help="exact | frame_tfidf | frame_embed | tfidf_only")
-    ] = "frame_tfidf",
+    cluster: ClusterOpt = "frame_tfidf",
     max_reports: Annotated[int | None, typer.Option("--max-reports")] = None,
     no_cache: Annotated[bool, typer.Option("--no-cache")] = False,
     config: ConfigOpt = None,
 ) -> None:
     """Full pipeline: cluster, rank, write reports. Exit 3 when a P1 bug was found."""
-    options = _options(out, provider, model, cluster, max_reports, docs, repo, no_cache, config)
     try:
+        options = _options(out, provider, model, cluster, max_reports, docs, repo, no_cache, config)
         result = run_triage(run_dirs, options)
-    except (FileNotFoundError, ValueError) as exc:
+    except USER_ERRORS as exc:
         console.print(f"[red]error:[/red] {exc}")
         raise typer.Exit(EXIT_ERROR) from exc
     by_priority = result.meta["by_priority"]
@@ -128,22 +136,25 @@ def triage_run(
 @triage_app.command("clusters")
 def triage_clusters_cmd(
     run_dirs: Annotated[list[Path], typer.Argument(help="Run folders or globs.")],
-    cluster: Annotated[str, typer.Option("--cluster")] = "frame_tfidf",
+    cluster: ClusterOpt = "frame_tfidf",
     provider: ProviderOpt = None,
     config: ConfigOpt = None,
 ) -> None:
-    """Debug: print clusters and scores without writing reports."""
-    options = _options(Path("."), provider or "none", None, cluster, None, None, None, True, config)
-    llm = make_provider(options.provider, use_cache=False) if cluster == "frame_embed" else None
+    """Debug: print clusters and scores without writing reports (no LLM unless frame_embed)."""
     try:
+        options = _options(Path("."), provider, None, cluster, None, None, None, True, config)
+        llm = None
+        if cluster == "frame_embed":  # the only variant that needs a model (embeddings)
+            llm = make_provider(options.provider, options.model, options.embed_model, False)
         runs = load_runs(run_dirs)
-    except FileNotFoundError as exc:
+        ranked = triage_clusters(runs, options, llm)
+    except USER_ERRORS as exc:
         console.print(f"[red]error:[/red] {exc}")
         raise typer.Exit(EXIT_ERROR) from exc
     table = Table(title=f"{len(runs)} run(s), variant {cluster}")
     for column in ("Prio", "Score", "Kind", "Signature", "Count", "Label", "Top frame"):
         table.add_column(column)
-    for c in triage_clusters(runs, options, llm):
+    for c in ranked:
         frame = c.top_frame.qualified if c.top_frame else "-"
         table.add_row(c.priority, f"{c.score:g}", c.kind, c.signature, str(c.count), c.label, frame)
     console.print(table)

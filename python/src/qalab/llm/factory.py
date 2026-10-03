@@ -34,7 +34,7 @@ def make_provider(
             embed_model=embed_model or DEFAULT_OLLAMA_EMBED_MODEL,
         )
     elif name in HOSTED:
-        raise NotImplementedError(f"provider {name!r}: hosted providers are not built yet")
+        raise ValueError(f"provider {name!r} is not built yet (optional extra, see spec 02 §9)")
     else:
         raise ValueError(f"unknown provider {name!r}")
     cache = LLMCache(cache_path) if use_cache else None

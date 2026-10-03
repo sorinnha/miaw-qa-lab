@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner
+from typer.testing import CliRunner, Result
 
 from qalab.cli import app
 
@@ -23,7 +23,7 @@ OUTPUT_FILES = (
 runner = CliRunner()
 
 
-def _invoke(args: list[str]):
+def _invoke(args: list[str]) -> Result:
     """Run the CLI; a YOU WRITE stub's NotImplementedError is re-raised so the test xfails."""
     result = runner.invoke(app, args)
     if isinstance(result.exception, NotImplementedError):
@@ -105,3 +105,62 @@ def test_triage_never_opens_labels(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     # and the guard itself works
     with pytest.raises(AssertionError):
         (SAMPLE_RUN / "labels.json").read_text()
+
+
+def test_unknown_cluster_variant_is_exit_2(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app, ["triage", "run", str(SAMPLE_RUN), "--cluster", "bogus", "--out", str(tmp_path)]
+    )
+    assert result.exit_code == 2 and "--cluster must be one of" in result.output
+
+
+def test_hosted_provider_and_missing_config_are_exit_2(tmp_path: Path) -> None:
+    hosted = runner.invoke(
+        app, ["triage", "run", str(SAMPLE_RUN), "--provider", "gemini", "--out", str(tmp_path)]
+    )
+    assert hosted.exit_code == 2 and "not built yet" in hosted.output
+    missing = runner.invoke(
+        app,
+        [
+            "triage",
+            "run",
+            str(SAMPLE_RUN),
+            "--config",
+            str(tmp_path / "x.toml"),
+            "--out",
+            str(tmp_path),
+        ],
+    )
+    assert missing.exit_code == 2
+
+
+def test_validate_reports_corrupted_labels(tmp_path: Path) -> None:
+    import shutil
+
+    run_dir = tmp_path / "run"
+    shutil.copytree(SAMPLE_RUN, run_dir, ignore=shutil.ignore_patterns("shots"))
+    (run_dir / "labels.json").write_text('{"schema": "qalab.labels/1"}', encoding="utf-8")
+    result = runner.invoke(app, ["validate", str(run_dir)])
+    assert result.exit_code == 2 and "labels.json" in result.output
+
+
+@pytest.mark.youwrite
+def test_config_values_reach_the_pipeline(tmp_path: Path) -> None:
+    toml = tmp_path / "qalab.toml"
+    toml.write_text("[triage]\nmax_reports = 2\n", encoding="utf-8")
+    out = tmp_path / "out"
+    result = _invoke(
+        [
+            "triage",
+            "run",
+            str(SAMPLE_RUN),
+            "--provider",
+            "none",
+            "--config",
+            str(toml),
+            "--out",
+            str(out),
+        ]
+    )
+    assert result.exit_code in (0, 3), result.output
+    assert len(json.loads((out / "bugs.json").read_text(encoding="utf-8"))) == 2

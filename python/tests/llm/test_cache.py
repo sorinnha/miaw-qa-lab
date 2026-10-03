@@ -74,7 +74,7 @@ def test_factory(tmp_path: Path) -> None:
     ollama = make_provider("ollama", model="x", use_cache=False)
     assert isinstance(ollama, CachedProvider) and isinstance(ollama.inner, OllamaProvider)
     assert ollama.cache is None and ollama.model == "x"
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(ValueError, match="not built yet"):
         make_provider("openai")
     with pytest.raises(ValueError):
         make_provider("gpt")

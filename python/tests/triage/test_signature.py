@@ -1,5 +1,6 @@
 import pytest
 
+from qalab.models.event import Event
 from qalab.triage.signature import (
     cell_of,
     detector_signature,
@@ -11,7 +12,7 @@ from tests.triage.fixtures import load_sample
 
 
 @pytest.fixture(scope="module")
-def events():
+def events() -> dict[int, Event]:
     return {e.seq: e for e in load_sample().events}
 
 
@@ -22,14 +23,14 @@ def test_exception_type() -> None:
     assert exception_type_of(None) == ""
 
 
-def test_candidates(events) -> None:
+def test_candidates(events: dict[int, Event]) -> None:
     assert is_candidate(events[8]) and is_candidate(events[13]) and is_candidate(events[23])
     assert not is_candidate(events[34])  # info log
     assert not is_candidate(events[4]) and not is_candidate(events[3])
     assert not is_candidate(events[13], min_level="error")
 
 
-def test_detector_signature_cells(events) -> None:
+def test_detector_signature_cells(events: dict[int, Event]) -> None:
     signature, detector, cell = detector_signature(events[23])
     assert detector == "fell_out_of_world" and cell == (6, 3)  # pos (26.4, -12, 14.1) / 4
     assert len(signature) == 12 and int(signature, 16) >= 0
@@ -39,7 +40,7 @@ def test_detector_signature_cells(events) -> None:
 
 
 @pytest.mark.youwrite
-def test_log_signatures(events) -> None:
+def test_log_signatures(events: dict[int, Event]) -> None:
     sb01, *_ = log_signature(events[8])
     sb04, *_ = log_signature(events[18])
     assert sb01 != sb04  # same message, different frames

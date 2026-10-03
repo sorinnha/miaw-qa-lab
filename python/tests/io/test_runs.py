@@ -98,3 +98,14 @@ def test_loader_never_opens_labels(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(Path, "open", guarded_open)
     assert load_run(SAMPLE_RUN).report.ok
+
+
+def test_invalid_ratio_warning(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    run_dir = _copy_run(tmp_path)
+    events_path = run_dir / "events.jsonl"
+    lines = events_path.read_text(encoding="utf-8").splitlines()
+    lines[3] = "broken"
+    events_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    with caplog.at_level("WARNING"):
+        load_run(run_dir)
+    assert "1 of 38 event lines are invalid" in caplog.text

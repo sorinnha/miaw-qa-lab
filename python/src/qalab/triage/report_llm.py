@@ -136,8 +136,16 @@ def ground_draft(draft: LLMBugDraft, context: ClusterContext, cluster: Cluster) 
         )
     if draft.confidence < MIN_CONFIDENCE:
         reasons.append(f"low confidence ({draft.confidence:.2f})")
+    reasons.extend(crash_reasons(context))
 
     return Grounded(evidence=evidence, steps=steps, docs_used=docs_used, reasons=reasons)
+
+
+def crash_reasons(context: ClusterContext) -> list[str]:
+    """Spec 00: the last error before an unclean exit is flagged as a possible crash."""
+    if context.facts.get("last_before_crash"):
+        return ["last error before the run ended without ended_at (possible crash)"]
+    return []
 
 
 # ---- entry point --------------------------------------------------------------------------
@@ -154,7 +162,7 @@ def generate_report(
 ) -> BugReport:
     """One cluster → one BugReport. ``provider=None`` means the template report."""
     if provider is None:
-        return template_report(cluster, context, bug_id)
+        return template_report(cluster, context, bug_id, crash_reasons(context))
     prompt = prompt or load_prompt("triage_v1")
     system = prompt.render_system()
     user = prompt.render_user(**context.to_prompt_vars())
@@ -173,7 +181,9 @@ def generate_report(
     if outcome.draft is None:
         reason = f"LLM draft failed after {outcome.attempts} attempt(s): {outcome.last_error}"
         log.warning("%s: %s", bug_id, reason)
-        return template_report(cluster, context, bug_id, [reason], generator)
+        return template_report(
+            cluster, context, bug_id, [reason, *crash_reasons(context)], generator
+        )
     return llm_report(outcome.draft, cluster, context, bug_id, generator)
 
 

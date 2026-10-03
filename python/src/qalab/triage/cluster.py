@@ -6,11 +6,28 @@ M2 must fill it exactly as documented here. Members are kept sorted by ``(run_id
 
 from __future__ import annotations
 
+import logging
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import Literal
 
+import numpy as np
+from sklearn.cluster import DBSCAN
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+from qalab.io.runs import LoadedRun
+from qalab.llm.base import LLMProvider
 from qalab.models.bug import BugKind, EventRef, Priority
 from qalab.models.event import DetectorSeverity, Event, Level
+from qalab.triage.signature import detector_signature, is_candidate, log_signature
 from qalab.triage.stack import Frame, app_frames_of
+
+log = logging.getLogger(__name__)
+
+Variant = Literal["exact", "frame_tfidf", "frame_embed", "tfidf_only"]
+VARIANTS: tuple[Variant, ...] = ("exact", "frame_tfidf", "frame_embed", "tfidf_only")
+# Highest first: when variants merge clusters of different levels the keeper takes the worst.
+LEVEL_ORDER = ("exception", "assert", "error", "warning", "info")
 
 
 @dataclass
@@ -125,27 +142,6 @@ class Cluster:
 #
 # ``exact`` groups candidate events by signature; the other variants then merge log clusters
 # with union-find in a deterministic order (sorted by signature) so results are reproducible.
-
-import logging  # noqa: E402
-from collections.abc import Mapping  # noqa: E402
-from typing import Literal  # noqa: E402
-
-import numpy as np  # noqa: E402
-from sklearn.cluster import DBSCAN  # noqa: E402
-from sklearn.feature_extraction.text import TfidfVectorizer  # noqa: E402
-
-from qalab.io.runs import LoadedRun  # noqa: E402
-from qalab.llm.base import LLMProvider  # noqa: E402
-from qalab.triage.signature import (  # noqa: E402
-    detector_signature,
-    is_candidate,
-    log_signature,
-)
-
-log = logging.getLogger(__name__)
-
-Variant = Literal["exact", "frame_tfidf", "frame_embed", "tfidf_only"]
-VARIANTS: tuple[Variant, ...] = ("exact", "frame_tfidf", "frame_embed", "tfidf_only")
 
 
 class UnionFind:
@@ -266,7 +262,20 @@ def _apply_union(clusters: list[Cluster], uf: UnionFind) -> list[Cluster]:
         keeper.members.extend(cluster.members)
         keeper.merged_from.append(cluster.signature)
         keeper.merged_from.extend(cluster.merged_from)
+        _take_worst_level(keeper, cluster)
     return [_sorted(c) for c in roots.values()]
+
+
+def _take_worst_level(keeper: Cluster, other: Cluster) -> None:
+    """A merged log cluster keeps the most severe level and the first non-empty exception type."""
+    if keeper.kind != "log":
+        return
+    if other.level and (
+        keeper.level is None or LEVEL_ORDER.index(other.level) < LEVEL_ORDER.index(keeper.level)
+    ):
+        keeper.level = other.level
+    if not keeper.exception_type:
+        keeper.exception_type = other.exception_type
 
 
 def merge_log_clusters(
@@ -278,6 +287,8 @@ def merge_log_clusters(
     tfidf_only_threshold: float = 0.8,
 ) -> list[Cluster]:
     """Spec §5 variants on top of exact grouping. Detector clusters pass through untouched."""
+    if variant not in VARIANTS:
+        raise ValueError(f"unknown cluster variant {variant!r}; use one of {', '.join(VARIANTS)}")
     if variant == "exact":
         return list(clusters)
     logs = sorted((c for c in clusters if c.kind == "log"), key=lambda c: c.signature)
@@ -291,7 +302,9 @@ def merge_log_clusters(
         matrix = provider.embed(texts)
         threshold = frame_embed_threshold
     else:
-        matrix = TfidfVectorizer().fit_transform(texts).toarray()
+        # token_pattern keeps 1-char tokens and placeholders like <n>, so an all-placeholder
+        # corpus can't raise "empty vocabulary".
+        matrix = TfidfVectorizer(token_pattern=r"(?u)\S+").fit_transform(texts).toarray()
         threshold = frame_tfidf_threshold if variant == "frame_tfidf" else tfidf_only_threshold
     similarity = matrix @ matrix.T  # rows are L2-normalized, so this is cosine
     uf = UnionFind(len(logs))

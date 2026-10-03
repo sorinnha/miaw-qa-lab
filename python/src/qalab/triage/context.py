@@ -158,6 +158,7 @@ class ClusterContext:
             "actions": [asdict(a) for a in self.actions],
             "logs": [asdict(line) for line in self.logs],
             "docs": [asdict(d) for d in self.docs],
+            "screenshots": list(self.screenshots),
             "code": self.code,
         }
 
@@ -192,6 +193,10 @@ def build_context(
 
 def cluster_facts(cluster: Cluster, runs: Mapping[str, LoadedRun]) -> dict[str, Any]:
     builds = sorted({runs[r].run.build_label for r in cluster.run_ids if r in runs})
+    last_before_crash = any(
+        r in runs and runs[r].suspected_crash and _is_last_candidate(cluster, runs[r])
+        for r in cluster.run_ids
+    )
     platforms = sorted(
         {
             runs[r].run.build.platform
@@ -215,9 +220,25 @@ def cluster_facts(cluster: Cluster, runs: Mapping[str, LoadedRun]) -> dict[str, 
         "first_t": cluster.first_t,
         "last_t": cluster.last_t,
         "suspected_crash": crash,
+        "last_before_crash": last_before_crash or None,
         "top_frame": cluster.top_frame.qualified if cluster.top_frame else None,
     }
     return {k: v for k, v in facts.items() if v not in (None, "", [])}
+
+
+def _is_last_candidate(cluster: Cluster, run: LoadedRun) -> bool:
+    """True when this cluster holds the last warning+/detector event of a run that never ended."""
+    last = next(
+        (e for e in reversed(run.events) if _is_candidate_event(e)),
+        None,
+    )
+    return last is not None and any(
+        m.event.run_id == run.run.run_id and m.event.seq == last.seq for m in cluster.members
+    )
+
+
+def _is_candidate_event(event: Event) -> bool:
+    return event.kind == "detector" or (event.kind == "log" and event.level != "info")
 
 
 def evidence_items(cluster: Cluster) -> list[EvidenceItem]:

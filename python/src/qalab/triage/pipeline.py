@@ -76,8 +76,16 @@ def load_runs(run_dirs: Sequence[str | Path]) -> dict[str, LoadedRun]:
     found = discover_runs(run_dirs)
     if not found:
         raise FileNotFoundError(f"no run folders under {', '.join(map(str, run_dirs))}")
-    runs = [load_run(path) for path in found]
-    return {r.run.run_id: r for r in runs}
+    runs: dict[str, LoadedRun] = {}
+    for path in found:
+        loaded = load_run(path)
+        if loaded.run.run_id in runs:
+            raise ValueError(
+                f"run_id {loaded.run.run_id!r} appears in both {runs[loaded.run.run_id].run_dir}"
+                f" and {path}; run ids must be unique"
+            )
+        runs[loaded.run.run_id] = loaded
+    return runs
 
 
 def triage_clusters(
