@@ -9,6 +9,24 @@ AI-assisted game QA for Unity. A seeded autoplay bot explores your game and catc
 - **Vision:** finds missing textures, black screens and broken UI using heuristics, a VLM, or both.
 - **Benchmark:** 16 seeded bugs in a sandbox project, so every result is measured.
 
-The full README (demo, quick start, results, data handling, how it was built) is written in milestones M3 and M7.
+## Quick start (triage)
+
+```powershell
+py -3.12 -m venv .venv ; .\.venv\Scripts\Activate.ps1 ; pip install -e ".\python[dev]"
+qalab validate samples\sample_run
+qalab triage run samples\sample_run --provider fake --docs docs\sandbox_design.md --out out\sample_report
+```
+
+Linux/macOS: `python3 -m venv .venv && . .venv/bin/activate && pip install -e "./python[dev]"`, then the same `qalab` commands with `/`.
+
+`qalab triage run` writes `bugs.json`, `report.md`, `bugs_jira.csv`, a self-contained `report.html`, plus `clusters.json`, `validation_report.json` and `triage_meta.json`. Exit code 3 means a P1 bug was found (CI can fail on it). Providers: `ollama` (default, local), `fake` (deterministic, used by the tests), `none` (template reports, TF-IDF retrieval). Tunables live in `qalab.toml`.
+
+Two functions are written by hand as learning tasks (`normalize_message`, `cosine_top_k`); until they exist the end-to-end run raises `NotImplementedError("YOU WRITE")` and their tests are expected failures (`pytest python -m youwrite -rxX`).
+
+## Data handling
+
+The default provider is a local model through Ollama: logs, screenshots and design docs never leave the machine. Hosted providers are optional extras; some free tiers may use what you send to improve their products, so read the provider's terms and only send sandbox data unless you know it is allowed. API keys live in `.env` (gitignored) and are never logged.
+
+The rest of the README (demo, measured results, how it was built) is written in milestones M5 and M7. Every number there will come from a script in this repo.
 
 License: MIT
