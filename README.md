@@ -1,5 +1,7 @@
 # Miaw QA Lab
 
+[![python-ci](https://github.com/sorinnha/miaw-qa-lab/actions/workflows/python-ci.yml/badge.svg)](https://github.com/sorinnha/miaw-qa-lab/actions/workflows/python-ci.yml)
+
 AI-assisted game QA for Unity. A seeded autoplay bot explores your game and catches bugs, and a Python tool turns the logs and screenshots into ranked, evidence-backed bug reports.
 
 > **Status:** in development. See [docs/PLAN.md](docs/PLAN.md) for the roadmap and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the design.

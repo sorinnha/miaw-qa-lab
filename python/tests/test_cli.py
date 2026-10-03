@@ -164,3 +164,25 @@ def test_config_values_reach_the_pipeline(tmp_path: Path) -> None:
     )
     assert result.exit_code in (0, 3), result.output
     assert len(json.loads((out / "bugs.json").read_text(encoding="utf-8"))) == 2
+
+
+def _invalid_cases() -> list[dict]:
+    return json.loads(
+        (REPO / "schemas" / "examples" / "events_invalid.json").read_text(encoding="utf-8")
+    )
+
+
+@pytest.mark.parametrize("case", _invalid_cases(), ids=lambda c: c["why"])
+def test_validate_rejects_every_invalid_example(tmp_path: Path, case: dict) -> None:
+    """M0 acceptance: qalab validate rejects each item of events_invalid.json."""
+    import shutil
+
+    run_dir = tmp_path / "run"
+    shutil.copytree(SAMPLE_RUN, run_dir, ignore=shutil.ignore_patterns("shots", "labels.json"))
+    events_path = run_dir / "events.jsonl"
+    lines = events_path.read_text(encoding="utf-8").splitlines()
+    lines[8] = json.dumps(case["event"])  # replace the seq-8 log line with the bad event
+    events_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    result = runner.invoke(app, ["validate", str(run_dir)])
+    assert result.exit_code == 2, case["why"]
+    assert "line 9:" in result.output
