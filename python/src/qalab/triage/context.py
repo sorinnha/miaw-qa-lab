@@ -192,6 +192,13 @@ def build_context(
 
 def cluster_facts(cluster: Cluster, runs: Mapping[str, LoadedRun]) -> dict[str, Any]:
     builds = sorted({runs[r].run.build_label for r in cluster.run_ids if r in runs})
+    platforms = sorted(
+        {
+            runs[r].run.build.platform
+            for r in cluster.run_ids
+            if r in runs and runs[r].run.build and runs[r].run.build.platform
+        }
+    )
     crash = any(runs[r].suspected_crash for r in cluster.run_ids if r in runs)
     facts: dict[str, Any] = {
         "signature": cluster.signature,
@@ -204,6 +211,7 @@ def cluster_facts(cluster: Cluster, runs: Mapping[str, LoadedRun]) -> dict[str, 
         "runs": cluster.runs_affected,
         "scenes": cluster.scenes,
         "builds": builds,
+        "platforms": platforms,
         "first_t": cluster.first_t,
         "last_t": cluster.last_t,
         "suspected_crash": crash,

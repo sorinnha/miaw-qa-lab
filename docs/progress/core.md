@@ -27,9 +27,16 @@ plus the pydantic models. Clustering/ranking (§2–§6) and outputs (§11) belo
   trim E→L→D, `resolve("E2")` → `EventRef`, `to_prompt_vars()` for the Jinja prompt).
   Fixture clusters: `tests/triage/fixtures.py`.
 
+- `qalab.triage.prompts`: loads `prompts/triage_v1.md` (version from its comment, system/user split).
+- `qalab.triage.report_template`: template report (title form, A-list steps, `expected=unknown`).
+- `qalab.triage.report_llm`: `generate_report()` = prompt → `request_draft()` (≤ 1 + max_retries,
+  error fed back) → `ground_draft()` (every §8 check → `review_reasons`) → `BugReport`;
+  template fallback with `needs_review`. Tests: `tests/triage/test_report.py`.
+
 ## Next
 
-- Item 4: §8 `report_llm.py` + `report_template.py` (prompt, retries, grounding checks).
+- Item 5: §10 RAG (`rag/chunk.py`, `index.py`, `retrieve.py` with YOU WRITE `cosine_top_k`,
+  TF-IDF retriever, `code_context.py`).
 
 ## Open questions
 
