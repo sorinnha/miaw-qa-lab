@@ -1,14 +1,22 @@
-"""Tunables from ``qalab.toml`` (spec 02 §12) with the spec's defaults built in."""
+"""Tunables from ``qalab.toml`` (spec 02 §12) with the spec's defaults built in, plus ``.env``."""
 
 from __future__ import annotations
 
 import logging
+import os
+import re
 import tomllib
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
 log = logging.getLogger(__name__)
+
+# 'GEMINI_API_KEY=abc' → ("GEMINI_API_KEY", "abc"); 'export X="a b"' → ("X", '"a b"')
+_DOTENV_LINE = re.compile(
+    r"^\s*(?:export\s+)?(?P<key>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?P<value>.*?)\s*$"
+)
+NO_DOTENV_ENV = "QALAB_NO_DOTENV"
 
 
 @dataclass
@@ -86,3 +94,32 @@ def load_config(path: Path | None = None) -> Config:
     elif path is not None:
         raise FileNotFoundError(path)
     return config
+
+
+def load_dotenv(path: Path = Path(".env")) -> list[str]:
+    """Copy ``KEY=value`` lines from ``.env`` into the environment, without overriding.
+
+    Variables already set in the shell win. Blank lines and ``#`` comments are skipped; matching
+    single or double quotes around a value are removed. Returns the names it set (never the values,
+    which may be API keys). A missing file is fine: everything can come from the shell instead.
+    """
+    if not path.is_file():
+        return []
+    loaded: list[str] = []
+    with path.open(encoding="utf-8") as f:
+        for line in f:
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            match = _DOTENV_LINE.match(line)
+            if not match:
+                continue
+            key, value = match.group("key"), match.group("value")
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+                value = value[1:-1]
+            if key in os.environ or not value:
+                continue
+            os.environ[key] = value
+            loaded.append(key)
+    if loaded:
+        log.info(".env: set %s", ", ".join(sorted(loaded)))
+    return loaded

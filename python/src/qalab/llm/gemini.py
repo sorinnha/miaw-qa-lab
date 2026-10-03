@@ -1,4 +1,4 @@
-"""Gemini provider (hosted, optional ``[gemini]`` extra) using Google's official ``google-genai`` SDK.
+"""Gemini provider (hosted, optional ``[gemini]`` extra) on Google's official ``google-genai`` SDK.
 
 - ``complete_json``: ``generate_content`` with structured output (``response_json_schema``),
   temperature 0 by default, and screenshots as inline image parts.
@@ -24,8 +24,8 @@ from qalab.llm.base import (
     LLMOutputError,
     LLMResult,
     Timer,
-    parse_json_object,
     normalize_rows,
+    parse_json_object,
 )
 
 log = logging.getLogger("qalab.llm")

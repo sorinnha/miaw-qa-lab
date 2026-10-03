@@ -11,7 +11,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from qalab.config import load_config
+from qalab.config import NO_DOTENV_ENV, load_config, load_dotenv
 from qalab.io.runs import discover_runs, validate_labels_file, validate_run
 from qalab.llm.base import LLMError
 from qalab.llm.factory import make_provider
@@ -46,6 +46,10 @@ ProviderOpt = Annotated[
 @app.callback()
 def _setup(verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False) -> None:
     logging.basicConfig(level=logging.INFO if verbose else logging.WARNING)
+    # Keys and model names may live in .env (gitignored). Tests set QALAB_NO_DOTENV so a real key in
+    # a developer's .env is never read during pytest.
+    if not os.environ.get(NO_DOTENV_ENV):
+        load_dotenv(Path(".env"))
 
 
 @app.command()
@@ -88,12 +92,18 @@ def _options(
     config = load_config(config_path)
     if cluster not in VARIANTS:
         raise ValueError(f"--cluster must be one of {', '.join(VARIANTS)}, not {cluster!r}")
-    name = provider or os.environ.get("QALAB_PROVIDER") or config.llm.provider
+    name = (provider or os.environ.get("QALAB_PROVIDER") or config.llm.provider).lower()
+    # qalab.toml's model names belong to qalab.toml's provider: a Gemini model name must not be sent
+    # to Ollama when someone runs --provider ollama.
+    same_provider = name == config.llm.provider.lower()
     return TriageOptions(
         out=out,
         provider=name,
-        model=model or config.llm.model,
-        embed_model=config.llm.embed_model,
+        model=model
+        or os.environ.get("QALAB_MODEL")
+        or (config.llm.model if same_provider else None),
+        embed_model=os.environ.get("QALAB_EMBED_MODEL")
+        or (config.llm.embed_model if same_provider else None),
         variant=cluster,  # type: ignore[arg-type]
         max_reports=max_reports or config.triage.max_reports,
         docs=list(docs or []),

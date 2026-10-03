@@ -18,7 +18,13 @@ p3 = 3.0
 crash_multiplier = 1.25
 
 [llm]
-provider = "ollama"          # overridden by QALAB_PROVIDER / --provider
+# Sora's PC has no Ollama, so the hosted Gemini API is the configured provider (DECISIONS D-021).
+# Needs GEMINI_API_KEY in .env and the [gemini] extra. Send sandbox data only (README, Data handling).
+# Precedence: --provider > QALAB_PROVIDER > this file. model/embed_model apply to this provider only;
+# QALAB_MODEL / QALAB_EMBED_MODEL and --model override them.
+provider = "gemini"
+model = "gemini-2.5-flash"
+embed_model = "gemini-embedding-001"
 temperature = 0.0
 max_retries = 2
 
