@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "qalab.labels/1",
+  "title": "Ground truth for a benchmark run: labels.json",
+  "description": "Written by the Unity sandbox in benchmark mode. ONLY `qalab eval` may read this file. Triage and vision inference code must never open it.",
+  "type": "object",
+  "required": ["schema", "run_id", "seeded_bugs", "screenshots"],
+  "properties": {
+    "schema": { "const": "qalab.labels/1" },
+    "run_id": { "type": "string" },
+    "seeded_bugs": { "type": "array", "items": { "$ref": "#/$defs/seededBug" } },
+    "screenshots": { "type": "array", "items": { "$ref": "#/$defs/shotLabel" } }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "vec3": { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 },
+    "visualLabel": { "enum": ["missing_texture", "black_screen", "ui_overflow", "placeholder_ui"] },
+    "seededBug": {
+      "type": "object",
+      "required": ["bug_id", "type", "feature", "expected_severity", "match"],
+      "properties": {
+        "bug_id": { "type": "string", "pattern": "^SB[0-9]{2}$" },
+        "type": { "enum": ["log", "detector", "visual"] },
+        "title": { "type": "string" },
+        "feature": { "type": "string", "description": "Exact H2 heading in docs/sandbox_design.md (retrieval ground truth)." },
+        "expected_severity": { "enum": ["S1", "S2", "S3", "S4"] },
+        "match": {
+          "type": "object",
+          "description": "How eval maps events to this bug. All given keys must match.",
+          "minProperties": 1,
+          "properties": {
+            "stack_contains": { "type": "string" },
+            "message_regex": { "type": "string" },
+            "detector": { "type": "string" },
+            "near": { "$ref": "#/$defs/vec3" },
+            "radius": { "type": "number", "exclusiveMinimum": 0 },
+            "visual_label": { "$ref": "#/$defs/visualLabel" }
+          },
+          "additionalProperties": false
+        },
+        "triggers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["t"],
+            "properties": {
+              "t": { "type": "number", "minimum": 0 },
+              "scene": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "shotLabel": {
+      "type": "object",
+      "required": ["path", "labels"],
+      "properties": {
+        "path": { "type": "string" },
+        "t": { "type": "number", "minimum": 0 },
+        "labels": { "type": "array", "items": { "$ref": "#/$defs/visualLabel" }, "uniqueItems": true, "description": "Empty = clean frame." },
+        "bug_ids": { "type": "array", "items": { "type": "string", "pattern": "^SB[0-9]{2}$" } }
+      },
+      "additionalProperties": false
+    }
+  }
+}

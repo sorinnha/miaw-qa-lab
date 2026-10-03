@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "qalab.event/1",
+  "title": "QA Lab event: one line of events.jsonl",
+  "description": "Written by the Unity package, read by the Python tools. One JSON object per line, UTF-8, LF line endings.",
+  "type": "object",
+  "required": ["schema", "run_id", "seq", "t", "kind"],
+  "properties": {
+    "schema": { "const": "qalab.event/1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "seq": { "type": "integer", "minimum": 0, "description": "Monotonic per run, starts at 0, no gaps." },
+    "t": { "type": "number", "minimum": 0, "description": "Seconds since run start (Stopwatch, thread-safe)." },
+    "ts": { "type": "string", "format": "date-time", "description": "UTC wall-clock time, ISO 8601." },
+    "frame": { "type": "integer", "minimum": 0, "description": "Approximate frame number (cached on the main thread)." },
+    "kind": { "enum": ["log", "action", "detector", "metric", "screenshot", "marker"] },
+    "level": { "enum": ["info", "warning", "error", "exception", "assert"], "description": "Required when kind = log. Maps Unity LogType Log/Warning/Error/Exception/Assert." },
+    "message": { "type": "string" },
+    "stack": { "type": ["string", "null"], "description": "Unity stack trace text, frames separated by \\n." },
+    "scene": { "type": ["string", "null"] },
+    "pos": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/vec3" }],
+      "description": "Player world position [x, y, z] when known."
+    },
+    "data": { "type": "object", "description": "Kind-specific payload, see $defs." }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "log" } } },
+      "then": { "required": ["level", "message"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "action" } } },
+      "then": { "required": ["data"], "properties": { "data": { "$ref": "#/$defs/actionData" } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "detector" } } },
+      "then": { "required": ["data"], "properties": { "data": { "$ref": "#/$defs/detectorData" } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "metric" } } },
+      "then": { "required": ["data"], "properties": { "data": { "$ref": "#/$defs/metricData" } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "screenshot" } } },
+      "then": { "required": ["data"], "properties": { "data": { "$ref": "#/$defs/screenshotData" } } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "marker" } } },
+      "then": { "required": ["data"], "properties": { "data": { "$ref": "#/$defs/markerData" } } }
+    }
+  ],
+  "$defs": {
+    "vec3": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "actionData": {
+      "type": "object",
+      "required": ["action", "step"],
+      "properties": {
+        "action": { "type": "string", "description": "e.g. move_to, interact, click, open_inventory, respawn, end_turn" },
+        "step": { "type": "integer", "minimum": 0, "description": "Bot step counter, starts at 1." },
+        "adapter": { "type": "string" },
+        "target": { "$ref": "#/$defs/vec3" },
+        "ui_path": { "type": "string", "description": "Hierarchy path of the clicked UI element." },
+        "args": { "type": "object" }
+      },
+      "additionalProperties": false
+    },
+    "detectorData": {
+      "type": "object",
+      "required": ["detector", "severity"],
+      "properties": {
+        "detector": {
+          "type": "string",
+          "pattern": "^[a-z0-9_]+(:[a-z0-9_]+)?$",
+          "description": "stuck, fell_out_of_world, perf_spike, exception_burst, tunneling, or visual:<label> (added by Python)."
+        },
+        "severity": { "enum": ["blocker", "critical", "major", "minor", "trivial"] },
+        "details": { "type": "object" },
+        "screenshot": { "type": "string", "description": "Path relative to the run folder." }
+      },
+      "additionalProperties": false
+    },
+    "metricData": {
+      "type": "object",
+      "properties": {
+        "fps": { "type": "number", "minimum": 0 },
+        "frame_ms": { "type": "number", "minimum": 0 },
+        "frame_ms_p95": { "type": "number", "minimum": 0 },
+        "mem_mb": { "type": "number", "minimum": 0 },
+        "gc_mb": { "type": "number", "minimum": 0 }
+      },
+      "additionalProperties": { "type": "number" }
+    },
+    "screenshotData": {
+      "type": "object",
+      "required": ["path", "reason"],
+      "properties": {
+        "path": { "type": "string", "description": "Relative to the run folder, e.g. shots/000003.png" },
+        "reason": { "enum": ["periodic", "detector", "manual"] },
+        "w": { "type": "integer", "minimum": 1 },
+        "h": { "type": "integer", "minimum": 1 },
+        "method": { "enum": ["screen_capture", "camera_render"] }
+      },
+      "additionalProperties": false
+    },
+    "markerData": {
+      "type": "object",
+      "required": ["marker"],
+      "properties": {
+        "marker": { "enum": ["run_start", "run_end", "scene_loaded", "scene_unloaded", "bot_started", "bot_stopped"] },
+        "details": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

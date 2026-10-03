@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "qalab.visual_finding/1",
+  "title": "One screenshot analysis result: a line of visual_findings.jsonl",
+  "type": "object",
+  "required": ["schema", "run_id", "shot", "method", "labels"],
+  "properties": {
+    "schema": { "const": "qalab.visual_finding/1" },
+    "run_id": { "type": "string" },
+    "shot": { "type": "string", "description": "Path relative to the run folder." },
+    "t": { "type": ["number", "null"] },
+    "scene": { "type": ["string", "null"] },
+    "pos": { "oneOf": [{ "type": "null" }, { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }] },
+    "method": { "enum": ["heuristic", "vlm", "ml", "hybrid"] },
+    "labels": {
+      "type": "array",
+      "description": "Empty = no bug found.",
+      "items": {
+        "type": "object",
+        "required": ["label", "score"],
+        "properties": {
+          "label": { "enum": ["missing_texture", "black_screen", "ui_overflow", "placeholder_ui"] },
+          "score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "region": {
+            "type": "array",
+            "items": { "type": "number", "minimum": 0, "maximum": 1 },
+            "minItems": 4,
+            "maxItems": 4,
+            "description": "Normalized x, y, w, h."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "explanation": { "type": "string" },
+    "model": { "type": ["string", "null"] },
+    "latency_ms": { "type": "number", "minimum": 0 },
+    "cached": { "type": "boolean" }
+  },
+  "additionalProperties": false
+}

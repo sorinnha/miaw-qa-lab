@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "qalab.llm_vision/1",
+  "title": "VLM screenshot verdict: the structured output requested from the vision model",
+  "description": "Flat on purpose so every provider's structured-output mode accepts it. An empty labels list means the frame looks normal.",
+  "type": "object",
+  "properties": {
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "label": { "type": "string", "enum": ["missing_texture", "black_screen", "ui_overflow", "placeholder_ui"] },
+          "score": { "type": "number" }
+        },
+        "required": ["label", "score"],
+        "additionalProperties": false
+      }
+    },
+    "explanation": { "type": "string" }
+  },
+  "required": ["labels", "explanation"],
+  "additionalProperties": false
+}

@@ -1,0 +1,252 @@
+[
+  {
+    "why": "missing seq",
+    "event": {
+      "schema": "qalab.event/1",
+      "run_id": "20261005T103000Z-s42",
+      "t": 8.21,
+      "ts": "2026-10-05T10:30:08.210Z",
+      "frame": 492,
+      "kind": "log",
+      "scene": "Sandbox_Level01",
+      "pos": [
+        7.6,
+        0.0,
+        4.8
+      ],
+      "level": "exception",
+      "message": "NullReferenceException: Object reference not set to an instance of an object",
+      "stack": "QALab.Sandbox.SeededDoor.Open () (at Assets/Sandbox/Scripts/SeededBugs/SeededDoor.cs:27)\nQALab.Sandbox.Interactor.TryInteract (UnityEngine.GameObject target) (at Assets/Sandbox/Scripts/Interactor.cs:41)\nMiawWorks.QALab.Bot.NavMeshExplorerAdapter.Step (MiawWorks.QALab.Bot.BotContext ctx) (at Packages/com.miawworks.qalab/Runtime/Bot/NavMeshExplorerAdapter.cs:88)\nMiawWorks.QALab.Bot.BotRunner.Update () (at Packages/com.miawworks.qalab/Runtime/Bot/BotRunner.cs:64)"
+    }
+  },
+  {
+    "why": "log event without level",
+    "event": {
+      "schema": "qalab.event/1",
+      "run_id": "20261005T103000Z-s42",
+      "seq": 8,
+      "t": 8.21,
+      "ts": "2026-10-05T10:30:08.210Z",
+      "frame": 492,
+      "kind": "log",
+      "scene": "Sandbox_Level01",
+      "pos": [
+        7.6,
+        0.0,
+        4.8
+      ],
+      "message": "NullReferenceException: Object reference not set to an instance of an object",
+      "stack": "QALab.Sandbox.SeededDoor.Open () (at Assets/Sandbox/Scripts/SeededBugs/SeededDoor.cs:27)\nQALab.Sandbox.Interactor.TryInteract (UnityEngine.GameObject target) (at Assets/Sandbox/Scripts/Interactor.cs:41)\nMiawWorks.QALab.Bot.NavMeshExplorerAdapter.Step (MiawWorks.QALab.Bot.BotContext ctx) (at Packages/com.miawworks.qalab/Runtime/Bot/NavMeshExplorerAdapter.cs:88)\nMiawWorks.QALab.Bot.BotRunner.Update () (at Packages/com.miawworks.qalab/Runtime/Bot/BotRunner.cs:64)"
+    }
+  },
+  {
+    "why": "unknown kind",
+    "event": {
+      "schema": "qalab.event/1",
+      "run_id": "20261005T103000Z-s42",
+      "seq": 8,
+      "t": 8.21,
+      "ts": "2026-10-05T10:30:08.210Z",
+      "frame": 492,
+      "kind": "crash",
+      "scene": "Sandbox_Level01",
+      "pos": [
+        7.6,
+        0.0,
+        4.8
+      ],
+      "level": "exception",
+      "message": "NullReferenceException: Object reference not set to an instance of an object",
+      "stack": "QALab.Sandbox.SeededDoor.Open () (at Assets/Sandbox/Scripts/SeededBugs/SeededDoor.cs:27)\nQALab.Sandbox.Interactor.TryInteract (UnityEngine.GameObject target) (at Assets/Sandbox/Scripts/Interactor.cs:41)\nMiawWorks.QALab.Bot.NavMeshExplorerAdapter.Step (MiawWorks.QALab.Bot.BotContext ctx) (at Packages/com.miawworks.qalab/Runtime/Bot/NavMeshExplorerAdapter.cs:88)\nMiawWorks.QALab.Bot.BotRunner.Update () (at Packages/com.miawworks.qalab/Runtime/Bot/BotRunner.cs:64)"
+    }
+  },
+  {
+    "why": "pos must have exactly 3 numbers",
+    "event": {
+      "schema": "qalab.event/1",
+      "run_id": "20261005T103000Z-s42",
+      "seq": 8,
+      "t": 8.21,
+      "ts": "2026-10-05T10:30:08.210Z",
+      "frame": 492,
+      "kind": "log",
+      "scene": "Sandbox_Level01",
+      "pos": [
+        1.0,
+        2.0
+      ],
+      "level": "exception",
+      "message": "NullReferenceException: Object reference not set to an instance of an object",
+      "stack": "QALab.Sandbox.SeededDoor.Open () (at Assets/Sandbox/Scripts/SeededBugs/SeededDoor.cs:27)\nQALab.Sandbox.Interactor.TryInteract (UnityEngine.GameObject target) (at Assets/Sandbox/Scripts/Interactor.cs:41)\nMiawWorks.QALab.Bot.NavMeshExplorerAdapter.Step (MiawWorks.QALab.Bot.BotContext ctx) (at Packages/com.miawworks.qalab/Runtime/Bot/NavMeshExplorerAdapter.cs:88)\nMiawWorks.QALab.Bot.BotRunner.Update () (at Packages/com.miawworks.qalab/Runtime/Bot/BotRunner.cs:64)"
+    }
+  },
+  {
+    "why": "negative t",
+    "event": {
+      "schema": "qalab.event/1",
+      "run_id": "20261005T103000Z-s42",
+      "seq": 8,
+      "t": -0.5,
+      "ts": "2026-10-05T10:30:08.210Z",
+      "frame": 492,
+      "kind": "log",
+      "scene": "Sandbox_Level01",
+      "pos": [
+        7.6,
+        0.0,
+        4.8
+      ],
+      "level": "exception",
+      "message": "NullReferenceException: Object reference not set to an instance of an object",
+      "stack": "QALab.Sandbox.SeededDoor.Open () (at Assets/Sandbox/Scripts/SeededBugs/SeededDoor.cs:27)\nQALab.Sandbox.Interactor.TryInteract (UnityEngine.GameObject target) (at Assets/Sandbox/Scripts/Interactor.cs:41)\nMiawWorks.QALab.Bot.NavMeshExplorerAdapter.Step (MiawWorks.QALab.Bot.BotContext ctx) (at Packages/com.miawworks.qalab/Runtime/Bot/NavMeshExplorerAdapter.cs:88)\nMiawWorks.QALab.Bot.BotRunner.Update () (at Packages/com.miawworks.qalab/Runtime/Bot/BotRunner.cs:64)"
+    }
+  },
+  {
+    "why": "unexpected top-level property",
+    "event": {
+      "schema": "qalab.event/1",
+      "run_id": "20261005T103000Z-s42",
+      "seq": 8,
+      "t": 8.21,
+      "ts": "2026-10-05T10:30:08.210Z",
+      "frame": 492,
+      "kind": "log",
+      "scene": "Sandbox_Level01",
+      "pos": [
+        7.6,
+        0.0,
+        4.8
+      ],
+      "level": "exception",
+      "message": "NullReferenceException: Object reference not set to an instance of an object",
+      "stack": "QALab.Sandbox.SeededDoor.Open () (at Assets/Sandbox/Scripts/SeededBugs/SeededDoor.cs:27)\nQALab.Sandbox.Interactor.TryInteract (UnityEngine.GameObject target) (at Assets/Sandbox/Scripts/Interactor.cs:41)\nMiawWorks.QALab.Bot.NavMeshExplorerAdapter.Step (MiawWorks.QALab.Bot.BotContext ctx) (at Packages/com.miawworks.qalab/Runtime/Bot/NavMeshExplorerAdapter.cs:88)\nMiawWorks.QALab.Bot.BotRunner.Update () (at Packages/com.miawworks.qalab/Runtime/Bot/BotRunner.cs:64)",
+      "player": "Sora"
+    }
+  },
+  {
+    "why": "wrong schema version",
+    "event": {
+      "schema": "qalab.event/2",
+      "run_id": "20261005T103000Z-s42",
+      "seq": 8,
+      "t": 8.21,
+      "ts": "2026-10-05T10:30:08.210Z",
+      "frame": 492,
+      "kind": "log",
+      "scene": "Sandbox_Level01",
+      "pos": [
+        7.6,
+        0.0,
+        4.8
+      ],
+      "level": "exception",
+      "message": "NullReferenceException: Object reference not set to an instance of an object",
+      "stack": "QALab.Sandbox.SeededDoor.Open () (at Assets/Sandbox/Scripts/SeededBugs/SeededDoor.cs:27)\nQALab.Sandbox.Interactor.TryInteract (UnityEngine.GameObject target) (at Assets/Sandbox/Scripts/Interactor.cs:41)\nMiawWorks.QALab.Bot.NavMeshExplorerAdapter.Step (MiawWorks.QALab.Bot.BotContext ctx) (at Packages/com.miawworks.qalab/Runtime/Bot/NavMeshExplorerAdapter.cs:88)\nMiawWorks.QALab.Bot.BotRunner.Update () (at Packages/com.miawworks.qalab/Runtime/Bot/BotRunner.cs:64)"
+    }
+  },
+  {
+    "why": "detector severity not in enum",
+    "event": {
+      "schema": "qalab.event/1",
+      "run_id": "20261005T103000Z-s42",
+      "seq": 21,
+      "t": 21.02,
+      "ts": "2026-10-05T10:30:21.020Z",
+      "frame": 1261,
+      "kind": "detector",
+      "scene": "Sandbox_Level01",
+      "pos": [
+        19.2,
+        0.0,
+        8.6
+      ],
+      "data": {
+        "detector": "perf_spike",
+        "severity": "high",
+        "details": {
+          "frame_ms": 143.2,
+          "threshold_ms": 50.0,
+          "zone": "GcZone"
+        }
+      }
+    }
+  },
+  {
+    "why": "detector name must be snake_case",
+    "event": {
+      "schema": "qalab.event/1",
+      "run_id": "20261005T103000Z-s42",
+      "seq": 21,
+      "t": 21.02,
+      "ts": "2026-10-05T10:30:21.020Z",
+      "frame": 1261,
+      "kind": "detector",
+      "scene": "Sandbox_Level01",
+      "pos": [
+        19.2,
+        0.0,
+        8.6
+      ],
+      "data": {
+        "detector": "FellOutOfWorld",
+        "severity": "minor",
+        "details": {
+          "frame_ms": 143.2,
+          "threshold_ms": 50.0,
+          "zone": "GcZone"
+        }
+      }
+    }
+  },
+  {
+    "why": "screenshot without path",
+    "event": {
+      "schema": "qalab.event/1",
+      "run_id": "20261005T103000Z-s42",
+      "seq": 5,
+      "t": 5.0,
+      "ts": "2026-10-05T10:30:05.000Z",
+      "frame": 300,
+      "kind": "screenshot",
+      "scene": "Sandbox_Level01",
+      "pos": [
+        3.1,
+        0.0,
+        1.6
+      ],
+      "data": {
+        "reason": "periodic",
+        "w": 160,
+        "h": 90,
+        "method": "screen_capture"
+      }
+    }
+  },
+  {
+    "why": "action without step",
+    "event": {
+      "schema": "qalab.event/1",
+      "run_id": "20261005T103000Z-s42",
+      "seq": 4,
+      "t": 2.1,
+      "ts": "2026-10-05T10:30:02.100Z",
+      "frame": 126,
+      "kind": "action",
+      "scene": "Sandbox_Level01",
+      "pos": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "data": {
+        "action": "move_to",
+        "adapter": "navmesh_explorer",
+        "target": [
+          4.0,
+          0.0,
+          2.0
+        ]
+      }
+    }
+  }
+]

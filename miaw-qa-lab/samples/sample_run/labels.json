@@ -1,0 +1,229 @@
+{
+  "schema": "qalab.labels/1",
+  "run_id": "20261005T103000Z-s42",
+  "seeded_bugs": [
+    {
+      "bug_id": "SB01",
+      "type": "log",
+      "title": "Door_02 throws NullReferenceException when opened (hinge not assigned)",
+      "feature": "Doors",
+      "expected_severity": "S2",
+      "match": {
+        "stack_contains": "SeededDoor.Open"
+      },
+      "triggers": [
+        {
+          "t": 8.21,
+          "scene": "Sandbox_Level01"
+        }
+      ]
+    },
+    {
+      "bug_id": "SB02",
+      "type": "log",
+      "title": "Inventory HUD requests slots beyond inventory size",
+      "feature": "Inventory",
+      "expected_severity": "S3",
+      "match": {
+        "stack_contains": "SeededInventory:GetSlot"
+      },
+      "triggers": [
+        {
+          "t": 11.32,
+          "scene": "Sandbox_Level01"
+        },
+        {
+          "t": 16.7,
+          "scene": "Sandbox_Level01"
+        }
+      ]
+    },
+    {
+      "bug_id": "SB03",
+      "type": "log",
+      "title": "Enemy registry lookup fails for unregistered enemy ids",
+      "feature": "Enemy registry",
+      "expected_severity": "S2",
+      "match": {
+        "stack_contains": "SeededEnemyRegistry.Get"
+      },
+      "triggers": [
+        {
+          "t": 20.3,
+          "scene": "Sandbox_Level01"
+        },
+        {
+          "t": 29.8,
+          "scene": "Sandbox_Level01"
+        }
+      ]
+    },
+    {
+      "bug_id": "SB04",
+      "type": "log",
+      "title": "Spawner throws NullReferenceException when spawning a wave",
+      "feature": "Spawner",
+      "expected_severity": "S2",
+      "match": {
+        "stack_contains": "SeededSpawner.SpawnWave"
+      },
+      "triggers": [
+        {
+          "t": 19.05,
+          "scene": "Sandbox_Level01"
+        }
+      ]
+    },
+    {
+      "bug_id": "SB06",
+      "type": "detector",
+      "title": "Player falls through floor tile T_17 (missing collider)",
+      "feature": "Level geometry",
+      "expected_severity": "S2",
+      "match": {
+        "detector": "fell_out_of_world",
+        "near": [
+          26.0,
+          0.0,
+          14.0
+        ],
+        "radius": 4.0
+      },
+      "triggers": [
+        {
+          "t": 26.9,
+          "scene": "Sandbox_Level01"
+        }
+      ]
+    },
+    {
+      "bug_id": "SB08",
+      "type": "detector",
+      "title": "Frame-time spikes in GcZone from large garbage allocations",
+      "feature": "Performance",
+      "expected_severity": "S3",
+      "match": {
+        "detector": "perf_spike"
+      },
+      "triggers": [
+        {
+          "t": 21.02,
+          "scene": "Sandbox_Level01"
+        }
+      ]
+    },
+    {
+      "bug_id": "SB09",
+      "type": "visual",
+      "title": "Crate_07 renders magenta (material missing)",
+      "feature": "Art assets",
+      "expected_severity": "S3",
+      "match": {
+        "visual_label": "missing_texture"
+      },
+      "triggers": [
+        {
+          "t": 30.0,
+          "scene": "Sandbox_Level01"
+        }
+      ]
+    },
+    {
+      "bug_id": "SB10",
+      "type": "visual",
+      "title": "3D view goes black for 2 s in the camera trigger zone",
+      "feature": "Camera",
+      "expected_severity": "S2",
+      "match": {
+        "visual_label": "black_screen"
+      },
+      "triggers": [
+        {
+          "t": 45.0,
+          "scene": "Sandbox_Level01"
+        }
+      ]
+    },
+    {
+      "bug_id": "SB13",
+      "type": "log",
+      "title": "Footstep warning spam for surfaces without audio clips",
+      "feature": "Audio",
+      "expected_severity": "S4",
+      "match": {
+        "message_regex": "^Footstep audio clip missing"
+      },
+      "triggers": [
+        {
+          "t": 13.5,
+          "scene": "Sandbox_Level01"
+        },
+        {
+          "t": 17.2,
+          "scene": "Sandbox_Level01"
+        },
+        {
+          "t": 31.5,
+          "scene": "Sandbox_Level01"
+        }
+      ]
+    },
+    {
+      "bug_id": "SB14",
+      "type": "log",
+      "title": "SafeDivide called with zero divisor from damage and speed code",
+      "feature": "Combat math",
+      "expected_severity": "S3",
+      "match": {
+        "stack_contains": "MathUtil:SafeDivide"
+      },
+      "triggers": [
+        {
+          "t": 34.2,
+          "scene": "Sandbox_Level01"
+        },
+        {
+          "t": 38.6,
+          "scene": "Sandbox_Level01"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "shots/000001.png",
+      "t": 5.0,
+      "labels": []
+    },
+    {
+      "path": "shots/000002.png",
+      "t": 10.0,
+      "labels": []
+    },
+    {
+      "path": "shots/000003.png",
+      "t": 26.91,
+      "labels": []
+    },
+    {
+      "path": "shots/000004.png",
+      "t": 30.0,
+      "labels": [
+        "missing_texture"
+      ],
+      "bug_ids": [
+        "SB09"
+      ]
+    },
+    {
+      "path": "shots/000005.png",
+      "t": 45.0,
+      "labels": [
+        "black_screen"
+      ],
+      "bug_ids": [
+        "SB10"
+      ]
+    }
+  ]
+}
