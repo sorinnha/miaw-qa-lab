@@ -6,6 +6,7 @@ Two retrievers share one interface: ``EmbeddingRetriever`` (dot product over the
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Protocol
@@ -20,6 +21,17 @@ from qalab.triage.cluster import Cluster
 
 DEFAULT_TOP_K = 3
 DEFAULT_MIN_SCORE = 0.25
+DEFAULT_TFIDF_MIN_SCORE = 0.1  # TF-IDF cosines run lower than embedding cosines
+
+# "SeededEnemyRegistry" → "Seeded Enemy Registry"   (CamelCase boundary)
+_CAMEL = re.compile(r"([a-z0-9])([A-Z])")
+# "fell_out_of_world" / "QALab.Sandbox.Door" → "fell out of world" / "QALab Sandbox Door"
+_SEPARATORS = re.compile(r"[_.:/\\]+")
+
+
+def split_identifiers(text: str) -> str:
+    """Make code names searchable as words: ``SeededDoor.Open`` → ``seeded door open``."""
+    return _SEPARATORS.sub(" ", _CAMEL.sub(r"\1 \2", text)).lower()
 
 
 @dataclass(frozen=True)
@@ -104,12 +116,12 @@ class TfidfRetriever:
         self,
         chunks: Sequence[Chunk],
         top_k: int = DEFAULT_TOP_K,
-        min_score: float = DEFAULT_MIN_SCORE,
+        min_score: float = DEFAULT_TFIDF_MIN_SCORE,
     ) -> None:
         self.chunks = list(chunks)
         self.top_k = top_k
         self.min_score = min_score
-        self._vectorizer = TfidfVectorizer(sublinear_tf=True)
+        self._vectorizer = TfidfVectorizer(preprocessor=split_identifiers, sublinear_tf=True)
         if self.chunks:
             self._matrix = self._vectorizer.fit_transform([c.embed_text for c in self.chunks])
 
@@ -130,8 +142,9 @@ def make_retriever(
     provider: LLMProvider | None,
     top_k: int = DEFAULT_TOP_K,
     min_score: float = DEFAULT_MIN_SCORE,
+    tfidf_min_score: float = DEFAULT_TFIDF_MIN_SCORE,
 ) -> Retriever:
     """``--provider none`` (or an index without vectors) → TF-IDF; otherwise embeddings."""
     if provider is None or not index.matrix.size:
-        return TfidfRetriever(index.chunks, top_k, min_score)
+        return TfidfRetriever(index.chunks, top_k, tfidf_min_score)
     return EmbeddingRetriever(index, provider, top_k, min_score)

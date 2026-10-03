@@ -22,6 +22,7 @@ from qalab.llm.base import (
 _PROMPT_ID = re.compile(r"^\[(?P<id>[EAD]\d+)\]", re.MULTILINE)
 # "[A3] step 3 t=8.2s interact object=Door_02" → "interact object=Door_02"
 _ACTION_LINE = re.compile(r"^\[(?P<id>A\d+)\] step \d+ t=[\d.]+s (?P<text>.*)$", re.MULTILINE)
+# "door opens slowly" → ["door", "opens", "slowly"]
 _WORD = re.compile(r"\w+")
 
 EMBED_DIM = 256

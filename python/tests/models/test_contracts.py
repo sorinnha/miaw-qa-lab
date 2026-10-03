@@ -183,3 +183,34 @@ def test_llm_draft_rejects_same_as_schema(mutate) -> None:
     assert first_error("llm_bug_draft", raw) is not None
     with pytest.raises(ValidationError):
         LLMBugDraft.model_validate(raw)
+
+
+def test_labels_model_matches_schema() -> None:
+    from qalab.models.labels import Labels
+
+    raw = json.loads((SAMPLE_RUN / "labels.json").read_text(encoding="utf-8"))
+    assert first_error("labels", raw) is None
+    labels = Labels.model_validate(raw)
+    assert labels.seeded_bugs and labels.screenshots
+    raw["seeded_bugs"][0]["match"] = {}
+    assert first_error("labels", raw) is not None
+
+
+def test_visual_finding_model_matches_schema() -> None:
+    from qalab.models.visual import VisualFinding
+
+    raw = {
+        "schema": "qalab.visual_finding/1",
+        "run_id": "r1",
+        "shot": "shots/000004.png",
+        "method": "heuristic",
+        "labels": [{"label": "missing_texture", "score": 0.9, "region": [0, 0, 0.5, 0.5]}],
+        "latency_ms": 3.0,
+        "cached": False,
+    }
+    assert first_error("visual_finding", raw) is None
+    assert VisualFinding.model_validate(raw).to_json_dict() == raw
+    raw["labels"][0]["label"] = "blurry"
+    assert first_error("visual_finding", raw) is not None
+    with pytest.raises(ValidationError):
+        VisualFinding.model_validate(raw)

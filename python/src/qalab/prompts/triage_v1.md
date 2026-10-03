@@ -45,6 +45,12 @@ DESIGN DOCS (retrieved)
 {% else -%}
 (none)
 {% endfor %}
+SCREENSHOTS (paths relative to the run folder)
+{% for s in screenshots -%}
+- {{ s }}
+{% else -%}
+(none)
+{% endfor %}
 CODE AROUND TOP FRAME
 {{ code or "(not available)" }}
 

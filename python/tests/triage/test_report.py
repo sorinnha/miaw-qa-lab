@@ -3,13 +3,17 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pytest
 
-from qalab.llm.base import LLMError
+from qalab.io.runs import LoadedRun
+from qalab.llm.base import LLMError, LLMResult
 from qalab.llm.cache import CachedProvider, LLMCache
 from qalab.llm.fake import FakeProvider
+from qalab.models.bug import BugReport
 from qalab.models.schemas import first_error
-from qalab.triage.context import build_context
+from qalab.triage.cluster import Cluster
+from qalab.triage.context import ClusterContext, build_context
 from qalab.triage.prompts import load_prompt
 from qalab.triage.report_llm import RETRY_SUFFIX, generate_report
 from qalab.triage.report_template import template_report, template_title
@@ -37,23 +41,23 @@ DOCS = [
 
 
 @pytest.fixture(scope="module")
-def runs():
+def runs() -> dict[str, LoadedRun]:
     loaded = load_sample()
     return {loaded.run.run_id: loaded}
 
 
 @pytest.fixture
-def sb03(runs):
+def sb03(runs: dict[str, LoadedRun]) -> tuple[Cluster, ClusterContext]:
     loaded = next(iter(runs.values()))
     cluster = make_cluster(loaded, SB03_ENEMY_REGISTRY, priority="P2", score=9.5)
     return cluster, build_context(cluster, runs, docs=DOCS)
 
 
-def _valid(report) -> None:
+def _valid(report: BugReport) -> None:
     assert first_error("bug_report", report.to_json_dict()) is None
 
 
-def test_prompt_loads_and_renders(sb03) -> None:
+def test_prompt_loads_and_renders(sb03: tuple[Cluster, ClusterContext]) -> None:
     cluster, context = sb03
     prompt = load_prompt("triage_v1")
     assert prompt.version == "triage-v1"
@@ -64,7 +68,7 @@ def test_prompt_loads_and_renders(sb03) -> None:
     assert "(not available)" in user  # no code was given
 
 
-def test_llm_report_is_grounded_and_valid(sb03) -> None:
+def test_llm_report_is_grounded_and_valid(sb03: tuple[Cluster, ClusterContext]) -> None:
     cluster, context = sb03
     provider = FakeProvider()
     report = generate_report(cluster, context, "QAL-0001", provider)
@@ -80,7 +84,9 @@ def test_llm_report_is_grounded_and_valid(sb03) -> None:
     assert report.frequency.count == 2 and report.environment.scenes == ["Sandbox_Level01"]
 
 
-def test_invalid_json_twice_then_valid_means_three_attempts(sb03) -> None:
+def test_invalid_json_twice_then_valid_means_three_attempts(
+    sb03: tuple[Cluster, ClusterContext],
+) -> None:
     cluster, context = sb03
     provider = FakeProvider(invalid_json_times=2)
     report = generate_report(cluster, context, "QAL-0001", provider)
@@ -96,7 +102,7 @@ def test_invalid_json_twice_then_valid_means_three_attempts(sb03) -> None:
     assert "Return only valid JSON." in provider.calls[2]["user"]
 
 
-def test_invalid_three_times_falls_back_to_template(sb03) -> None:
+def test_invalid_three_times_falls_back_to_template(sb03: tuple[Cluster, ClusterContext]) -> None:
     cluster, context = sb03
     report = generate_report(cluster, context, "QAL-0001", FakeProvider(invalid_json_times=3))
     _valid(report)
@@ -107,7 +113,9 @@ def test_invalid_three_times_falls_back_to_template(sb03) -> None:
     assert all(s.source == "template" for s in report.steps_to_reproduce)
 
 
-def test_schema_invalid_draft_retries_with_field_error(sb03) -> None:
+def test_schema_invalid_draft_retries_with_field_error(
+    sb03: tuple[Cluster, ClusterContext],
+) -> None:
     cluster, context = sb03
     provider = FakeProvider(script=['{"title": "x"}'])
     report = generate_report(cluster, context, "QAL-0001", provider)
@@ -115,7 +123,7 @@ def test_schema_invalid_draft_retries_with_field_error(sb03) -> None:
     assert "failed validation: component: Field required" in provider.calls[1]["user"]
 
 
-def test_transport_error_falls_back_without_retrying(sb03) -> None:
+def test_transport_error_falls_back_without_retrying(sb03: tuple[Cluster, ClusterContext]) -> None:
     cluster, context = sb03
 
     class Down:
@@ -123,11 +131,11 @@ def test_transport_error_falls_back_without_retrying(sb03) -> None:
         model = "m"
         calls = 0
 
-        def complete_json(self, *args, **kwargs):
+        def complete_json(self, *args: object, **kwargs: object) -> LLMResult:
             self.calls += 1
             raise LLMError("unreachable")
 
-        def embed(self, texts):
+        def embed(self, texts: list[str]) -> np.ndarray:
             raise AssertionError
 
     provider = Down()
@@ -137,7 +145,7 @@ def test_transport_error_falls_back_without_retrying(sb03) -> None:
     assert report.generator.method == "template" and "provider error" in report.review_reasons[0]
 
 
-def test_unknown_evidence_ids_are_dropped_and_flagged(sb03) -> None:
+def test_unknown_evidence_ids_are_dropped_and_flagged(sb03: tuple[Cluster, ClusterContext]) -> None:
     cluster, context = sb03
     report = generate_report(
         cluster, context, "QAL-0001", FakeProvider(overrides={"evidence_ids": ["E2", "E9"]})
@@ -152,7 +160,9 @@ def test_unknown_evidence_ids_are_dropped_and_flagged(sb03) -> None:
     assert "no valid evidence ids in the draft; used E1" in report.review_reasons
 
 
-def test_bot_log_step_with_bad_action_id_becomes_inferred(sb03) -> None:
+def test_bot_log_step_with_bad_action_id_becomes_inferred(
+    sb03: tuple[Cluster, ClusterContext],
+) -> None:
     cluster, context = sb03
     steps = [
         {"text": "ok", "source": "bot_log", "action_ids": ["A1", "A2"]},
@@ -178,7 +188,7 @@ def test_bot_log_step_with_bad_action_id_becomes_inferred(sb03) -> None:
     assert report.docs_used == ["sandbox_design.md#enemy-registry-0"]
 
 
-def test_severity_gap_and_low_confidence_are_flagged(sb03) -> None:
+def test_severity_gap_and_low_confidence_are_flagged(sb03: tuple[Cluster, ClusterContext]) -> None:
     cluster, context = sb03  # priority P2
     report = generate_report(
         cluster, context, "QAL-0001", FakeProvider(overrides={"severity": "S4", "confidence": 0.3})
@@ -192,7 +202,7 @@ def test_severity_gap_and_low_confidence_are_flagged(sb03) -> None:
     assert fine.needs_review is False
 
 
-def test_long_title_is_cut_to_schema_limit(sb03) -> None:
+def test_long_title_is_cut_to_schema_limit(sb03: tuple[Cluster, ClusterContext]) -> None:
     cluster, context = sb03
     report = generate_report(
         cluster, context, "QAL-0001", FakeProvider(overrides={"title": "T" * 150})
@@ -201,14 +211,16 @@ def test_long_title_is_cut_to_schema_limit(sb03) -> None:
     assert len(report.title) == 100
 
 
-def test_cached_second_run_is_recorded(sb03, tmp_path: Path) -> None:
+def test_cached_second_run_is_recorded(
+    sb03: tuple[Cluster, ClusterContext], tmp_path: Path
+) -> None:
     cluster, context = sb03
     provider = CachedProvider(FakeProvider(), LLMCache(tmp_path / "llm.sqlite"), "triage-v1")
     assert generate_report(cluster, context, "QAL-0001", provider).generator.cached is False
     assert generate_report(cluster, context, "QAL-0001", provider).generator.cached is True
 
 
-def test_template_report_shapes(runs) -> None:
+def test_template_report_shapes(runs: dict[str, LoadedRun]) -> None:
     loaded = next(iter(runs.values()))
     cluster = make_cluster(loaded, SB01_DOORS, priority="P1", score=16.0)
     context = build_context(cluster, runs)
@@ -231,3 +243,15 @@ def test_template_report_shapes(runs) -> None:
     _valid(fell_report)
     assert fell_report.title.startswith("fell_out_of_world: fell_out_of_world in Sandbox_Level01")
     assert fell_report.attachments == ["shots/000003.png"]
+
+
+def test_last_error_before_crash_is_flagged(runs: dict[str, LoadedRun]) -> None:
+    loaded = next(iter(runs.values()))
+    crashed_run = loaded.run.model_copy(update={"ended_at": None})
+    crashed = LoadedRun(loaded.run_dir, crashed_run, loaded.events, loaded.report)
+    crashed_runs = {crashed_run.run_id: crashed}
+    cluster = make_cluster(crashed, [31])
+    context = build_context(cluster, crashed_runs)
+    for provider in (None, FakeProvider()):
+        report = generate_report(cluster, context, "QAL-0001", provider)
+        assert report.needs_review and any("possible crash" in r for r in report.review_reasons)

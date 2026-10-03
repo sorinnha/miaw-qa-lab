@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QA Lab triage report</title>
+<style>
+  :root { --bg:#fff; --fg:#1b1b1f; --muted:#5f6368; --line:#e3e3e8; --card:#f7f7fa;
+          --p1:#c62828; --p2:#ef6c00; --p3:#f9a825; --p4:#607d8b; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#141418; --fg:#ececf1; --muted:#a0a0ab; --line:#2c2c34; --card:#1d1d24; } }
+  body { margin:0; padding:16px; background:var(--bg); color:var(--fg);
+         font:15px/1.45 system-ui, Segoe UI, Roboto, sans-serif; max-width:1100px; margin-inline:auto; }
+  h1 { font-size:1.4rem; margin:.2rem 0 1rem; }
+  .counts { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  .tile { flex:1 1 120px; padding:10px 14px; border-radius:8px; background:var(--card); border:1px solid var(--line); }
+  .tile b { font-size:1.6rem; display:block; }
+  .P1 { color:var(--p1); } .P2 { color:var(--p2); } .P3 { color:var(--p3); } .P4 { color:var(--p4); }
+  .bar { display:flex; gap:10px; align-items:center; margin:12px 0; flex-wrap:wrap; }
+  input[type=search] { flex:1 1 240px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); }
+  details { border:1px solid var(--line); border-radius:8px; margin:8px 0; background:var(--card); }
+  summary { cursor:pointer; padding:10px 14px; display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+  summary .id { font-family:ui-monospace, monospace; color:var(--muted); }
+  summary .pri { font-weight:700; min-width:2.2em; }
+  .body { padding:0 14px 14px; }
+  table { border-collapse:collapse; width:100%; font-size:.92em; margin:.4rem 0 .8rem; }
+  th, td { text-align:left; padding:4px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  code, pre { font-family:ui-monospace, Consolas, monospace; font-size:.9em; }
+  pre { white-space:pre-wrap; background:var(--bg); padding:8px; border-radius:6px; border:1px solid var(--line); }
+  .shots img { height:90px; margin:4px 6px 4px 0; border:1px solid var(--line); border-radius:4px; }
+  .muted { color:var(--muted); }
+  .review { color:var(--p1); font-weight:600; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<h1>QA Lab triage report</h1>
+<div class="counts">
+  {% for p in ["P1", "P2", "P3", "P4"] %}<div class="tile"><b class="{{ p }}">{{ counts[p] }}</b>{{ p }}</div>{% endfor %}
+  <div class="tile"><b>{{ reports | length }}</b>reports</div>
+</div>
+<div class="bar">
+  <input id="q" type="search" placeholder="Filter by text, id, kind, priority…" aria-label="Filter bugs">
+  <label><input type="checkbox" id="review-only"> needs review only</label>
+  <button type="button" id="expand">Expand all</button>
+</div>
+<div id="bugs">
+{% for r in reports %}
+<details class="bug" data-text="{{ (r.id ~ ' ' ~ r.priority ~ ' ' ~ r.kind ~ ' ' ~ r.title ~ ' ' ~ r.component ~ ' ' ~ r.summary) | lower }}" data-review="{{ 'yes' if r.needs_review else 'no' }}">
+  <summary><span class="pri {{ r.priority }}">{{ r.priority }}</span><span class="id">{{ r.id }}</span>
+    <span>{{ r.title }}</span><span class="muted">{{ r.kind }} · {{ r.component }} · score {{ r.score }}</span>
+    {% if r.needs_review %}<span class="review">needs review</span>{% endif %}</summary>
+  <div class="body">
+    <p>{{ r.summary }}</p>
+    <p><b>Severity</b> {{ r.severity }} · <b>Seen</b> {{ r.frequency.count }}× in {{ r.frequency.runs }} run(s)
+       · <b>Confidence</b> {{ "%.2f" | format(r.confidence) }}
+       {% if r.environment.scenes %}· <b>Scenes</b> {{ r.environment.scenes | join(", ") }}{% endif %}
+       {% if r.environment.builds %}· <b>Builds</b> {{ r.environment.builds | join(", ") }}{% endif %}</p>
+    <b>Steps to reproduce</b>
+    <ol>{% for s in r.steps_to_reproduce %}<li>{{ s.text }} <span class="muted">({{ s.source }}{% if s.action_refs %}: {% for a in s.action_refs %}{{ a.run_id }}#{{ a.seq }}{{ ", " if not loop.last }}{% endfor %}{% endif %})</span></li>{% endfor %}</ol>
+    <p><b>Expected</b> {{ r.expected }}<br><b>Actual</b> {{ r.actual }}<br><b>Suspected cause</b> {{ r.suspected_cause }}</p>
+    {% if r.attachments %}<div class="shots">{% for a in r.attachments %}<a href="{{ a }}"><img src="{{ a }}" alt="{{ a }}" loading="lazy"></a>{% endfor %}</div>{% endif %}
+    <b>Evidence</b>
+    <table><tr><th>Run</th><th>Seq</th></tr>{% for e in r.evidence %}<tr><td><code>{{ e.run_id }}</code></td><td>{{ e.seq }}</td></tr>{% endfor %}</table>
+    {% if r.docs_used %}<p><b>Docs used</b> {% for d in r.docs_used %}<code>{{ d }}</code>{{ " " }}{% endfor %}</p>{% endif %}
+    {% if r.score_breakdown %}<b>Score breakdown</b>
+    <table><tr>{% for k in r.score_breakdown %}<th>{{ k }}</th>{% endfor %}</tr><tr>{% for v in r.score_breakdown.values() %}<td>{{ v }}</td>{% endfor %}</tr></table>{% endif %}
+    {% if r.review_reasons %}<p class="review">Needs review: {{ r.review_reasons | join("; ") }}</p>{% endif %}
+    <p class="muted">Generator: {{ r.generator.method }}{% if r.generator.provider %} · {{ r.generator.provider }}/{{ r.generator.model }} · {{ r.generator.prompt_version }}{% endif %}{% if r.generator.attempts %} · attempts {{ r.generator.attempts }}{% endif %}{% if r.generator.latency_ms is not none %} · {{ r.generator.latency_ms | round(0) | int }} ms{% endif %}{% if r.generator.cached %} · cached{% endif %} · signature <code>{{ r.signature }}</code></p>
+  </div>
+</details>
+{% endfor %}
+</div>
+<details><summary class="muted">Generator info (triage_meta.json)</summary><pre>{{ meta_json }}</pre></details>
+<script>
+(function () {
+  var q = document.getElementById('q'), only = document.getElementById('review-only');
+  var bugs = Array.prototype.slice.call(document.querySelectorAll('details.bug'));
+  function apply() {
+    var text = q.value.trim().toLowerCase();
+    bugs.forEach(function (d) {
+      var hit = !text || d.getAttribute('data-text').indexOf(text) !== -1;
+      var rev = !only.checked || d.getAttribute('data-review') === 'yes';
+      d.classList.toggle('hidden', !(hit && rev));
+    });
+  }
+  q.addEventListener('input', apply); only.addEventListener('change', apply);
+  document.getElementById('expand').addEventListener('click', function () {
+    var open = bugs.some(function (d) { return !d.open; });
+    bugs.forEach(function (d) { d.open = open; });
+    this.textContent = open ? 'Collapse all' : 'Expand all';
+  });
+})();
+</script>
+</body>
+</html>

@@ -64,7 +64,9 @@ def test_code_context_for_frames(tmp_path: Path) -> None:
     assert ">11 |" in code_context_for(with_line, repo)
     release = Frame("QALab.Sandbox.SeededDoor.Open", "Assets/Sandbox/Scripts/SeededDoor.cs")
     assert "> 9 |" in code_context_for(release, repo)
-    assert code_context_for(Frame("QALab.Sandbox.SeededDoor.Open"), repo) is None
+    # Release frame (no "(at file:line)"): found by class name, then class/method lookup.
+    assert "> 9 |" in code_context_for(Frame("QALab.Sandbox.SeededDoor.Open"), repo)
+    assert code_context_for(Frame("QALab.Sandbox.Nowhere.Run"), repo) is None
     assert code_context_for(with_line, None) is None
     assert code_context_for(None, repo) is None
     missing = Frame("X.Y", "Assets/Missing.cs", 3)

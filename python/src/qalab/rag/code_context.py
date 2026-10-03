@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from qalab.triage.stack import Frame
@@ -26,12 +27,28 @@ def resolve_source(file: str, repo: Path) -> Path | None:
     return None
 
 
+@lru_cache(maxsize=256)
+def _class_pattern(class_name: str) -> re.Pattern[str]:
+    # "public class SeededDoor : MonoBehaviour" → matches "class SeededDoor"
+    return re.compile(rf"\bclass\s+{re.escape(class_name)}\b")
+
+
+@lru_cache(maxsize=256)
+def _method_pattern(method: str) -> re.Pattern[str]:
+    # "    public void Open()" → matches "Open("
+    return re.compile(rf"\b{re.escape(method)}\s*\(")
+
+
+def find_source_by_class(class_name: str, repo: Path) -> Path | None:
+    """``SeededDoor`` → the first ``**/SeededDoor.cs`` under ``repo`` (frame without a file)."""
+    matches = sorted(p for p in repo.rglob(f"{class_name}.cs") if p.is_file())
+    return matches[0] if matches else None
+
+
 def find_line(lines: list[str], class_name: str, method: str) -> int | None:
     """1-based line of ``{method}(`` after ``class {Class}``, for frames without a line number."""
-    # "public class SeededDoor : MonoBehaviour" → matches class SeededDoor
-    class_re = re.compile(rf"\bclass\s+{re.escape(class_name)}\b")
-    # "    public void Open()" → matches Open(
-    method_re = re.compile(rf"\b{re.escape(method)}\s*\(")
+    class_re = _class_pattern(class_name)
+    method_re = _method_pattern(method)
     start = next((i for i, line in enumerate(lines) if class_re.search(line)), None)
     if start is None:
         return None
@@ -59,9 +76,11 @@ def snippet(path: Path, line: int, radius: int = RADIUS, max_lines: int = MAX_LI
 
 def code_context_for(frame: Frame | None, repo: Path | None) -> str | None:
     """The CODE block for a frame, or None when there is nothing to show."""
-    if frame is None or repo is None or not frame.file:
+    if frame is None or repo is None:
         return None
-    path = resolve_source(frame.file, repo)
+    path = resolve_source(frame.file, repo) if frame.file else None
+    if path is None and "+" not in frame.class_name:
+        path = find_source_by_class(frame.class_name, repo)
     if path is None:
         return None
     line = frame.line

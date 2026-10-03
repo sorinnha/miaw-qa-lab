@@ -3,8 +3,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from qalab.io.runs import LoadedRun
 from qalab.llm.fake import FakeProvider
-from qalab.rag.chunk import chunk_file
+from qalab.rag.chunk import Chunk, chunk_file
 from qalab.rag.index import DocIndex, build_index
 from qalab.rag.retrieve import (
     EmbeddingRetriever,
@@ -27,16 +28,16 @@ DESIGN_DOC = REPO / "docs" / "sandbox_design.md"
 
 
 @pytest.fixture(scope="module")
-def chunks():
+def chunks() -> list[Chunk]:
     return chunk_file(DESIGN_DOC)
 
 
 @pytest.fixture(scope="module")
-def loaded():
+def loaded() -> LoadedRun:
     return load_sample()
 
 
-def test_build_query(loaded) -> None:
+def test_build_query(loaded: LoadedRun) -> None:
     sb03 = make_cluster(loaded, SB03_ENEMY_REGISTRY, normalized_message="The given key <str>")
     assert build_query(sb03) == (
         "KeyNotFoundException The given key <str> "
@@ -46,7 +47,7 @@ def test_build_query(loaded) -> None:
     assert build_query(fell) == "Sandbox_Level01 fell_out_of_world"
 
 
-def test_tfidf_retriever_finds_the_feature_heading(chunks, loaded) -> None:
+def test_tfidf_retriever_finds_the_feature_heading(chunks: list[Chunk], loaded: LoadedRun) -> None:
     retriever = TfidfRetriever(chunks, top_k=3, min_score=0.0)
     expected = {
         "Doors": make_cluster(loaded, SB01_DOORS, normalized_message="Object reference not set"),
@@ -66,12 +67,12 @@ def test_tfidf_retriever_finds_the_feature_heading(chunks, loaded) -> None:
     assert TfidfRetriever([]).retrieve("doors") == []
 
 
-def test_min_score_filters_weak_hits(chunks) -> None:
+def test_min_score_filters_weak_hits(chunks: list[Chunk]) -> None:
     assert TfidfRetriever(chunks, min_score=0.99).retrieve("door opens") == []
     assert len(TfidfRetriever(chunks, top_k=2, min_score=0.0).retrieve("door opens")) == 2
 
 
-def test_make_retriever_picks_tfidf_without_provider(chunks, tmp_path: Path) -> None:
+def test_make_retriever_picks_tfidf_without_provider(chunks: list[Chunk], tmp_path: Path) -> None:
     index = build_index([DESIGN_DOC], FakeProvider(), index_dir=tmp_path)
     assert isinstance(make_retriever(index, None), TfidfRetriever)
     assert isinstance(make_retriever(index, FakeProvider()), EmbeddingRetriever)
@@ -94,7 +95,7 @@ def test_cosine_top_k_orders_and_limits() -> None:
 
 
 @pytest.mark.youwrite
-def test_embedding_retriever_on_fake_index(loaded, tmp_path: Path) -> None:
+def test_embedding_retriever_on_fake_index(loaded: LoadedRun, tmp_path: Path) -> None:
     provider = FakeProvider()
     index = build_index([DESIGN_DOC], provider, index_dir=tmp_path)
     retriever = EmbeddingRetriever(index, provider, top_k=3, min_score=0.0)

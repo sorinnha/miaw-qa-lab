@@ -51,6 +51,7 @@ class RagConfig:
     overlap_chars: int = 100
     top_k: int = 3
     min_score: float = 0.25
+    tfidf_min_score: float = 0.1  # the TF-IDF fallback scores lower than embeddings
 
 
 @dataclass

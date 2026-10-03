@@ -33,8 +33,11 @@ class DocIndex:
         return len(self.chunks)
 
 
-def cache_key(text: str, model: str) -> str:
-    return hashlib.sha256(f"{model}\x00{text}".encode()).hexdigest()
+def cache_key(text: str, model: str, chunk_chars: int = 800, overlap_chars: int = 100) -> str:
+    """Anything that changes the chunks or the vectors is part of the key."""
+    return hashlib.sha256(
+        f"{model}\x00{chunk_chars}\x00{overlap_chars}\x00{text}".encode()
+    ).hexdigest()
 
 
 def embed_in_batches(
@@ -64,7 +67,7 @@ def build_index(
     index_dir.mkdir(parents=True, exist_ok=True)
     for path in doc_paths:
         text = path.read_text(encoding="utf-8")
-        key = cache_key(text, model)
+        key = cache_key(text, model, chunk_chars, overlap_chars)
         npz_path, meta_path = index_dir / f"{key}.npz", index_dir / f"{key}.json"
         if npz_path.is_file() and meta_path.is_file():
             chunks = [Chunk(**c) for c in json.loads(meta_path.read_text(encoding="utf-8"))]
@@ -82,4 +85,16 @@ def build_index(
             matrices.append(matrix)
     if matrices:
         index.matrix = np.vstack(matrices).astype(np.float32)
+    return index
+
+
+def chunk_only_index(
+    doc_paths: Sequence[Path], chunk_chars: int = 800, overlap_chars: int = 100
+) -> DocIndex:
+    """Chunks without vectors, for ``--provider none`` (TF-IDF needs no embeddings)."""
+    index = DocIndex(model="tfidf")
+    for path in doc_paths:
+        index.chunks.extend(
+            chunk_markdown(path.read_text(encoding="utf-8"), path.name, chunk_chars, overlap_chars)
+        )
     return index
