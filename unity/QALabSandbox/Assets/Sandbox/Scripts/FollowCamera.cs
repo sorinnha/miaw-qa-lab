@@ -2,11 +2,11 @@ using UnityEngine;
 
 namespace QALab.Sandbox
 {
-    /// <summary>Keeps the camera at a fixed offset above and behind the player.</summary>
+    /// <summary>Third-person follow camera: 6 m behind and 2.5 m above the player (design doc: "Camera").</summary>
     public sealed class FollowCamera : MonoBehaviour
     {
         [SerializeField] private Transform target;
-        [SerializeField] private Vector3 offset = new Vector3(0f, 12f, -8f);
+        [SerializeField] private Vector3 offset = new Vector3(0f, 2.5f, -6f);
 
         public void SetTarget(Transform value) => target = value;
 
@@ -14,7 +14,7 @@ namespace QALab.Sandbox
         {
             if (target == null) return;
             transform.position = target.position + offset;
-            transform.LookAt(target.position);
+            transform.LookAt(target.position + Vector3.up);   // look at chest height, not the feet
         }
     }
 }

@@ -13,9 +13,11 @@ namespace QALab.Sandbox
         private static void RegisterCatalog()
         {
             LabelRecorder.UseCatalog(SandboxSeedCatalog.All());
-            foreach (var id in SandboxSeedCatalog.Stubbed())
+            var stubbed = SandboxSeedCatalog.Stubbed().Count;
+            if (stubbed > 0)
             {
-                Debug.LogWarning($"[QALab] catalog entry {id} is still a YOU WRITE stub; it won't appear in labels.json");
+                // Count only: seed ids never go into log text (player.log sits in the run folder).
+                Debug.LogWarning($"[QALab] {stubbed} SandboxSeedCatalog entry/entries are still YOU WRITE stubs and won't appear in labels.json");
             }
         }
     }

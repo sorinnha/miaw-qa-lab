@@ -104,11 +104,23 @@ namespace MiawWorks.QALab.Tests
         public DateTime UtcNow { get; set; } = new DateTime(2026, 10, 5, 10, 30, 0, DateTimeKind.Utc);
     }
 
-    /// <summary>A main-thread snapshot tests can set.</summary>
+    /// <summary>A main-thread snapshot tests can set. <see cref="OnFrameRead"/> lets a test pause a producer.</summary>
     public sealed class FakeState : IMainThreadState
     {
+        private long _frame;
+
         public string Scene { get; set; } = "Sandbox_Level01";
-        public long Frame { get; set; }
         public float[] Position { get; set; }
+        public Action OnFrameRead { get; set; }
+
+        public long Frame
+        {
+            get
+            {
+                OnFrameRead?.Invoke();
+                return _frame;
+            }
+            set => _frame = value;
+        }
     }
 }

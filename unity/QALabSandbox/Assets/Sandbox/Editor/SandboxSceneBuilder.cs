@@ -16,6 +16,8 @@ namespace QALab.Sandbox.Editor
     /// Tools > QA Lab > Rebuild Sandbox Scenes. Builds Sandbox_Level01 and Sandbox_Menu from code, bakes
     /// the NavMesh and saves both scenes, so the level is reproducible and reviewable: change this file,
     /// rebuild, and commit the regenerated .unity files with it (never edit the scenes by hand).
+    /// Geometry and camera follow docs/sandbox_design.md (the RAG ground truth): 2 m tiles T_00–T_399,
+    /// camera 6 m behind and 2.5 m above the player.
     /// M1 contents: floor tiles with footstep surfaces, walls, 3 doors (Door_02 without hinge), crates,
     /// the spawner, the player, the inventory HUD, the asset loader, combat math and the F1 menu.
     /// M4 adds the GC zone, camera trigger, ballistics range, score label, ammo icon and T_17's missing collider.
@@ -27,8 +29,10 @@ namespace QALab.Sandbox.Editor
         private const string MaterialsFolder = Root + "/Materials";
         public const string LevelScene = ScenesFolder + "/Sandbox_Level01.unity";
         public const string MenuScene = ScenesFolder + "/Sandbox_Menu.unity";
-        private const float TileSize = 4f;
-        private const int TilesPerSide = 10;   // 10 × 4 m = 40 × 40 m
+        // docs/sandbox_design.md, "Level geometry": a 40 × 40 m grid of 2 m tiles, T_00 to T_399.
+        private const float TileSize = 2f;
+        private const int TilesPerSide = 20;
+        public const string NavMeshAsset = ScenesFolder + "/NavMesh-Sandbox_Level01.asset";
 
         [MenuItem("Tools/QA Lab/Rebuild Sandbox Scenes", priority = 20)]
         public static void RebuildAll()
@@ -98,22 +102,30 @@ namespace QALab.Sandbox.Editor
             EditorSceneManager.SaveScene(scene, LevelScene);
         }
 
-        /// <summary>Tiles are named T_xz (T_17 = column 1, row 7) and tagged with a footstep surface.</summary>
+        /// <summary>
+        /// Tile index = row × 20 + column, written with at least two digits: T_00 is the tile at the
+        /// origin corner (x 0–2 m, z 0–2 m), T_17 is row 0, column 17 (x 34–36 m), T_399 the far corner.
+        /// Each tile is tagged with its footstep surface.
+        /// </summary>
         private static void AddTile(GameObject parent, int x, int z)
         {
             var surface = SurfaceFor(x, z);
-            var tile = Box(parent, $"T_{x}{z}", new Vector3(x * TileSize + TileSize / 2f, -0.25f, z * TileSize + TileSize / 2f),
+            var index = z * TilesPerSide + x;
+            var tile = Box(parent, $"T_{index:00}", new Vector3(x * TileSize + TileSize / 2f, -0.25f, z * TileSize + TileSize / 2f),
                 new Vector3(TileSize, 0.5f, TileSize), MaterialFor(surface, SurfaceColor(surface)));
             tile.isStatic = true;
             tile.AddComponent<SurfaceTag>().Set(surface);
         }
 
-        /// <summary>A gravel path along x = 2–3, a metal deck in the north-east, wood near the doors, grass elsewhere.</summary>
+        /// <summary>
+        /// A gravel path at x 4–8 m, a metal deck beyond x, z ≥ 24 m, wood at z 4–8 m, grass elsewhere.
+        /// (Column/row = metres / 2.) Gravel and Metal have no footstep clip (SB13).
+        /// </summary>
         private static string SurfaceFor(int x, int z)
         {
-            if (x == 2 || x == 3) return "Gravel";            // SB13: no clip
-            if (x >= 6 && z >= 6) return "Metal";             // SB13: no clip
-            if (z == 1 || z == 2) return "Wood";
+            if (x >= 2 && x <= 3) return "Gravel";
+            if (x >= 12 && z >= 12) return "Metal";
+            if (z >= 2 && z <= 3) return "Wood";
             return "Grass";
         }
 
@@ -188,8 +200,8 @@ namespace QALab.Sandbox.Editor
             var camera = go.AddComponent<Camera>();
             camera.clearFlags = CameraClearFlags.Skybox;
             go.AddComponent<AudioListener>();
-            go.transform.position = player.position + new Vector3(0f, 12f, -8f);
-            go.transform.LookAt(player.position);
+            go.transform.position = player.position + new Vector3(0f, 2.5f, -6f);   // design doc: "Camera"
+            go.transform.LookAt(player.position + Vector3.up);
             var follow = go.AddComponent<FollowCamera>();
             follow.SetTarget(player);
         }
@@ -262,6 +274,10 @@ namespace QALab.Sandbox.Editor
             // must still look walkable to the NavMesh, which is exactly how the bot falls through it.
             surface.useGeometry = UnityEngine.AI.NavMeshCollectGeometry.RenderMeshes;
             surface.BuildNavMesh();
+            // Save the baked data as its own asset; otherwise it is serialized into the .unity file
+            // and every rebuild produces a huge, unreviewable scene diff.
+            AssetDatabase.DeleteAsset(NavMeshAsset);
+            AssetDatabase.CreateAsset(surface.navMeshData, NavMeshAsset);
 #else
             Debug.LogWarning("[QALab] AI Navigation package missing: install com.unity.ai.navigation, then rebuild the scenes (the M4 bot needs the NavMesh)");
 #endif

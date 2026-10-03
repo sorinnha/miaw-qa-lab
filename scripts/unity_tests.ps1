@@ -27,8 +27,12 @@ $results = Join-Path $outDir "$Platform.xml"
 $log = Join-Path $outDir "$Platform.log"
 Remove-Item -ErrorAction SilentlyContinue $results
 
+# find_unity prints only the path on its output stream; on failure it prints nothing (and says why).
 $unity = & (Join-Path $PSScriptRoot "find_unity.ps1")
-if ($LASTEXITCODE -ne 0 -or -not $unity) { exit 1 }
+if (-not $unity) {
+    Write-Host "unity_tests: $Platform not run (Unity editor not found)" -ForegroundColor Red
+    exit 1
+}
 
 $unityArgs = @(
     "-runTests", "-batchmode",
@@ -46,7 +50,8 @@ $process = Start-Process -FilePath $unity -ArgumentList $unityArgs -Wait -PassTh
 $code = $process.ExitCode
 
 if (-not (Test-Path $results)) {
-    Write-Error "No results file ($results). Unity exited with $code; see $log"
+    # Write-Host, not Write-Error: under "Stop" Write-Error would end the script and lose Unity's code.
+    Write-Host "unity_tests: $Platform no results file ($results); Unity exited with $code, see $log" -ForegroundColor Red
     exit $(if ($code -ne 0) { $code } else { 1 })
 }
 [xml]$xml = Get-Content -Raw -Path $results

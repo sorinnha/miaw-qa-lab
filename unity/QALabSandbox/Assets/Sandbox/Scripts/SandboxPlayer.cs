@@ -5,7 +5,8 @@ namespace QALab.Sandbox
 {
     /// <summary>
     /// Capsule player: CharacterController movement (WASD, 4.5 m/s, gravity −20 m/s²), footsteps every
-    /// 0.6 m on the surface below, and respawn below the kill plane (y = −10). Implements
+    /// 0.6 m on the surface below, and respawn at the last checkpoint below the kill plane (y = −10),
+    /// as "Player movement" in docs/sandbox_design.md says. Implements
     /// <see cref="IBotMover"/> so the M4 bot can drive it through the same code.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
@@ -19,7 +20,7 @@ namespace QALab.Sandbox
         [SerializeField] private FootstepAudio footsteps;
 
         private CharacterController _controller;
-        private Vector3 _spawnPoint;
+        private Vector3 _checkpoint;
         private float _verticalSpeed;
         private float _sinceStep;
         private Vector3? _botTarget;
@@ -31,7 +32,7 @@ namespace QALab.Sandbox
         private void Awake()
         {
             _controller = GetComponent<CharacterController>();
-            _spawnPoint = transform.position;
+            _checkpoint = transform.position;   // the start is the first checkpoint
         }
 
         private void Start() => SandboxSeeds.RegisterPlayer(transform, this);
@@ -96,23 +97,27 @@ namespace QALab.Sandbox
             return "Grass";
         }
 
+        /// <summary>Respawns happen here from now on (checkpoint zones call this).</summary>
+        public void SetCheckpoint(Vector3 position) => _checkpoint = position;
+
         // ---- IBotMover (driven by the M4 bot) -------------------------------------------------------
 
         public void MoveTowards(Vector3 worldTarget) => _botTarget = worldTarget;
 
         public void Stop() => _botTarget = null;
 
+        /// <summary>Queues the nearest door; it opens next frame through the same path as the E key.</summary>
         public bool TryInteract(out string objectName)
         {
             objectName = null;
-            return interactor != null && interactor.TryInteractNearest(out objectName);
+            return interactor != null && interactor.RequestInteractNearest(out objectName);
         }
 
         public void Respawn()
         {
             // A CharacterController overrides transform changes while enabled, so turn it off to teleport.
             _controller.enabled = false;
-            transform.position = _spawnPoint;
+            transform.position = _checkpoint;
             _controller.enabled = true;
             _verticalSpeed = 0f;
             _botTarget = null;

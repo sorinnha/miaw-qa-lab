@@ -28,10 +28,16 @@ namespace MiawWorks.QALab
         private float _sinceDrain;
         private bool _recording;
 
+        /// <summary>The run folder (<c>&lt;out&gt;/&lt;run_id&gt;</c>) this host writes to.</summary>
         public string RunDir { get; private set; }
+
+        /// <summary>True from <see cref="Begin"/> until the run ends.</summary>
         public bool IsRecording => _recording;
 
-        /// <summary>Called by <see cref="QALab"/> right after AddComponent, before the first scene loads.</summary>
+        /// <summary>
+        /// Start recording into <paramref name="runDir"/>. Called by <see cref="QALab"/> right after
+        /// AddComponent, before the first scene loads (and by PlayMode tests).
+        /// </summary>
         internal void Begin(QALabOptions options, string runId, string runDir)
         {
             _options = options;
@@ -39,7 +45,8 @@ namespace MiawWorks.QALab
             RunDir = runDir;
 
             var scene = SceneManager.GetActiveScene().name;
-            _cache.Capture(scene, Time.frameCount, QALab.Player);
+            _cache.SetScene(scene);
+            _cache.Capture(Time.frameCount, QALab.Player);
 
             _writer = EventWriter.ToFile(runId, _clock, _cache, Path.Combine(runDir, "events.jsonl"));
             _run = new RunContext(options, runId, runDir, _clock, SeedsEnabled(options));
@@ -47,11 +54,11 @@ namespace MiawWorks.QALab
             _run.WriteStart();
 
             LabelRecorder.Begin(options.Benchmark, _clock, _cache);
+            // run_start first, so it gets seq 0 before any log from another thread can.
+            _writer.Marker("run_start", new JObject { ["adapter"] = options.Adapter, ["seed"] = options.Seed });
             _logs = new LogCapture(_writer, options.MinLevel);
             _logs.Start();
             _metrics = new MetricsSampler(_writer);
-
-            _writer.Marker("run_start", new JObject { ["adapter"] = options.Adapter, ["seed"] = options.Seed });
             SceneManager.sceneLoaded += OnSceneLoaded;
             SceneManager.activeSceneChanged += OnActiveSceneChanged;
             Application.quitting += OnQuitting;
@@ -79,7 +86,7 @@ namespace MiawWorks.QALab
         private void Update()
         {
             if (!_recording) return;
-            _cache.Capture(SceneManager.GetActiveScene().name, Time.frameCount, QALab.Player);
+            _cache.Capture(Time.frameCount, QALab.Player);
             _metrics.Tick(Time.unscaledDeltaTime);
             _sinceDrain += Time.unscaledDeltaTime;
             if (_sinceDrain >= DrainInterval)
@@ -106,9 +113,10 @@ namespace MiawWorks.QALab
                 _writer.Dispose();
                 _run.WriteEnd(exitReason, exitCode);
                 var unknown = LabelRecorder.End(Path.Combine(RunDir, "labels.json"), _runId);
-                foreach (var id in unknown)
+                if (unknown.Count > 0)
                 {
-                    Debug.LogWarning($"[QALab] seed {id} fired but has no catalog entry; it is missing from labels.json");
+                    // Count only: seed ids must never appear in log text (player.log sits in the run folder).
+                    Debug.LogWarning($"[QALab] {unknown.Count} triggered seed(s) have no catalog entry and are missing from labels.json");
                 }
                 Debug.Log($"[QALab] run {_runId} ended ({exitReason}): {RunDir}");
             }

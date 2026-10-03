@@ -42,7 +42,7 @@ namespace QALab.Sandbox
             if (GUILayout.Button("SB14  Damage + speed math")) combat.RequestBoth();
             GUILayout.Space(8);
             if (GUILayout.Button("Trigger all")) TriggerAll();
-            if (GUILayout.Button("End run now")) MiawWorks.QALab.QALab.EndRun();
+            if (GUILayout.Button("End run now")) MiawWorks.QALab.QALab.EndRun(MiawWorks.QALab.ExitReasons.UserQuit);
             GUI.DragWindow();
         }
 

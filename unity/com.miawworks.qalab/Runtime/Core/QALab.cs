@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace MiawWorks.QALab
 {
@@ -25,7 +26,10 @@ namespace MiawWorks.QALab
         /// <summary>The current run folder, or null.</summary>
         public static string RunDir => _host != null ? _host.RunDir : null;
 
+        /// <summary>The registered player (events take their <c>pos</c> from it), or null.</summary>
         public static Transform Player { get; private set; }
+
+        /// <summary>The registered player's mover, used by the M4 bot; null until registered.</summary>
         public static IBotMover Mover { get; private set; }
 
         /// <summary>Games call this once their player exists, so events carry the player's position.</summary>
@@ -96,8 +100,12 @@ namespace MiawWorks.QALab
         {
             var args = new List<string>(Environment.GetCommandLineArgs());
 #if UNITY_EDITOR
+            // The Test Runner enters Play Mode too (batch "-runTests" or its temporary InitTestScene);
+            // auto-starting there would record the tests' deliberate errors as a game run.
+            var underTestRunner = args.Contains("-runTests")
+                || SceneManager.GetActiveScene().name.StartsWith("InitTestScene", StringComparison.Ordinal);
             var settings = Resources.Load<QALabSettings>(QALabSettings.ResourceName);
-            if (settings != null && settings.AutoStartInPlayMode)
+            if (settings != null && settings.AutoStartInPlayMode && !underTestRunner)
             {
                 return settings.ToArgs(ProjectFolder());
             }
@@ -116,7 +124,10 @@ namespace MiawWorks.QALab
             return Path.GetFullPath(Path.IsPathRooted(options.OutDir) ? options.OutDir : Path.Combine(baseDir, options.OutDir));
         }
 
-        /// <summary>Two runs in the same second with the same seed get <c>_2</c>, <c>_3</c>, ... appended.</summary>
+        /// <summary>
+        /// Two runs in the same second with the same seed get <c>_2</c>, <c>_3</c>, ... appended (still a
+        /// valid run_id: <c>^[A-Za-z0-9_.-]+$</c>), so a second run never overwrites the first (D-022).
+        /// </summary>
         private static string UniqueRunDir(string outDir, ref string runId)
         {
             var baseId = runId;

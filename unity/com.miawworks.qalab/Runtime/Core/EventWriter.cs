@@ -83,6 +83,7 @@ namespace MiawWorks.QALab
             return e;
         }
 
+        /// <summary>A log event; an empty <paramref name="stack"/> is written as null.</summary>
         public QAEvent Log(string level, string message, string stack) =>
             Enqueue(EventKinds.Log, null, level, message ?? string.Empty, stack);
 

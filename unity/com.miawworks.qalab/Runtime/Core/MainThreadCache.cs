@@ -25,10 +25,13 @@ namespace MiawWorks.QALab
         /// <summary>A fresh array per call (each event owns its copy), or null without a player.</summary>
         public float[] Position => _hasPosition ? new[] { Round(_x), Round(_y), Round(_z) } : null;
 
-        /// <summary>Main thread only: copy this frame's values.</summary>
-        public void Capture(string scene, int frame, Transform player)
+        /// <summary>
+        /// Main thread only, every frame: copy the frame number and player position. The scene is set
+        /// separately (<see cref="SetScene"/>) on scene events, because <c>Scene.name</c> allocates a new
+        /// string on every call and the per-frame path must not allocate.
+        /// </summary>
+        public void Capture(int frame, Transform player)
         {
-            _scene = NullIfEmpty(scene);
             Interlocked.Exchange(ref _frame, frame);
             if (player != null)
             {
@@ -44,6 +47,7 @@ namespace MiawWorks.QALab
             }
         }
 
+        /// <summary>Main thread only: the active scene changed (or the run started).</summary>
         public void SetScene(string scene) => _scene = NullIfEmpty(scene);
 
         // Before the first scene finishes loading the active scene has no name; write null, not "".

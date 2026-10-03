@@ -18,7 +18,10 @@ Delete this note when everything below is done.
   `SandboxSeedCatalog`, `SandboxSceneBuilder`, asmdefs, EditMode tests.
 - **Checks:** `tools/cs-check` (netstandard2.1 core + net8 NUnit), CI job `csharp-check`,
   `scripts/find_unity.ps1`, `scripts/unity_tests.ps1`, `scripts/link_sandbox_package.py`.
-- **Decisions:** D-017 … D-020.
+- **Decisions:** D-017 … D-020, plus D-022 (review follow-ups).
+- **Tests (Unity-only, run on the PC):** package PlayMode `LogCaptureTests`, `RunRecordingTests` (real
+  host → run.json/events.jsonl/labels.json); sandbox EditMode `SeededLogBugTests` (SB03, SB05, SB13,
+  SB14), `SeededInventoryTests` (YOU WRITE); sandbox PlayMode `SeededComponentTests` (SB01, SB03, SB04).
 
 ## Not verified here (needs Unity on Sora's PC)
 
@@ -40,3 +43,7 @@ Until `GetSlot` is written, opening the inventory (Tab or F1 → SB02) logs `Not
 Bot framework (`Bot/`), detectors, screenshots, `JUnitWriter`, exit codes 1/2, seeds SB06–SB12, SB15,
 SB16 (+ their catalog entries), `BuildRunner`, QA Lab window, `run_playtest.ps1`, `run_pipeline.ps1`.
 The `Cluster`-side Python code already expects `detector` events (spec 02 §4).
+
+M4 notes from the M1 review (D-022): set the NavMesh agent radius to 0.3 m (design doc) before SB07;
+take SB06's `near` from the builder's T_17 (row 0, column 17 → x 35, z 1), not from the sample run;
+the bot must go through `SandboxPlayer.TryInteract` (queues; same SB01 stack as the E key).

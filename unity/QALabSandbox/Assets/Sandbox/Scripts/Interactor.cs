@@ -2,36 +2,43 @@ using UnityEngine;
 
 namespace QALab.Sandbox
 {
-    /// <summary>Press Interact (E) within 2 m of a door to open it (design doc: "Doors").</summary>
+    /// <summary>
+    /// Press Interact (E) within 2 m of a door to open it (design doc: "Doors"). Every way of
+    /// interacting (E key, F1 menu, the M4 bot via <see cref="SandboxPlayer"/>) only queues a target;
+    /// <see cref="Update"/> then calls <see cref="TryInteract"/>. So SB01's stack is always
+    /// <c>SeededDoor.Open ← Interactor.TryInteract ← Interactor.Update</c> and triage sees one cluster.
+    /// </summary>
     public sealed class Interactor : MonoBehaviour
     {
         [SerializeField, Min(0.5f)] private float rangeM = 2f;
 
         private GameObject _requested;
 
-        /// <summary>F1 menu: interact with <paramref name="target"/> on the next frame (normal Update path).</summary>
+        /// <summary>Interact with <paramref name="target"/> on the next frame (F1 menu).</summary>
         public void RequestInteract(GameObject target) => _requested = target;
+
+        /// <summary>Queue the nearest door in range for the next frame; false when nothing is in range.</summary>
+        public bool RequestInteractNearest(out string objectName)
+        {
+            var door = NearestDoor();
+            objectName = door != null ? door.name : null;
+            if (door == null) return false;
+            _requested = door.gameObject;
+            return true;
+        }
 
         private void Update()
         {
+            if (SandboxInput.InteractPressed)
+            {
+                RequestInteractNearest(out _);
+            }
             if (_requested != null)
             {
                 var target = _requested;
                 _requested = null;
                 TryInteract(target);
             }
-            else if (SandboxInput.InteractPressed)
-            {
-                TryInteractNearest(out _);
-            }
-        }
-
-        /// <summary>Interact with the nearest door in range; used by the E key and the bot (IBotMover).</summary>
-        public bool TryInteractNearest(out string objectName)
-        {
-            var door = NearestDoor();
-            objectName = door != null ? door.name : null;
-            return door != null && TryInteract(door.gameObject);
         }
 
         public bool TryInteract(GameObject target)

@@ -21,7 +21,7 @@ namespace MiawWorks.QALab
         [SerializeField] private int seed;
         [SerializeField, Min(1f)] private float durationS = 120f;
         [Tooltip("Bot adapter (M4), or 'manual' for no bot.")]
-        [SerializeField] private string adapter = "manual";
+        [SerializeField] private string adapter = "navmesh_explorer";
         [Tooltip("Scene to load first. Empty = the scene you pressed Play in.")]
         [SerializeField] private string scene = "";
         [SerializeField, Min(0f)] private float shotEveryS = 5f;

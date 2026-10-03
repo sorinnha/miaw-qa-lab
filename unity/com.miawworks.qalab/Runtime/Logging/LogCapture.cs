@@ -20,6 +20,7 @@ namespace MiawWorks.QALab
             _minLevel = minLevel;
         }
 
+        /// <summary>Start listening to Unity's log callback (idempotent).</summary>
         public void Start()
         {
             if (_listening) return;
@@ -27,6 +28,7 @@ namespace MiawWorks.QALab
             _listening = true;
         }
 
+        /// <summary>Stop listening (idempotent). Call before closing the writer.</summary>
         public void Stop()
         {
             if (!_listening) return;

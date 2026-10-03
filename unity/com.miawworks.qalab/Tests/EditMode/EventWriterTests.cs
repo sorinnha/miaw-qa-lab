@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -53,17 +54,37 @@ namespace MiawWorks.QALab.Tests
         }
 
         [Test]
-        public void EachDrainWritesItsBatchSortedBySeq()
+        public void DrainSortsABatchThatWasQueuedOutOfOrder()
         {
+            // Producer A takes seq 0, then pauses (inside the Frame read) before it enqueues. Producer B
+            // takes seq 1 and enqueues. So the queue holds [1, 0]; the drained file must say [0, 1].
+            var paused = new ManualResetEventSlim(false);
+            var resume = new ManualResetEventSlim(false);
+            var first = 1;
+            var state = new FakeState
+            {
+                OnFrameRead = () =>
+                {
+                    if (Interlocked.Exchange(ref first, 0) == 1)
+                    {
+                        paused.Set();
+                        resume.Wait(TimeSpan.FromSeconds(10));
+                    }
+                },
+            };
             var output = new StringWriter();
-            var writer = new EventWriter("r", new FakeClock(), new FakeState(), output);
-            // Create events, then shuffle the queue order by draining through a second writer is not
-            // possible; instead check the documented contract on many threads below. Here: one batch.
-            for (var i = 0; i < 50; i++) writer.Marker("scene_loaded");
-            writer.Drain();
+            var writer = new EventWriter("r", new FakeClock(), state, output);
+            var producerA = Task.Run(() => writer.Log("error", "from A", null));
+            Assert.IsTrue(paused.Wait(TimeSpan.FromSeconds(10)), "producer A reached the pause");
+            writer.Log("error", "from B", null);
+            resume.Set();
+            producerA.Wait(TimeSpan.FromSeconds(10));
+            Assert.AreEqual(2, writer.Drain());
             writer.Dispose();
-            var seqs = Lines(output.ToString()).Select(l => (long)l["seq"]).ToList();
-            CollectionAssert.AreEqual(Enumerable.Range(0, 50).Select(i => (long)i), seqs);
+
+            var lines = Lines(output.ToString());
+            CollectionAssert.AreEqual(new[] { 0L, 1L }, lines.Select(l => (long)l["seq"]));
+            CollectionAssert.AreEqual(new[] { "from A", "from B" }, lines.Select(l => (string)l["message"]));
         }
 
         [Test]

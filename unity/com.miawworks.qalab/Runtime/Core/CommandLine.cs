@@ -69,18 +69,27 @@ namespace MiawWorks.QALab
     /// <summary>Everything the command-line flags control (spec 01, "Activation and configuration").</summary>
     public sealed class QALabOptions
     {
+        /// <summary><c>-qalab</c>: record a run.</summary>
         public bool Enabled;
-        /// <summary>Parent folder for run folders; null means the platform default (persistentDataPath).</summary>
+        /// <summary><c>-qalabOut</c>: parent folder for run folders; null = persistentDataPath/qalab/runs.</summary>
         public string OutDir;
+        /// <summary><c>-qalabSeed</c>: seed for the bot's random numbers.</summary>
         public int Seed;
+        /// <summary><c>-qalabDuration</c>: seconds until the run ends.</summary>
         public float DurationS = 120f;
+        /// <summary><c>-qalabAdapter</c>: bot adapter name, or <c>manual</c> for no bot.</summary>
         public string Adapter = "navmesh_explorer";
-        /// <summary>Scene to load first; null means the active scene.</summary>
+        /// <summary><c>-qalabScene</c>: scene to load first; null means the active scene.</summary>
         public string Scene;
+        /// <summary><c>-qalabShotEvery</c>: seconds between periodic screenshots (0 = off, M4).</summary>
         public float ShotEveryS = 5f;
+        /// <summary><c>-qalabMinLevel</c>: lowest log level captured.</summary>
         public string MinLevel = LogLevels.Warning;
+        /// <summary><c>-qalabSeeds</c>: sandbox seeded bugs to enable.</summary>
         public SeedSelection Seeds = SeedSelection.All;
+        /// <summary><c>-qalabBenchmark</c>: write labels.json.</summary>
         public bool Benchmark;
+        /// <summary><c>-qalabQuitOnEnd</c>: quit (or leave Play Mode) when the run ends.</summary>
         public bool QuitOnEnd;
     }
 
