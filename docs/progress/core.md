@@ -16,9 +16,14 @@ plus the pydantic models. Clustering/ranking (§2–§6) and outputs (§11) belo
 - `qalab.cli`: `qalab validate <run_dir>...`.
 - Tests: `tests/models/test_contracts.py`, `tests/io/test_runs.py`.
 
+- `qalab.llm`: `LLMProvider` protocol + `LLMResult`; `FakeProvider` (invalid-JSON mode, overrides,
+  script, hashed bag-of-words embeddings); `OllamaProvider` (`/api/chat` with `format` schema,
+  `/api/embed`); `LLMCache` (SQLite) + `CachedProvider` (cache + latency/token logging);
+  `make_provider()`. Tests: `tests/llm/`.
+
 ## Next
 
-- Item 2: `qalab.llm` provider layer (base, fake, ollama, cache).
+- Item 3: typed `Cluster` (spec §4–6 shape) and the §7 context builder.
 
 ## Open questions
 
