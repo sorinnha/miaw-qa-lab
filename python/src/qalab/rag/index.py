@@ -83,3 +83,15 @@ def build_index(
     if matrices:
         index.matrix = np.vstack(matrices).astype(np.float32)
     return index
+
+
+def chunk_only_index(
+    doc_paths: Sequence[Path], chunk_chars: int = 800, overlap_chars: int = 100
+) -> DocIndex:
+    """Chunks without vectors, for ``--provider none`` (TF-IDF needs no embeddings)."""
+    index = DocIndex(model="tfidf")
+    for path in doc_paths:
+        index.chunks.extend(
+            chunk_markdown(path.read_text(encoding="utf-8"), path.name, chunk_chars, overlap_chars)
+        )
+    return index

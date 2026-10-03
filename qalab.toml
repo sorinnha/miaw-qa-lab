@@ -27,3 +27,4 @@ chunk_chars = 800
 overlap_chars = 100
 top_k = 3
 min_score = 0.25
+tfidf_min_score = 0.1        # --provider none: TF-IDF cosines run lower than embeddings

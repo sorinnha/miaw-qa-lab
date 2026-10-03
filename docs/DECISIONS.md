@@ -63,3 +63,9 @@ One entry per real choice: what we decided, why, what else we considered, and wh
 - **What:** with the spec weights a single `minor` detector scores 2 × (1 + log2 1) = 2.0 while three warnings score 1 × (1 + log2 3) ≈ 2.58, so on the sample run `perf_spike` (SB08) ends last and SB13 is second to last. Both are P4.
 - **Decision:** implement the formula as written and assert the intent (SB13 is in the lowest band and below every error/exception cluster) rather than tune weights to the fixture. Sora can decide on the PC whether `w_det.minor` should be 3 or warnings should carry less than 1; change `qalab.toml`/`W_DET` and EXPECTED.md together.
 - **Also:** `rank_clusters` sorts by (priority, −score, signature) so ties are stable across runs.
+
+## D-013 · 2026-10-03 · Pipeline outputs are built from `Cluster` + `BugReport` only; TF-IDF splits identifiers
+- **Pipeline:** `triage.pipeline.run_triage` = load → `build_clusters` → `rank_clusters` → per cluster `build_context` (RAG docs + code) → `generate_report` → `write_outputs`. Screenshots are copied to `<out>/shots/<run_id>/<file>` and `attachments` point there (relative to the reports folder, as the schema says). Exit code 3 when any report is P1.
+- **Outputs independent of YOU WRITE code:** writers, Markdown/CSV/HTML renderers and `make_reports` are tested on fixture clusters, so only the end-to-end smoke and leakage tests wait on `normalize_message`.
+- **TF-IDF fallback:** code identifiers are split before vectorizing (`SeededEnemyRegistry` → `seeded enemy registry`, `fell_out_of_world` → `fell out of world`), which puts the right design-doc heading in the top 3 for every log bug of the sample run. TF-IDF cosines run lower than embedding cosines, so it has its own threshold `[rag] tfidf_min_score = 0.1` (embeddings keep the spec's 0.25).
+- **Jira CSV:** description is Jira wiki markup with numbered steps, evidence refs and the QA Lab id/signature so a ticket links back to `bugs.json`.
