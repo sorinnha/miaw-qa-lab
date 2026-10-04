@@ -175,7 +175,8 @@ namespace MiawWorks.QALab.Tests
                 },
             };
             var output = new StringWriter();
-            var writer = new EventWriter("r", new FakeClock(), state, output);
+            // A long cap, so a stalled test thread (GC, busy CI machine) can't make Close give up early.
+            var writer = new EventWriter("r", new FakeClock(), state, output) { CloseWait = TimeSpan.FromSeconds(30) };
             var producer = Task.Run(() => writer.Log("error", "in flight", null));
             Assert.IsTrue(paused.Wait(TimeSpan.FromSeconds(10)), "the producer holds seq 0");
 

@@ -32,9 +32,6 @@ namespace MiawWorks.QALab
         private readonly ConcurrentQueue<QAEvent> _queue = new ConcurrentQueue<QAEvent>();
         private readonly List<QAEvent> _batch = new List<QAEvent>(256);
         private static readonly Comparison<QAEvent> BySeq = (a, b) => a.Seq.CompareTo(b.Seq);
-        // Producers never block, so they leave the in-flight bracket within microseconds; the cap only
-        // matters for a thread frozen mid-event (a debugger breakpoint).
-        private const int CloseWaitMs = 1000;
         private long _lastSeq = -1;   // Interlocked.Increment makes the first seq 0
         private long _written;
         private int _sealed;       // 1 once Close/Dispose has begun: producers drop new events
@@ -62,6 +59,13 @@ namespace MiawWorks.QALab
 
         /// <summary>Events created but not yet written.</summary>
         public int Pending => _queue.Count;
+
+        /// <summary>
+        /// Longest time <see cref="Close"/> waits for producers in flight. They never block, so they
+        /// finish within microseconds; the cap only matters for a thread frozen mid-event (a debugger
+        /// breakpoint), whose event is then lost and leaves a seq gap.
+        /// </summary>
+        public TimeSpan CloseWait { get; set; } = TimeSpan.FromSeconds(1);
 
         // ---- producers (any thread) ---------------------------------------------------------------
 
@@ -205,15 +209,23 @@ namespace MiawWorks.QALab
             {
                 return false;
             }
-            SpinWait.SpinUntil(() => Volatile.Read(ref _inFlight) == 0, CloseWaitMs);
+            SpinWait.SpinUntil(() => Volatile.Read(ref _inFlight) == 0, CloseWait);
             return true;
         }
 
         private void Finish()
         {
-            Drain();
-            _closed = true;
-            _out.Dispose();
+            try
+            {
+                Drain();
+            }
+            finally
+            {
+                // Release the file even if the last write fails (disk full): the writer is sealed, so
+                // nothing else would close it, and Windows would keep events.jsonl locked.
+                _closed = true;
+                _out.Dispose();
+            }
         }
     }
 }

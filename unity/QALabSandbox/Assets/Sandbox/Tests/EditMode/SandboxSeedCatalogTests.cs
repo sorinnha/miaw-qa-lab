@@ -117,7 +117,7 @@ namespace QALab.Sandbox.Tests
             ("SB01", "NullReferenceException: Object reference not set to an instance of an object",
                 "QALab.Sandbox.SeededDoor.Open ()\nQALab.Sandbox.Interactor.TryInteract (UnityEngine.GameObject target)\nQALab.Sandbox.Interactor.Update ()"),
             ("SB02", "Inventory slot 7 out of range (size 5)",
-                "UnityEngine.Debug:LogError (object)\nQALab.Sandbox.SeededInventory:GetSlot (int)\nQALab.Sandbox.HudInventory:Refresh ()\nQALab.Sandbox.HudInventory:Update ()"),
+                "UnityEngine.Debug:LogError (object)\nQALab.Sandbox.SeededInventory:GetSlot (int)\nQALab.Sandbox.HudInventory:Refresh ()\nQALab.Sandbox.HudInventory:Open ()\nQALab.Sandbox.HudInventory:Update ()"),
             ("SB03", "KeyNotFoundException: The given key 'enemy_4f2a9c1e' was not present in the dictionary.",
                 "System.Collections.Generic.Dictionary`2[TKey,TValue].get_Item (TKey key)\nQALab.Sandbox.SeededEnemyRegistry.Get (System.String id)\nQALab.Sandbox.SeededSpawner.AssignTarget (QALab.Sandbox.Enemy enemy)\nQALab.Sandbox.SeededSpawner.Update ()"),
             ("SB04", "NullReferenceException: Object reference not set to an instance of an object",
