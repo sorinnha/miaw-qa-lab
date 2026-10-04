@@ -46,7 +46,11 @@ if (-not $IncludeYouWrite) {
 }
 
 Write-Host "unity_tests: running $Platform tests (log: $log)"
-$process = Start-Process -FilePath $unity -ArgumentList $unityArgs -Wait -PassThru -NoNewWindow
+# Not Start-Process -Wait: it also waits for every child process, and Unity can leave its licensing
+# client running after it exits, which would hang this script. Wait for Unity itself instead.
+$process = Start-Process -FilePath $unity -ArgumentList $unityArgs -PassThru -NoNewWindow
+$null = $process.Handle   # keep a handle open, or ExitCode can come back empty after the exit
+$process.WaitForExit()
 $code = $process.ExitCode
 
 if (-not (Test-Path $results)) {
