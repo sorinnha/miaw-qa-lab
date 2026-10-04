@@ -108,9 +108,8 @@ namespace MiawWorks.QALab
             const int exitCode = 0;   // M4: 1 when a blocker/critical detector fired, 2 on internal error
             try
             {
-                _writer.Marker("run_end", new JObject { ["exit_reason"] = exitReason });
-                _logs.Stop();
-                _writer.Dispose();
+                _logs.Stop();   // no new log callbacks; Close waits for any still in flight
+                _writer.Close("run_end", new JObject { ["exit_reason"] = exitReason });
                 _run.WriteEnd(exitReason, exitCode);
                 var unknown = LabelRecorder.End(Path.Combine(RunDir, "labels.json"), _runId);
                 if (unknown.Count > 0)
@@ -154,20 +153,15 @@ namespace MiawWorks.QALab
         // Leaving Play Mode or quitting destroys this object: a clean end, if the run is still open.
         private void OnDestroy() => EndRun(ExitReasons.UserQuit);
 
-        /// <summary>run.json → seeds_enabled: the game's catalog ids that -qalabSeeds turns on.</summary>
+        /// <summary>run.json → seeds_enabled (rule in <see cref="SeedSelection.EnabledIds"/>).</summary>
         private static IEnumerable<string> SeedsEnabled(QALabOptions options)
         {
-            var ids = new List<string>();
+            var catalogIds = new List<string>();
             foreach (var entry in LabelRecorder.Catalog)
             {
-                if (options.Seeds.IsEnabled(entry.BugId)) ids.Add(entry.BugId);
+                catalogIds.Add(entry.BugId);
             }
-            if (ids.Count == 0 && !options.Seeds.IsAll)
-            {
-                ids.AddRange(options.Seeds.Ids);
-            }
-            ids.Sort(StringComparer.Ordinal);
-            return ids;
+            return options.Seeds.EnabledIds(catalogIds);
         }
     }
 }

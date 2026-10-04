@@ -107,5 +107,16 @@ namespace MiawWorks.QALab.Tests
             StringAssert.Contains("BAD", error);
             Assert.IsEmpty(SeedSelection.All.Ids);
         }
+
+        [Test]
+        public void SeedsEnabledIsTheCatalogForAllAndTheGivenIdsForAList()
+        {
+            var catalog = new[] { "SB03", "SB01" };
+            CollectionAssert.AreEqual(new[] { "SB01", "SB03" }, SeedSelection.All.EnabledIds(catalog));
+            // SB02 has no catalog entry until its YOU WRITE task is done; SB06 arrives in M4. Both were
+            // asked for, so both are recorded, the same as an id the catalog does know.
+            CollectionAssert.AreEqual(new[] { "SB01", "SB02" }, SeedSelection.Parse("SB02,sb01", out _).EnabledIds(catalog));
+            CollectionAssert.AreEqual(new[] { "SB06" }, SeedSelection.Parse("SB06", out _).EnabledIds(catalog));
+        }
     }
 }

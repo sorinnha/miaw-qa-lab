@@ -7,8 +7,11 @@ namespace QALab.Sandbox
     /// <summary>
     /// SB04 (Spawner): one spawn point was removed from the level but is still in the list, and
     /// <c>SpawnWave</c> doesn't check it → NullReferenceException with the same message as SB01 but a
-    /// different stack. Waves alternate: odd waves hit the removed point (SB04), even waves spawn and
-    /// assign targets, where the registry lookup fails (SB03).
+    /// different stack. Waves alternate: odd waves hit the removed point (SB04), even waves spawn, and
+    /// then <c>Update</c> assigns targets, where the registry lookup fails (SB03).
+    /// Targets are assigned from <c>Update</c>, not inside <c>SpawnWave</c>: SB03's stack
+    /// (<c>Get ← AssignTarget ← Update</c>) must not contain <c>SeededSpawner.SpawnWave</c>, or it would
+    /// also match SB04's catalog rule and one exception would count as two seeded bugs.
     /// </summary>
     public sealed class SeededSpawner : MonoBehaviour
     {
@@ -53,10 +56,15 @@ namespace QALab.Sandbox
             if (!due && _wavesRequested == 0) return;
             if (!due) _wavesRequested--;
             _nextWave = Time.time + waveIntervalS;
-            SpawnWave();
+            var spawned = SpawnWave();
+            foreach (var enemy in spawned)
+            {
+                AssignTarget(enemy);
+            }
         }
 
-        public void SpawnWave()
+        /// <summary>Spawn and register 3–5 enemies; the caller assigns their targets.</summary>
+        public List<Enemy> SpawnWave()
         {
             _wave++;
             var spawned = new List<Enemy>();
@@ -75,10 +83,7 @@ namespace QALab.Sandbox
                 spawned.Add(enemy);
                 Debug.DrawRay(position, Vector3.up * 2f, Color.red, 1f);
             }
-            foreach (var enemy in spawned)
-            {
-                AssignTarget(enemy);
-            }
+            return spawned;
         }
 
         public void AssignTarget(Enemy enemy)

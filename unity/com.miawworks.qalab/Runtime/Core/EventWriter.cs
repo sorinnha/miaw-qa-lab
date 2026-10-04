@@ -18,6 +18,9 @@ namespace MiawWorks.QALab
     /// <item>Only the main thread calls <see cref="Drain"/> (every 0.5 s and on quit): it sorts the batch
     /// by <c>seq</c> and appends one line per event. An event created on another thread just before a
     /// drain can land in the next batch, so the file may be slightly out of order; readers sort by seq.</item>
+    /// <item>The main thread ends the run with <see cref="Close"/>: producers from then on get null and
+    /// take no seq, producers already past that check finish enqueuing first, and the closing marker
+    /// (<c>run_end</c>) gets the last seq. So the file has no seq gaps and nothing after <c>run_end</c>.</item>
     /// </list>
     /// </summary>
     public sealed class EventWriter : IDisposable
@@ -31,7 +34,8 @@ namespace MiawWorks.QALab
         private static readonly Comparison<QAEvent> BySeq = (a, b) => a.Seq.CompareTo(b.Seq);
         private long _lastSeq = -1;   // Interlocked.Increment makes the first seq 0
         private long _written;
-        private int _disposed;
+        private int _sealed;       // 1 once Close/Dispose has begun: producers drop new events
+        private int _inFlight;     // producers between their sealed check and their enqueue
         private bool _closed;      // set after the file is closed; main thread only
 
         public EventWriter(string runId, IClock clock, IMainThreadState state, TextWriter output)
@@ -56,10 +60,40 @@ namespace MiawWorks.QALab
         /// <summary>Events created but not yet written.</summary>
         public int Pending => _queue.Count;
 
+        /// <summary>
+        /// Longest time <see cref="Close"/> waits for producers in flight. They never block, so they
+        /// finish within microseconds; the cap only matters for a thread frozen mid-event (a debugger
+        /// breakpoint), whose event is then lost and leaves a seq gap.
+        /// </summary>
+        public TimeSpan CloseWait { get; set; } = TimeSpan.FromSeconds(1);
+
         // ---- producers (any thread) ---------------------------------------------------------------
 
-        /// <summary>Stamp and enqueue an event of any kind. <c>data</c> may be null for log events.</summary>
+        /// <summary>
+        /// Stamp and enqueue an event of any kind. <c>data</c> may be null for log events. Once the writer
+        /// is closing this returns null and takes no seq.
+        /// </summary>
         public QAEvent Enqueue(string kind, JObject data = null, string level = null, string message = null, string stack = null)
+        {
+            // The in-flight bracket is what Close waits on. Both sides use full fences (Interlocked) before
+            // reading the other side's flag, so either Close sees this producer in flight and waits for its
+            // enqueue, or this producer sees _sealed and drops the event before taking a seq.
+            Interlocked.Increment(ref _inFlight);
+            try
+            {
+                if (Volatile.Read(ref _sealed) != 0)
+                {
+                    return null;
+                }
+                return Push(kind, data, level, message, stack);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _inFlight);
+            }
+        }
+
+        private QAEvent Push(string kind, JObject data, string level, string message, string stack)
         {
             var e = new QAEvent
             {
@@ -76,10 +110,7 @@ namespace MiawWorks.QALab
                 Stack = string.IsNullOrEmpty(stack) ? null : stack,
                 Data = data,
             };
-            if (Volatile.Read(ref _disposed) == 0)
-            {
-                _queue.Enqueue(e);
-            }
+            _queue.Enqueue(e);
             return e;
         }
 
@@ -88,14 +119,17 @@ namespace MiawWorks.QALab
             Enqueue(EventKinds.Log, null, level, message ?? string.Empty, stack);
 
         /// <summary><c>run_start</c>, <c>run_end</c>, <c>scene_loaded</c>, ... with optional details.</summary>
-        public QAEvent Marker(string marker, JObject details = null)
+        public QAEvent Marker(string marker, JObject details = null) =>
+            Enqueue(EventKinds.Marker, MarkerData(marker, details));
+
+        private static JObject MarkerData(string marker, JObject details)
         {
             var data = new JObject { ["marker"] = marker };
             if (details != null)
             {
                 data["details"] = details;
             }
-            return Enqueue(EventKinds.Marker, data);
+            return data;
         }
 
         /// <summary>A metric event; pass <c>memMb = null</c> when the platform reports nothing.</summary>
@@ -144,16 +178,54 @@ namespace MiawWorks.QALab
             return _batch.Count;
         }
 
-        /// <summary>Final drain, then close the file. Events enqueued afterwards are dropped.</summary>
+        /// <summary>
+        /// End the run (main thread): stop accepting events, let producers already in flight enqueue,
+        /// write <paramref name="marker"/> as the last event, drain and close the file. Returns the
+        /// marker event, or null if the writer was already closed.
+        /// </summary>
+        public QAEvent Close(string marker, JObject details = null)
+        {
+            if (!Seal())
+            {
+                return null;
+            }
+            var last = Push(EventKinds.Marker, MarkerData(marker, details), null, null, null);
+            Finish();
+            return last;
+        }
+
+        /// <summary>Like <see cref="Close"/> without a closing marker. Later events are dropped.</summary>
         public void Dispose()
         {
-            if (Interlocked.Exchange(ref _disposed, 1) == 1)
+            if (Seal())
             {
-                return;
+                Finish();
             }
-            Drain();
-            _closed = true;
-            _out.Dispose();
+        }
+
+        private bool Seal()
+        {
+            if (Interlocked.Exchange(ref _sealed, 1) == 1)
+            {
+                return false;
+            }
+            SpinWait.SpinUntil(() => Volatile.Read(ref _inFlight) == 0, CloseWait);
+            return true;
+        }
+
+        private void Finish()
+        {
+            try
+            {
+                Drain();
+            }
+            finally
+            {
+                // Release the file even if the last write fails (disk full): the writer is sealed, so
+                // nothing else would close it, and Windows would keep events.jsonl locked.
+                _closed = true;
+                _out.Dispose();
+            }
         }
     }
 }

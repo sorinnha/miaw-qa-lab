@@ -1,7 +1,8 @@
 # Unity side: hand-off note
 
-Branch `m1-unity-core` (draft PR "M1: Unity package core + sandbox log bugs"). Covers spec 01's M1 items.
-Delete this note when everything below is done.
+M1 code is on `main` (PR #5, "M1: Unity package core + sandbox log bugs"). A second fresh-context review
+found 10 issues; the fixes are on `m1-unity-core` (draft PR "M1: review fixes"), see D-023. Covers spec 01's
+M1 items. Delete this note when everything below is done.
 
 ## Built (M1)
 
@@ -18,16 +19,18 @@ Delete this note when everything below is done.
   `SandboxSeedCatalog`, `SandboxSceneBuilder`, asmdefs, EditMode tests.
 - **Checks:** `tools/cs-check` (netstandard2.1 core + net8 NUnit), CI job `csharp-check`,
   `scripts/find_unity.ps1`, `scripts/unity_tests.ps1`, `scripts/link_sandbox_package.py`.
-- **Decisions:** D-017 … D-020, plus D-022 (review follow-ups).
+- **Decisions:** D-017 … D-020, plus D-022 and D-023 (review follow-ups).
 - **Tests (Unity-only, run on the PC):** package PlayMode `LogCaptureTests`, `RunRecordingTests` (real
   host → run.json/events.jsonl/labels.json); sandbox EditMode `SeededLogBugTests` (SB03, SB05, SB13,
-  SB14), `SeededInventoryTests` (YOU WRITE); sandbox PlayMode `SeededComponentTests` (SB01, SB03, SB04).
+  SB14), `SeededInventoryTests` (YOU WRITE); sandbox PlayMode `SeededComponentTests` (SB01, SB03, SB04, and the
+  real SB03/SB04 stacks against both catalog rules).
 
 ## Not verified here (needs Unity on Sora's PC)
 
-Everything Unity-only above compiles only in the editor. The PR's PC checklist lists the exact steps:
-create the project, copy, link the package, rebuild scenes, commit generated `.meta`/`.unity` files,
-run EditMode/PlayMode tests, play 60 s with F1 → `qalab validate`.
+Everything Unity-only above compiles only in the editor. The cloud sessions smoke-compiled it against
+hand-written UnityEngine stubs (syntax and name lookup only). The PR's PC checklist lists the exact steps:
+create the project, copy, link the package, set Product Name back to `QALabSandbox`, rebuild scenes,
+commit generated `.meta`/`.unity` files, run EditMode/PlayMode tests, play 60 s with F1 → `qalab validate`.
 
 ## Open YOU WRITE tasks (Sora)
 

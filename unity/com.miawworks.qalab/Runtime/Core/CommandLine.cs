@@ -34,6 +34,17 @@ namespace MiawWorks.QALab
 
         public bool IsEnabled(string bugId) => _ids == null || _ids.Contains(bugId);
 
+        /// <summary>
+        /// run.json <c>seeds_enabled</c>, sorted: for <c>all</c>, every id in the game's catalog; for a
+        /// list, exactly the listed ids, including ids the catalog doesn't have (yet).
+        /// </summary>
+        public List<string> EnabledIds(IEnumerable<string> catalogIds)
+        {
+            var ids = new List<string>(_ids ?? new HashSet<string>(catalogIds, StringComparer.Ordinal));
+            ids.Sort(StringComparer.Ordinal);
+            return ids;
+        }
+
         /// <summary>Parse <c>all</c> or a comma list like <c>SB01, sb06</c>. Returns null on a bad id.</summary>
         public static SeedSelection Parse(string text, out string error)
         {

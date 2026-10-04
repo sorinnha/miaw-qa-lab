@@ -22,9 +22,8 @@ namespace QALab.Sandbox
         /// <item>For any other index: call <c>LabelRecorder.Trigger("SB02")</c> first, then log with
         /// <c>Debug.LogError</c> exactly <c>Inventory slot {index} out of range (size 5)</c> (use
         /// <see cref="Size"/>, not a literal 5), and return null. Never throw: the HUD keeps working.</item>
-        /// <item>Why Debug.LogError and not an exception? Unity then prints the frame as
-        /// <c>QALab.Sandbox.SeededInventory:GetSlot (int)</c>, which is what the SB02 catalog entry and
-        /// the triage tests expect.</item>
+        /// <item>Why Debug.LogError and not an exception? The HUD has to keep working after a bad index,
+        /// and the sample run (the triage fixture) records SB02 as an error log, not an exception.</item>
         /// </list>
         /// Tests: <c>Tests/EditMode/SeededInventoryTests.cs</c> (category YouWrite).
         /// </summary>
