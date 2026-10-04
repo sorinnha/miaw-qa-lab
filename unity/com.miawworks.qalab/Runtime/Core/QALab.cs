@@ -102,7 +102,7 @@ namespace MiawWorks.QALab
 #if UNITY_EDITOR
             // The Test Runner enters Play Mode too (batch "-runTests" or its temporary InitTestScene);
             // auto-starting there would record the tests' deliberate errors as a game run.
-            var underTestRunner = args.Contains("-runTests")
+            var underTestRunner = args.Exists(a => string.Equals(a, "-runTests", StringComparison.OrdinalIgnoreCase))
                 || SceneManager.GetActiveScene().name.StartsWith("InitTestScene", StringComparison.Ordinal);
             var settings = Resources.Load<QALabSettings>(QALabSettings.ResourceName);
             if (settings != null && settings.AutoStartInPlayMode && !underTestRunner)

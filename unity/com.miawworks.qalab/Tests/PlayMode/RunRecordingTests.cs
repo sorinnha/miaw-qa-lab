@@ -16,14 +16,23 @@ namespace MiawWorks.QALab.Tests
     /// </summary>
     public class RunRecordingTests
     {
+        private const string LastRunDirPref = "QALab.LastRunDir";
         private string _outDir;
         private GameObject _go;
+        private string _savedLastRunDir;
 
         [SetUp]
         public void SetUp()
         {
             _outDir = Path.Combine(Path.GetTempPath(), "qalab-playmode-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(_outDir);
+#if UNITY_EDITOR
+            // The host remembers its run folder for Tools > QA Lab > Open Last Run Folder; this test's
+            // folder is deleted afterwards, so put the user's last real run back in TearDown.
+            _savedLastRunDir = UnityEditor.EditorPrefs.HasKey(LastRunDirPref)
+                ? UnityEditor.EditorPrefs.GetString(LastRunDirPref)
+                : null;
+#endif
         }
 
         [TearDown]
@@ -32,6 +41,10 @@ namespace MiawWorks.QALab.Tests
             if (_go != null) UnityEngine.Object.Destroy(_go);
             LabelRecorder.UseCatalog(new SeedCatalogEntry[0]);
             try { Directory.Delete(_outDir, true); } catch (IOException) { /* best effort */ }
+#if UNITY_EDITOR
+            if (_savedLastRunDir == null) UnityEditor.EditorPrefs.DeleteKey(LastRunDirPref);
+            else UnityEditor.EditorPrefs.SetString(LastRunDirPref, _savedLastRunDir);
+#endif
         }
 
         [UnityTest]
@@ -74,13 +87,17 @@ namespace MiawWorks.QALab.Tests
             var kinds = new List<string>();
             var seqs = new List<long>();
             JObject log = null;
+            JObject last = null;
             foreach (var line in File.ReadAllLines(Path.Combine(runDir, "events.jsonl")))
             {
+                StringAssert.DoesNotContain("SB99", line, "labels never go into events.jsonl");
                 var e = JObject.Parse(line);   // every line parses
                 Assert.AreEqual("qalab.event/1", (string)e["schema"]);
                 kinds.Add((string)e["kind"]);
                 seqs.Add((long)e["seq"]);
-                if ((string)e["kind"] == "log") log = e;
+                last = e;
+                // Found by message: Unity may log unrelated warnings during the run.
+                if ((string)e["kind"] == "log" && (string)e["message"] == "qalab wiring error 7") log = e;
                 if ((string)e["kind"] == "marker" && (string)e["data"]["marker"] == "run_start")
                 {
                     Assert.AreEqual(0L, (long)e["seq"], "run_start is the first event");
@@ -89,7 +106,9 @@ namespace MiawWorks.QALab.Tests
             seqs.Sort();
             for (var i = 0; i < seqs.Count; i++) Assert.AreEqual(i, seqs[i], "seq has no gaps");
             CollectionAssert.Contains(kinds, "metric");
-            Assert.AreEqual("marker", kinds[kinds.Count - 1], "run_end is written last");
+            Assert.AreEqual("marker", (string)last["kind"]);
+            Assert.AreEqual("run_end", (string)last["data"]["marker"], "run_end is written last");
+            Assert.AreEqual((long)(seqs.Count - 1), (long)last["seq"], "run_end has the last seq");
             Assert.IsNotNull(log, "the error was captured");
             Assert.AreEqual("error", (string)log["level"]);
             Assert.AreEqual("qalab wiring error 7", (string)log["message"]);

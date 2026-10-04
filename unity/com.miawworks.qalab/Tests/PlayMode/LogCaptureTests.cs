@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using MiawWorks.QALab;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
@@ -11,7 +12,10 @@ using UnityEngine.TestTools;
 
 namespace MiawWorks.QALab.Tests
 {
-    /// <summary>Spec 01 PlayMode: LogCapture records Debug.LogError and an exception thrown in a coroutine.</summary>
+    /// <summary>
+    /// Spec 01 PlayMode: LogCapture records Debug.LogError, an exception thrown in a coroutine and a log
+    /// from a worker thread (logMessageReceivedThreaded), and skips info logs and its own [QALab] logs.
+    /// </summary>
     public class LogCaptureTests
     {
         private sealed class Clock : IClock
@@ -58,8 +62,10 @@ namespace MiawWorks.QALab.Tests
                 capture.Start();
                 LogAssert.Expect(LogType.Error, "qalab test error");
                 Debug.LogError("qalab test error");
-                Debug.Log("info is below the minimum level");
+                Debug.Log("qalab info is below the minimum level");
                 Debug.LogWarning("[QALab] own message, ignored");   // warnings never fail a Unity test
+                // The threaded callback runs on the logging thread, before Wait returns.
+                Task.Run(() => Debug.LogWarning("qalab worker thread warning")).Wait();
                 LogAssert.Expect(LogType.Exception, new Regex("InvalidOperationException: qalab coroutine boom"));
                 var thrower = go.AddComponent<Thrower>();
                 thrower.StartCoroutine(thrower.Throw());
@@ -73,13 +79,18 @@ namespace MiawWorks.QALab.Tests
             }
             writer.Drain();
 
-            var lines = Lines(output);
-            Assert.AreEqual(2, lines.Count, output.ToString());
+            // Only this test's lines: Unity can log unrelated warnings meanwhile (e.g. no audio listener).
+            // Every message above contains "qalab", so a skipped one that leaks in still fails the count.
+            var lines = Lines(output).FindAll(
+                l => ((string)l["message"]).IndexOf("qalab", StringComparison.OrdinalIgnoreCase) >= 0);
+            Assert.AreEqual(3, lines.Count, output.ToString());
             Assert.AreEqual("error", (string)lines[0]["level"]);
             Assert.AreEqual("qalab test error", (string)lines[0]["message"]);
-            Assert.AreEqual("exception", (string)lines[1]["level"]);
-            StringAssert.Contains("InvalidOperationException: qalab coroutine boom", (string)lines[1]["message"]);
-            StringAssert.Contains("Thrower", (string)lines[1]["stack"]);
+            Assert.AreEqual("warning", (string)lines[1]["level"]);
+            Assert.AreEqual("qalab worker thread warning", (string)lines[1]["message"]);
+            Assert.AreEqual("exception", (string)lines[2]["level"]);
+            StringAssert.Contains("InvalidOperationException: qalab coroutine boom", (string)lines[2]["message"]);
+            StringAssert.Contains("Thrower", (string)lines[2]["stack"]);
         }
 
         [Test]
