@@ -29,3 +29,17 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
                     strict=False,
                 )
             )
+
+
+@pytest.fixture(autouse=True)
+def _no_real_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tests never read a developer's .env or real API keys, so nothing can reach a hosted model."""
+    monkeypatch.setenv("QALAB_NO_DOTENV", "1")
+    for name in (
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY",
+        "QALAB_PROVIDER",
+        "QALAB_MODEL",
+        "QALAB_EMBED_MODEL",
+    ):
+        monkeypatch.delenv(name, raising=False)

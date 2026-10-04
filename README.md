@@ -27,7 +27,20 @@ Two functions are written by hand as learning tasks (`normalize_message`, `cosin
 
 ## Data handling
 
-The default provider is a local model through Ollama: logs, screenshots and design docs never leave the machine. Hosted providers are optional extras; some free tiers may use what you send to improve their products, so read the provider's terms and only send sandbox data unless you know it is allowed. API keys live in `.env` (gitignored) and are never logged.
+Triage sends log lines, stack traces, nearby bot actions, design-doc excerpts and (for vision)
+screenshots to the configured model. Choose the provider with that in mind:
+
+- **Gemini (configured in `qalab.toml`).** Sora's PC runs no local model, so triage uses Google's
+  hosted Gemini API (`[gemini]` extra, key in `GEMINI_API_KEY`). On the free tier Google may use
+  what you send to improve its products, and people may review it. **Send sandbox data only**:
+  `samples/` and runs of `unity/QALabSandbox`. Don't send runs of an unreleased or proprietary game
+  unless you're on a paid tier whose terms allow it, or switch that run to `--provider ollama` or
+  `--provider none`.
+- **Ollama** keeps everything on the machine; **`none`** writes template reports with no model;
+  **`fake`** is the deterministic offline provider the tests use.
+- The API key is read from the environment or `.env` (gitignored) only. It is never logged, cached
+  or written to reports, and prompts are not logged either (`triage_meta.json` holds token counts
+  and timings only). The LLM cache in `.cache/llm.sqlite` stores model answers; it is gitignored.
 
 The rest of the README (demo, measured results, how it was built) is written in milestones M5 and M7. Every number there will come from a script in this repo.
 
