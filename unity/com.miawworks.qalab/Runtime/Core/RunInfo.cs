@@ -36,16 +36,23 @@ namespace MiawWorks.QALab
 
         public static RunInfo FromJson(string json) => JsonConvert.DeserializeObject<RunInfo>(json, JsonSettings.Strict);
 
-        /// <summary>Write <c>run.json</c> atomically (temp file + move), UTF-8 without BOM, LF.</summary>
+        /// <summary>
+        /// Write <c>run.json</c> through a temp file, UTF-8 without BOM, LF. An existing file is swapped in
+        /// one step (<see cref="File.Replace(string, string, string)"/>), so a crash while the run ends
+        /// never leaves the folder without a run.json.
+        /// </summary>
         public void WriteTo(string path)
         {
             var temp = path + ".tmp";
             File.WriteAllText(temp, ToJson().Replace("\r\n", "\n") + "\n", new UTF8Encoding(false));
             if (File.Exists(path))
             {
-                File.Delete(path);
+                File.Replace(temp, path, null);
             }
-            File.Move(temp, path);
+            else
+            {
+                File.Move(temp, path);
+            }
         }
 
         /// <summary>Mark a clean end: <c>ended_at</c>, duration, exit reason and code.</summary>
