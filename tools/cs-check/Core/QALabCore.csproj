@@ -15,6 +15,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <PackageRoot>../../../unity/com.miawworks.qalab/Runtime</PackageRoot>
+    <PackageEditor>../../../unity/com.miawworks.qalab/Editor</PackageEditor>
     <SandboxScripts>../../../unity/QALabSandbox/Assets/Sandbox/Scripts</SandboxScripts>
   </PropertyGroup>
   <ItemGroup>
@@ -31,6 +32,7 @@
     <Compile Include="$(PackageRoot)/Bot/SeededRandom.cs" Link="Package/Bot/SeededRandom.cs" />
     <Compile Include="$(PackageRoot)/Bot/NamedRegistry.cs" Link="Package/Bot/NamedRegistry.cs" />
     <Compile Include="$(PackageRoot)/Bot/BotActionData.cs" Link="Package/Bot/BotActionData.cs" />
+    <Compile Include="$(PackageEditor)/Scanner/ScanReport.cs" Link="Package/Editor/Scanner/ScanReport.cs" />
     <Compile Include="$(SandboxScripts)/SandboxSeedCatalog.cs" Link="Sandbox/SandboxSeedCatalog.cs" />
   </ItemGroup>
   <ItemGroup>
