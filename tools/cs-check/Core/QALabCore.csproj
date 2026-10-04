@@ -16,6 +16,7 @@
   <PropertyGroup>
     <PackageRoot>../../../unity/com.miawworks.qalab/Runtime</PackageRoot>
     <PackageEditor>../../../unity/com.miawworks.qalab/Editor</PackageEditor>
+    <AdapterSample>../../../unity/com.miawworks.qalab/Samples~/GameAdapterTemplate</AdapterSample>
     <SandboxScripts>../../../unity/QALabSandbox/Assets/Sandbox/Scripts</SandboxScripts>
   </PropertyGroup>
   <ItemGroup>
@@ -33,6 +34,9 @@
     <Compile Include="$(PackageRoot)/Bot/NamedRegistry.cs" Link="Package/Bot/NamedRegistry.cs" />
     <Compile Include="$(PackageRoot)/Bot/BotActionData.cs" Link="Package/Bot/BotActionData.cs" />
     <Compile Include="$(PackageEditor)/Scanner/ScanReport.cs" Link="Package/Editor/Scanner/ScanReport.cs" />
+    <!-- The engine-free half of the "Game adapter template" sample (its Unity half compiles in the game). -->
+    <Compile Include="$(AdapterSample)/IGameCommands.cs" Link="Sample/IGameCommands.cs" />
+    <Compile Include="$(AdapterSample)/TurnPolicy.cs" Link="Sample/TurnPolicy.cs" />
     <Compile Include="$(SandboxScripts)/SandboxSeedCatalog.cs" Link="Sandbox/SandboxSeedCatalog.cs" />
   </ItemGroup>
   <ItemGroup>

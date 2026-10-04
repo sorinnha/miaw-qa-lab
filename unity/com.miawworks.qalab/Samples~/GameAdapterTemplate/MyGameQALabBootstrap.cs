@@ -12,8 +12,15 @@ namespace MyGame.QALab
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
         private static void Register()
         {
-            BotAdapterRegistry.Register(MyGameAdapter.AdapterName,
-                () => new MyGameAdapter(() => GameCommandsLocator.Current));
+            BotAdapterRegistry.Register(MyGameAdapter.AdapterName, () => new MyGameAdapter(FindGame));
+        }
+
+        /// <summary>The current turn manager, or null if there is none or it was destroyed without clearing the locator.</summary>
+        private static IGameCommands FindGame()
+        {
+            var game = GameCommandsLocator.Current;
+            // Unity's "destroyed equals null" only works through a UnityEngine.Object reference.
+            return game is Object unityObject && unityObject == null ? null : game;
         }
     }
 }

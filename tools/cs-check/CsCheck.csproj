@@ -30,6 +30,8 @@
     <Compile Include="$(PackageTests)/LabelBookTests.cs" Link="Tests/LabelBookTests.cs" />
     <Compile Include="$(PackageTests)/BotFrameworkTests.cs" Link="Tests/BotFrameworkTests.cs" />
     <Compile Include="$(PackageTests)/ScanReportTests.cs" Link="Tests/ScanReportTests.cs" />
+    <!-- Tests of the adapter template's YOU WRITE rule; cs-check only (the sample is copied into a game). -->
+    <Compile Include="SampleTests/TurnPolicyTests.cs" />
     <Compile Include="$(SandboxTests)/SandboxSeedCatalogTests.cs" Link="Tests/SandboxSeedCatalogTests.cs" />
   </ItemGroup>
   <ItemGroup>

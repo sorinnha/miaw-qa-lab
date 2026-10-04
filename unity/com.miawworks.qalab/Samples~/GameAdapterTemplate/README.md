@@ -7,7 +7,8 @@ A starting point for a QA Lab bot adapter that plays your game through its own c
 | File | What to do with it |
 |---|---|
 | `IGameCommands.cs` | Implement it on your turn manager (or change it to your game's verbs). Set `GameCommandsLocator.Current = this` in `Awake`. |
-| `MyGameAdapter.cs` | Rename it, set `AdapterName`, adjust the decision rule. Use only `ctx.Random`. |
+| `TurnPolicy.cs` | The decision rule: which unit, which order, when to end the turn. Engine-free; uses only the run's `SeededRandom`. |
+| `MyGameAdapter.cs` | Carries each decision out and logs it. Rename it and set `AdapterName` (snake_case). |
 | `MyGameQALabBootstrap.cs` | Registers the adapter before the first scene loads. |
 
 There is deliberately no `.asmdef` here: the files compile into your game's main assembly, so they can

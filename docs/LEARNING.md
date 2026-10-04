@@ -15,7 +15,7 @@ See what's still open: `pytest python -m youwrite -rxX` (x = open, X = passing b
 | M4 | unity/com.miawworks.qalab/Runtime/Detectors/StuckCalculator.cs | StuckCalculator | | |
 | M5 | python/src/qalab/eval/metrics.py | pairwise_prf | | |
 | M6 | python/src/qalab/vision/heuristics.py | magenta_ratio | | |
-| M7 | (your game) | game adapter | | |
+| M7 | unity/com.miawworks.qalab/Samples~/GameAdapterTemplate/TurnPolicy.cs + your game | TurnPolicy.Decide, IGameCommands | | |
 
 ## Entries
 
