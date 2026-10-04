@@ -97,7 +97,7 @@ namespace QALab.Sandbox
             return "Grass";
         }
 
-        /// <summary>Respawns happen here from now on (checkpoint zones call this).</summary>
+        /// <summary>Respawns happen here from now on. Nothing calls it yet: checkpoint zones come with the fall seed (SB06, M4).</summary>
         public void SetCheckpoint(Vector3 position) => _checkpoint = position;
 
         // ---- IBotMover (driven by the M4 bot) -------------------------------------------------------

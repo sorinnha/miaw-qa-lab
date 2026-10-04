@@ -130,3 +130,37 @@ One entry per real choice: what we decided, why, what else we considered, and wh
 - **`run.json`** replaces an existing file with `File.Replace` (one call) instead of delete + move; if the OS swap fails halfway, the new content is still in `run.json.tmp`.
 - **`unity_tests.ps1`** waits for the Unity process only (`WaitForExit`), not `Start-Process -Wait`, which also waits for child processes such as Unity's licensing client.
 - **PC setup:** the project is created as `QALabSandbox_new` and its ProjectSettings are copied, so Player Settings → Product Name must be set back to `QALabSandbox` (it becomes run.json `project` and the persistentDataPath folder). This is a PC checklist step.
+
+## D-024 · 2026-10-04 · Polish session: M7 code before M4–M6, scanner report format, versions stay 0.1.0 (M7)
+- **Built early:**
+  - ProjectScanner (spec 01, M7).
+  - The bot contracts from spec 01's M4 section (`IBotAdapter`, `BotStepResult`, `BotContext`, `BotAdapterRegistry`, `SeededRandom`), so the M7 game-adapter template compiles against the real API.
+  - The bot runner, built-in adapters, detectors and screenshots stay in M4.
+- **Bot contract details the spec leaves open:**
+  - `BotStepResult` is `Continue | Done`.
+  - Adapter names follow one rule, snake_case, matched exactly. `CommandLine.IsAdapterName` is shared by `-qalabAdapter` and the registry, so every registered adapter can be selected. A later registration replaces an earlier one, so a game can override a built-in.
+  - `BotContext.LogAction` also takes a plain dictionary, so adapters don't build JSON. Strings, numbers and bools are written as they are, a `Vector3` as `[x, y, z]`, anything else as text. Calling it still needs a Newtonsoft reference. Game code without an asmdef has one (the Newtonsoft package's DLL is auto-referenced); an asmdef with Override References must list `Newtonsoft.Json.dll`.
+  - Action data goes through the engine-free `BotActionData`, which is checked against the schema example.
+- **`scan.json` is not a contract.** It's a Unity-side report that Python never reads, so it has no schema in `schemas/`. It carries `tool` and `format_version: 1`, and its format is documented in `docs/USER_GUIDE.md`. If Python ever reads it, it gets a schema first (contracts first).
+- **Scanner rules:**
+  - unassigned references are reported for scripts outside Unity's own packages only (`MonoScript` path not under `Packages/com.unity.*`). Built-in components, uGUI and TextMeshPro have many optional slots;
+  - a material slot is reported once, as `null_material`, not also as a broken reference;
+  - for a `ParticleSystemRenderer` only slot 0 is checked (slot 1 is the trail material, empty unless trails are used);
+  - a Build Settings scene whose file is gone is an error (`missing_scene`);
+  - loaded scenes are scanned in place, and others are opened additively, then removed again; a scene that was in the Hierarchy unloaded is unloaded again. The scanner never saves anything, and it refuses to run in Play Mode;
+  - scene existence is checked through the AssetDatabase (`SceneAsset`), which also finds scenes in registry or git packages;
+  - the default output is `Logs/qalab/scan.json` (outside Assets, gitignored by Unity's template);
+  - exit codes are 0 clean, 1 errors, 2 the scan failed. `scan_project.ps1` also exits 2 when it couldn't run (no Unity, no scan.json).
+- **Packaging:**
+  - The editor asmdef references `Newtonsoft.Json.dll` explicitly, like the runtime.
+  - The adapter template is a UPM sample (`Samples~`, listed in `package.json`) with no asmdef, so after import it compiles into the game's assembly and can call game code.
+  - The template's decision rule is the M7 learning task, stubbed. `TurnPolicy.Decide` is engine-free; its YouWrite tests run in `tools/cs-check` (`SampleTests/TurnPolicyTests.cs`), because the sample is copied into a game where Unity can't run the repo's tests. `MyGameAdapter` only carries decisions out and logs them, and looks the game up on every step, since a destroyed turn manager behind an interface doesn't compare equal to null.
+  - `scripts/scan_project.ps1` (not in spec 04's list) runs the scanner on any project.
+- **Jenkinsfile:**
+  - a Prepare stage deletes `runs\nightly`, `reports\nightly` and `out` (gitignored, so checkout keeps them) so a night never re-triages the previous one;
+  - stages for M4/M6 scripts are guarded with `fileExists`, and triage falls back to `samples/sample_run` as a dry run;
+  - the provider parameter defaults to `none`;
+  - a Gate stage fails the build after publishing when triage exits 3;
+  - it's an example: parse-checked with Groovy, never run on Jenkins.
+- **Versions stay 0.1.0** in all four places: `python/pyproject.toml`, `qalab.__version__` (triage_meta.json), `package.json` and `QALab.Version` (run.json `qalab_version`). `python/tests/test_versions.py` keeps them equal. No release has been cut. Spec 04 ties version bumps to tags, the first tag is v0.1.0 after M3's PC acceptance, and v1.0.0 needs M4–M7. Everything is listed under `[Unreleased]` in `CHANGELOG.md`. Bumping now would claim releases that don't exist.
+- **Hand-off notes:** `docs/progress/` is now one file, `PC_CHECKLIST.md`, with the code state for the next session and every PC step for M0–M8 (`core.md` and `unity.md` are folded in).

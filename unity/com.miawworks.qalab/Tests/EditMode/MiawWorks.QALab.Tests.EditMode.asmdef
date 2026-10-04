@@ -1,7 +1,7 @@
 {
     "name": "MiawWorks.QALab.Tests.EditMode",
     "rootNamespace": "MiawWorks.QALab.Tests",
-    "references": ["MiawWorks.QALab", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
+    "references": ["MiawWorks.QALab", "MiawWorks.QALab.Editor", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
     "includePlatforms": ["Editor"],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

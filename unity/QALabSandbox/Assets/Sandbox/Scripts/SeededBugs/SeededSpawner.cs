@@ -29,8 +29,6 @@ namespace QALab.Sandbox
         private int _wave;
         private int _wavesRequested;
 
-        public SeededEnemyRegistry Registry => _registry;
-
         /// <summary>F1 menu: queue a wave; queued waves run one per frame through the normal Update path.</summary>
         public void RequestWave() => _wavesRequested++;
 
