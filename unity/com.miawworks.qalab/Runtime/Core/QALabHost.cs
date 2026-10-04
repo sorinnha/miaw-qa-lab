@@ -108,9 +108,8 @@ namespace MiawWorks.QALab
             const int exitCode = 0;   // M4: 1 when a blocker/critical detector fired, 2 on internal error
             try
             {
-                _writer.Marker("run_end", new JObject { ["exit_reason"] = exitReason });
-                _logs.Stop();
-                _writer.Dispose();
+                _logs.Stop();   // no new log callbacks; Close waits for any still in flight
+                _writer.Close("run_end", new JObject { ["exit_reason"] = exitReason });
                 _run.WriteEnd(exitReason, exitCode);
                 var unknown = LabelRecorder.End(Path.Combine(RunDir, "labels.json"), _runId);
                 if (unknown.Count > 0)

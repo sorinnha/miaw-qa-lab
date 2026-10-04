@@ -129,10 +129,66 @@ namespace MiawWorks.QALab.Tests
             var writer = new EventWriter("r", new FakeClock(), new FakeState(), output);
             writer.Marker("run_start");
             writer.Dispose();
-            writer.Marker("run_end");
+            Assert.IsNull(writer.Marker("run_end"), "dropped events are not returned");
             Assert.AreEqual(0, writer.Drain());
             writer.Dispose();   // second dispose is a no-op
             Assert.AreEqual(1, Lines(output.ToString()).Count);
+        }
+
+        [Test]
+        public void CloseWritesTheMarkerLastAndLaterEventsTakeNoSeq()
+        {
+            var output = new StringWriter();
+            var writer = new EventWriter("r", new FakeClock(), new FakeState(), output);
+            writer.Marker("run_start");
+            writer.Log("error", "boom", null);
+            var end = writer.Close("run_end", new JObject { ["exit_reason"] = "test_finished" });
+            Assert.AreEqual(2L, end.Seq);
+            Assert.IsNull(writer.Log("error", "too late", null));
+            Assert.IsNull(writer.Close("run_end"), "a second close does nothing");
+            writer.Dispose();
+
+            var lines = Lines(output.ToString());
+            CollectionAssert.AreEqual(new[] { 0L, 1L, 2L }, lines.Select(l => (long)l["seq"]));
+            Assert.AreEqual("run_end", (string)lines[2]["data"]["marker"]);
+            Assert.AreEqual("test_finished", (string)lines[2]["data"]["details"]["exit_reason"]);
+        }
+
+        [Test]
+        public void CloseWaitsForAProducerInFlightSoSeqHasNoGap()
+        {
+            // A log thread takes seq 0, then pauses inside the Frame read, before it enqueues. The run
+            // ends meanwhile. Close must wait for it: dropping it would leave seq 0 missing before
+            // run_end (seq 1), and letting it in later would put an event after run_end.
+            var paused = new ManualResetEventSlim(false);
+            var resume = new ManualResetEventSlim(false);
+            var first = 1;
+            var state = new FakeState
+            {
+                OnFrameRead = () =>
+                {
+                    if (Interlocked.Exchange(ref first, 0) == 1)
+                    {
+                        paused.Set();
+                        resume.Wait(TimeSpan.FromSeconds(10));
+                    }
+                },
+            };
+            var output = new StringWriter();
+            var writer = new EventWriter("r", new FakeClock(), state, output);
+            var producer = Task.Run(() => writer.Log("error", "in flight", null));
+            Assert.IsTrue(paused.Wait(TimeSpan.FromSeconds(10)), "the producer holds seq 0");
+
+            var closing = Task.Run(() => writer.Close("run_end"));
+            Assert.IsFalse(closing.Wait(200), "Close waits while a producer is in flight");
+            resume.Set();
+            Assert.IsTrue(closing.Wait(TimeSpan.FromSeconds(10)), "Close finishes once the producer is done");
+            Assert.IsTrue(producer.Wait(TimeSpan.FromSeconds(10)));
+
+            var lines = Lines(output.ToString());
+            CollectionAssert.AreEqual(new[] { 0L, 1L }, lines.Select(l => (long)l["seq"]));
+            Assert.AreEqual("in flight", (string)lines[0]["message"]);
+            Assert.AreEqual("run_end", (string)lines[1]["data"]["marker"]);
         }
 
         [Test]
