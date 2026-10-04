@@ -1,5 +1,6 @@
 #if QALAB_AI
 using System;
+using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.AI;
@@ -13,8 +14,12 @@ namespace MiawWorks.QALab
     /// registered <see cref="IBotMover"/>, no game-specific code, which is why it finds level problems
     /// (holes, gaps, slow zones) that scripted tests never visit.
     /// <list type="bullet">
-    /// <item>New target: a random point inside the NavMesh bounds, snapped with
-    /// <c>NavMesh.SamplePosition(.., 5 m)</c>, used only if <c>CalculatePath</c> is <c>PathComplete</c>.</item>
+    /// <item>New target: random points inside the NavMesh bounds, snapped with
+    /// <c>NavMesh.SamplePosition(.., 5 m)</c> and kept only if <c>CalculatePath</c> is <c>PathComplete</c>.
+    /// Of up to 6 such candidates it takes the one in the least-visited 4 m cell (coverage bias):
+    /// uniform targets cluster in the middle of a level and rarely reach corners and side rooms, where
+    /// level bugs hide. Choosing a target counts as a visit to its cell, so a pocket the player can't
+    /// actually reach doesn't attract the bot for the whole run.</item>
     /// <item>Follows the path corners with <c>MoveTowards</c>, advancing within 0.5 m of a corner.</item>
     /// <item>Gives up after path length / speed × 2 + 3 s and picks a new target.</item>
     /// <item>With p = 0.2 per step it tries to interact; a success is logged as <c>interact</c>.</item>
@@ -27,10 +32,14 @@ namespace MiawWorks.QALab
         public const float CornerReachedM = 0.5f;
         public const float SampleRadiusM = 5f;
         public const double InteractChance = 0.2;
-        private const int TargetAttemptsPerStep = 10;
+        public const float CoverageCellM = 4f;
+        private const int CandidatesPerTarget = 6;
+        private const int TargetAttemptsPerStep = 12;
+        private const int ChosenTargetVisitWeight = 8;   // ≈ 2 s spent there
 
         private readonly float _speedMps;
         private readonly NavMeshPath _path = new NavMeshPath();
+        private readonly Dictionary<(int X, int Z), int> _visits = new Dictionary<(int X, int Z), int>();
         private Vector3[] _corners = Array.Empty<Vector3>();
         private int _corner;
         private float _giveUpAt;
@@ -55,6 +64,7 @@ namespace MiawWorks.QALab
         {
             _corners = Array.Empty<Vector3>();
             _hasLastPosition = false;
+            _visits.Clear();
         }
 
         public BotStepResult Step(BotContext ctx)
@@ -74,6 +84,7 @@ namespace MiawWorks.QALab
             _lastPosition = position;
             _lastStepAt = now;
             _hasLastPosition = true;
+            AddVisits(position, 1);
 
             if (ctx.Random.Chance(InteractChance) && mover.TryInteract(out var objectName))
             {
@@ -109,7 +120,11 @@ namespace MiawWorks.QALab
         {
             if (!EnsureBounds()) return false;
             if (!NavMesh.SamplePosition(from, out var start, SampleRadiusM, NavMesh.AllAreas)) return false;
-            for (var attempt = 0; attempt < TargetAttemptsPerStep; attempt++)
+            Vector3[] bestCorners = null;
+            var bestTarget = Vector3.zero;
+            var bestVisits = int.MaxValue;
+            var candidates = 0;
+            for (var attempt = 0; attempt < TargetAttemptsPerStep && candidates < CandidatesPerTarget; attempt++)
             {
                 var random = new Vector3(
                     ctx.Random.Range(_bounds.min.x, _bounds.max.x),
@@ -118,16 +133,36 @@ namespace MiawWorks.QALab
                 if (!NavMesh.SamplePosition(random, out var hit, SampleRadiusM, NavMesh.AllAreas)) continue;
                 if (!NavMesh.CalculatePath(start.position, hit.position, NavMesh.AllAreas, _path)) continue;
                 if (_path.status != NavMeshPathStatus.PathComplete || _path.corners.Length < 2) continue;
-
-                _corners = _path.corners;
-                _corner = 1;   // corner 0 is where the player stands
-                var length = 0f;
-                for (var i = 1; i < _corners.Length; i++) length += Vector3.Distance(_corners[i - 1], _corners[i]);
-                _giveUpAt = now + length / _speedMps * 2f + 3f;
-                ctx.LogAction("move_to", hit.position);
-                return true;
+                candidates++;
+                var visits = Visits(hit.position);
+                if (visits < bestVisits)   // ties keep the earlier candidate: same seed, same choice
+                {
+                    bestVisits = visits;
+                    bestTarget = hit.position;
+                    bestCorners = _path.corners;
+                }
             }
-            return false;
+            if (bestCorners == null) return false;
+
+            _corners = bestCorners;
+            _corner = 1;   // corner 0 is where the player stands
+            var length = 0f;
+            for (var i = 1; i < _corners.Length; i++) length += Vector3.Distance(_corners[i - 1], _corners[i]);
+            _giveUpAt = now + length / _speedMps * 2f + 3f;
+            AddVisits(bestTarget, ChosenTargetVisitWeight);
+            ctx.LogAction("move_to", bestTarget);
+            return true;
+        }
+
+        private static (int X, int Z) Cell(Vector3 p) =>
+            (Mathf.FloorToInt(p.x / CoverageCellM), Mathf.FloorToInt(p.z / CoverageCellM));
+
+        private int Visits(Vector3 p) => _visits.TryGetValue(Cell(p), out var n) ? n : 0;
+
+        private void AddVisits(Vector3 p, int n)
+        {
+            var cell = Cell(p);
+            _visits[cell] = (_visits.TryGetValue(cell, out var old) ? old : 0) + n;
         }
 
         // The NavMesh of the active scene, measured once per scene: its triangles' bounding box.
