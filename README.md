@@ -7,7 +7,7 @@ thousands of log lines into a short list of unique, ranked bugs, with reports th
 
 > **Status:** in development, nothing released yet. Built: run recording (M1), triage with AI reports
 > and RAG (M2–M3), the project scanner and game adapter contracts (M7). Next: the seeded bot,
-> detectors and screenshots (M4), then measured results (M5–M6). See [Limitations](#limitations) and
+> detectors and screenshots (M4), then measured results (M5–M6). See [Limitations](#8-limitations) and
 > [docs/PLAN.md](docs/PLAN.md).
 
 ## 1. Problem
@@ -47,9 +47,10 @@ evidence.
   - missing scripts, broken references, empty material slots and error shaders in Build Settings
     scenes and prefabs;
   - writes `scan.json`; exit 1 on errors.
-- **Plays games through their own commands** (from M4). Bot adapters (`IBotAdapter`) use a seeded RNG,
-  so a seed replays the same decisions, and every action becomes a "step to reproduce". A game adapter
-  template ships as a package sample.
+- **Plays games through their own commands** (from M4). Bot adapters (`IBotAdapter`) draw every random
+  choice from a seeded RNG, so a seed gives the same random sequence. Game state and timing still vary
+  between runs, so the action log, where every action becomes a "step to reproduce", is the repro
+  record. A game adapter template ships as a package sample.
 - **Measures itself.** A sandbox project has 16 seeded bugs with known causes, so clustering and
   detection can be scored against ground truth (M5–M6).
 
@@ -127,12 +128,14 @@ copy .env.example .env        # then put your key after GEMINI_API_KEY= in .env
 qalab triage run samples\sample_run --provider gemini --docs docs\sandbox_design.md --out out\sample_report
 ```
 
-> Until the `normalize_message` learning task is written, `triage run` stops with
-> `NotImplementedError: YOU WRITE` (see [How it was built](#11-how-it-was-built)). `qalab validate` and
-> the test suite (`pytest python -q`) already work.
+> Two learning tasks still gate these commands (see [How it was built](#11-how-it-was-built)): every
+> `triage run` needs `normalize_message`, and `--docs` with an embedding provider (fake, Ollama, Gemini)
+> also needs `cosine_top_k` (`--provider none` uses TF-IDF instead). Until they're written, the run stops
+> with `NotImplementedError: YOU WRITE`. `qalab validate` and the test suite (`pytest python -q`) already work.
 
-Exit code 3 means a P1 bug was found, so CI can fail on it. Tunables (rank weights, clustering
-thresholds, model names) live in `qalab.toml`. The engine-free C# is tested outside Unity with
+Exit code 3 means a P1 bug was found, so CI can fail on it. Tunables (priority thresholds, crash
+multiplier, clustering thresholds, model names) live in `qalab.toml`; the rank weights are fixed in
+`triage/rank.py`. The engine-free C# is tested outside Unity with
 `dotnet test tools/cs-check -c Release --filter "TestCategory!=YouWrite"`, and the Unity tests run with
 `scripts\unity_tests.ps1 -Platform EditMode|PlayMode`.
 
@@ -231,7 +234,7 @@ computer engineering student) with Claude Code as a pair programmer:
   before Sora reviewed the pull request.
 - **Sora's part:** owning the design and reviewing every change. Sora also writes the learning tasks by
   hand: the message normalizer, cosine retrieval, the SB02 seeded bug, and (planned) the stuck
-  detector, clustering metrics, magenta heuristic and game adapter. Unity, the sandbox and the real-game
+  detector, clustering metrics, magenta heuristic and the game adapter's decision rule. Unity, the sandbox and the real-game
   runs happen on Sora's PC.
 - **The record:** `docs/DECISIONS.md` keeps the reasoning, `docs/LEARNING.md` what was learned.
 

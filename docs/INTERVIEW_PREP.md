@@ -35,7 +35,7 @@ These are things you can open and explain. Decisions are in `docs/DECISIONS.md` 
 | Log capture + metrics | `Runtime/Logging/LogCapture.cs`, `Runtime/Metrics/MetricsSampler.cs`, `RingBuffer.cs` | Threaded callback, `[QALab]` filter, p95 from a preallocated ring buffer, no per-frame allocations | D-022 |
 | Seeded sandbox | `unity/QALabSandbox/Assets/Sandbox/Scripts/SeededBugs/*`, `SandboxSeedCatalog.cs` | Real NullReferenceExceptions from plain objects; one code path per seed; catalog rules checked to be disjoint | D-017, D-020, D-023 |
 | ProjectScanner | `Editor/Scanner/ProjectScanner.cs`, `Editor/Scanner/ScanReport.cs`, `scripts/scan_project.ps1` | Missing vs unassigned reference via instance id; scenes opened additively and closed; exit codes for CI | D-024 |
-| Bot contracts | `Runtime/Bot/IBotAdapter.cs`, `BotContext.cs`, `BotAdapterRegistry.cs`, `SeededRandom.cs`, `Samples~/GameAdapterTemplate/` | Strategy + registry; seeded RNG; action events become repro steps | D-024 |
+| Bot contracts | `Runtime/Bot/IBotAdapter.cs`, `BotContext.cs`, `BotAdapterRegistry.cs`, `SeededRandom.cs`, `Samples~/GameAdapterTemplate/` (`TurnPolicy.Decide` is yours) | Strategy + registry; one snake_case name rule shared with `-qalabAdapter`; seeded RNG; action events become repro steps | D-024 |
 | C# outside Unity | `tools/cs-check/` | netstandard2.1 + C# 9 like Unity, NUnit on .NET 8 in CI; what it does and doesn't prove | D-006, D-018 |
 | CI | `.github/workflows/python-ci.yml`, `scripts/ci_smoke.py`, `ci/Jenkinsfile` | Windows + Ubuntu, smoke triage with the fake provider; Jenkinsfile is an example | D-015, D-016 |
 
@@ -104,15 +104,15 @@ These are things you can open and explain. Decisions are in `docs/DECISIONS.md` 
 
 ### Things that happened while building it
 
-31. *How do you end a run without losing a log written on another thread?* Producers increment an in-flight counter, then check a "sealed" flag. `Close` sets the flag, then waits for the counter to reach 0. Both sides use `Interlocked` (a full fence) before reading the other's value, so either `Close` sees the producer or the producer sees the seal. Then `run_end` gets the last seq. Know the 1 s cap and why it exists.
-32. *How did you find out your ground truth was wrong?* A review found that SB03's real stack ran through `SpawnWave`, so it also matched SB04's match rule: one exception would have counted as two bugs. The fix moved target assignment to `Update`, and a test now checks that every seed's real event matches only its own rule.
-33. *A test was flaky in CI. What did you do?* A multi-threaded test assumed the producers would still be running when the drain started. I reproduced it with a forced delay and rewrote it with a handshake (no timing assumptions); it passed 40/40.
-34. *Why test Unity C# outside Unity?* Fast feedback in CI with no license. netstandard2.1 + C# 9 catches APIs Unity doesn't have. It can't check Unity APIs, scenes or serialization, so those stay as EditMode/PlayMode tests.
-35. *Missing vs unassigned in your scanner, and why unassigned is only info?* Instance id ≠ 0 with a null value means a deleted target; id 0 means never set, often optional. Built-in components have many optional slots, so only your own scripts get the info line.
+30. *How do you end a run without losing a log written on another thread?* Producers increment an in-flight counter, then check a "sealed" flag. `Close` sets the flag, then waits for the counter to reach 0. Both sides use `Interlocked` (a full fence) before reading the other's value, so either `Close` sees the producer or the producer sees the seal. Then `run_end` gets the last seq. Know the 1 s cap and why it exists.
+31. *How did you find out your ground truth was wrong?* A review found that SB03's real stack ran through `SpawnWave`, so it also matched SB04's match rule: one exception would have counted as two bugs. The fix moved target assignment to `Update`, and a test now checks that every seed's real event matches only its own rule.
+32. *A test was flaky in CI. What did you do?* A multi-threaded test assumed the producers would still be running when the drain started. I reproduced it with a forced delay and rewrote it with a handshake (no timing assumptions); it passed 40/40.
+33. *Why test Unity C# outside Unity?* Fast feedback in CI with no license. netstandard2.1 + C# 9 catches APIs Unity doesn't have. It can't check Unity APIs, scenes or serialization, so those stay as EditMode/PlayMode tests.
+34. *Missing vs unassigned in your scanner, and why unassigned is only info?* Instance id ≠ 0 with a null value means a deleted target; id 0 means never set, often optional. Unity's built-in components and its own packages (uGUI, TextMeshPro) have many optional slots, so only scripts outside `Packages/com.unity.*` get the info line.
 
 ### C++ refresh (they list it as nice-to-have)
 
-36. RAII, `unique_ptr` vs `shared_ptr`, references vs pointers, virtual functions and vtables, `std::map` vs `std::unordered_map` (asked in a past R&D interview).
+35. RAII, `unique_ptr` vs `shared_ptr`, references vs pointers, virtual functions and vtables, `std::map` vs `std::unordered_map` (asked in a past R&D interview).
 
 ## Design patterns you used (covers the gap from your last interview)
 
@@ -129,7 +129,7 @@ These are things you can open and explain. Decisions are in `docs/DECISIONS.md` 
 
 ## STAR stories to prepare (write them in LEARNING.md)
 
-1. The hardest bug you hit while building this, and how you found it. Real candidates from this repo: the run-end race (Q31), the SB03/SB04 rule overlap (Q32), the flaky thread test (Q33), and terminal colour codes breaking the CI smoke check on Ubuntu (`scripts/ci_smoke.py`).
+1. The hardest bug you hit while building this, and how you found it. Real candidates from this repo: the run-end race (Q30), the SB03/SB04 rule overlap (Q31), the flaky thread test (Q32), and terminal colour codes breaking the CI smoke check on Ubuntu (`scripts/ci_smoke.py`).
 2. A decision you made from data (E1, E3 or H3).
 3. Learning Python quickly while shipping.
 4. Something that didn't work (for example, VLM false positives) and what you changed.

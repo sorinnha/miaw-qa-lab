@@ -33,7 +33,7 @@ Run commands in PowerShell from the repo root with the virtual environment activ
 | M4 | `Runtime/Detectors/StuckCalculator.cs` (to be created) | `StuckCalculator` + `StuckDetector` | after the M4 cloud session |
 | M5 | `python/src/qalab/eval/metrics.py` (to be created) | `pairwise_prf` | after the M5 cloud session |
 | M6 | `python/src/qalab/vision/heuristics.py` (to be created) | `magenta_ratio` | after the M6 cloud session |
-| M7 | your game | the game adapter (from the template) | `docs/GAME_INTEGRATION.md` §4 |
+| M7 | `unity/com.miawworks.qalab/Samples~/GameAdapterTemplate/TurnPolicy.cs`, then your game | `TurnPolicy.Decide`, then `IGameCommands` for the real game | `dotnet test tools\cs-check -c Release --filter "FullyQualifiedName~TurnPolicy"`; `docs/GAME_INTEGRATION.md` §4 |
 
 `pytest python -m youwrite -rxX` lists the open Python ones (x = still open, X = passing, awaiting
 `/review-mine`). After each task: `/review-mine`, then `/teach`, then a line in `docs/LEARNING.md`.
@@ -94,7 +94,7 @@ Run commands in PowerShell from the repo root with the virtual environment activ
 
   If a model name is rejected, set `[llm] model` or `embed_model` in `qalab.toml`.
 - [ ] Record a 30–60 s GIF of `report.html` and replace the README §2 placeholder.
-- [ ] Ask Claude to prepare v0.1.0: CHANGELOG `[Unreleased]` → `[0.1.0]`, tag, and a GitHub Release with `report.html`. Claude asks before tagging. Then send the follow-up in `docs/OUTREACH.md`.
+- [ ] Ask Claude to prepare v0.1.0: CHANGELOG `[Unreleased]` → `[0.1.0]` (the four version constants are already 0.1.0), tag, and a GitHub Release with `report.html`. Claude asks before tagging. Then send the follow-up in `docs/OUTREACH.md`.
 
 ## M4: Bot, detectors, screenshots, pipeline → v0.2.0
 
@@ -126,18 +126,18 @@ Run commands in PowerShell from the repo root with the virtual environment activ
 
 - [ ] In the sandbox:
   - **Tools → QA Lab → Scan Project** prints `[QALab] scan: ...` and opens `Logs/qalab/scan.json`;
-  - `scripts\scan_project.ps1` prints its summary line, exit 0 or 1;
+  - `scripts\scan_project.ps1` prints its summary line, exit 0 or 1 (2 means it didn't run: read the `.log`);
   - the EditMode tests include `ProjectScannerTests`, `ScanReportTests` and `BotFrameworkTests`.
 - [ ] Check the missing-script rule by hand: on a throwaway prefab, add a small script component, delete the script, scan, and expect `missing_script`. Then delete the prefab.
 - [ ] Install the package in Crimson Tactics by git URL (`docs/GAME_INTEGRATION.md` §1–2). Record a manual run and run `qalab validate` on it.
-- [ ] Import the **Game adapter template** sample.
-- [ ] YOU WRITE the game adapter, pairing with Claude (§4). It plays only once M4's bot runner exists.
+- [ ] YOU WRITE `TurnPolicy.Decide` in the template until its cs-check tests pass, then `/review-mine` (it drops the `YouWrite` category).
+- [ ] Import the **Game adapter template** sample into the game and implement `IGameCommands`, pairing with Claude (§4). It plays only once M4's bot runner exists.
 - [ ] Triage 3 runs with `--provider none` (or `ollama`), **never Gemini**, plus `--repo <game>\Assets`.
 - [ ] `scripts\scan_project.ps1 -ProjectPath <game> -Out out\game_scan.json`.
 - [ ] Write `docs/REAL_GAME.md` honestly: what was found, false positives, scanner results, measured numbers only.
 - [ ] Optional: run `ci/Jenkinsfile` on Jenkins in Docker. Only with a screenshot of a green run, drop the "example" label in README, USER_GUIDE and the file header.
 - [ ] Final README: §2 GIF, §6 results, the 2-minute demo video link.
-- [ ] Release v1.0.0 (ask first): versions in `package.json`, `pyproject.toml` and CHANGELOG are set at release time (D-024).
+- [ ] Release v1.0.0 (ask first). Set the version at release time in `python/pyproject.toml`, `python/src/qalab/__init__.py`, `unity/com.miawworks.qalab/package.json` and `QALab.Version` (`Runtime/Core/QALab.cs`), plus the CHANGELOG (D-024; `pytest` checks they agree).
 - [ ] GitHub cleanup (PLAN.md M7): pin repos, archive forks, add READMEs with GIFs.
 
 ## M8: Interview readiness

@@ -44,7 +44,9 @@ stay at version 0.1.0.
   - missing scripts, broken and unassigned references, empty material slots, error shaders and missing Build Settings scenes;
   - writes `scan.json`; Tools → QA Lab → Scan Project, or `-executeMethod`;
   - `scripts/scan_project.ps1`.
-- **Bot contracts (M7 polish):** `IBotAdapter`, `BotContext`, `BotAdapterRegistry`, `SeededRandom`, and a "Game adapter template" package sample.
+- **Bot contracts (M7 polish):**
+  - `IBotAdapter`, `BotContext`, `BotAdapterRegistry` (snake_case names, the same rule as `-qalabAdapter`) and `SeededRandom`;
+  - a "Game adapter template" package sample whose decision rule, `TurnPolicy.Decide`, is the M7 learning task.
 - **Engine-free C# checked outside Unity:** `tools/cs-check` builds it as netstandard2.1 / C# 9 and runs its NUnit tests on .NET 8.
 - **Scripts and CI:**
   - `find_unity.ps1`, `unity_tests.ps1`, `link_sandbox_package.py`;

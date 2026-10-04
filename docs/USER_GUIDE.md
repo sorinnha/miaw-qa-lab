@@ -15,8 +15,10 @@ new game is in [GAME_INTEGRATION.md](GAME_INTEGRATION.md); the design is in [ARC
 | Seeded bot, detectors, screenshots, one-command pipeline | Planned (M4) |
 | Vision (missing textures, black screens, broken UI) | Planned (M6) |
 
-Two learning tasks still gate the end-to-end triage run: until `normalize_message` exists,
-`qalab triage run` stops with `NotImplementedError: YOU WRITE`.
+Two learning tasks still gate the end-to-end triage run. Until `normalize_message` exists, every
+`qalab triage run` stops with `NotImplementedError: YOU WRITE`. Until `cosine_top_k` exists, so does a
+run with `--docs` and an embedding provider (fake, Ollama, Gemini); `--provider none` retrieves with
+TF-IDF instead.
 
 ## 1. Set up once
 
@@ -39,7 +41,7 @@ Play, play, stop. **Tools → QA Lab → Open Last Run Folder** opens the run.
 |---|---|---|
 | `-qalab` | off | Record a run |
 | `-qalabOut <dir>` | `<persistentDataPath>/qalab/runs` | Parent folder; each run gets its own `<run_id>` subfolder |
-| `-qalabSeed <int>` | 0 | Bot seed: the same seed makes the same bot decisions |
+| `-qalabSeed <int>` | 0 | Seed for the bot's random choices (same seed, same random sequence; the action log is the repro record) |
 | `-qalabDuration <s>` | 120 | End the run after this many seconds |
 | `-qalabAdapter <name>` | `navmesh_explorer` | Bot adapter, or `manual` for a human player |
 | `-qalabScene <name>` | active scene | Scene to load first |
@@ -149,8 +151,9 @@ scripts\scan_project.ps1 -ProjectPath D:\Games\MyGame -Out out\mygame_scan.json
 | `missing_scene` | error | Build Settings lists a scene file that doesn't exist | Remove it from Build Settings |
 | `unassigned_reference` | info | A script field was never set ("None"); often intended | Check it's optional |
 
-Unassigned fields are reported for your own scripts only, because built-in components have many
-optional slots.
+Unassigned fields are reported for scripts outside Unity's own packages (`Packages/com.unity.*`: uGUI,
+TextMeshPro, AI Navigation...), because their components and Unity's built-in ones have many optional
+slots.
 
 `scan.json` contains:
 - `tool`, `format_version` (1), `project`, `unity`, `scanned_at`;
@@ -158,7 +161,9 @@ optional slots.
 - `findings[]`, errors first, each with `severity`, `rule`, `asset`, `object` (hierarchy path),
   `component`, `property` and `detail`.
 
-Exit code 0 means no errors, 1 means errors found, 2 means the scan itself failed.
+Exit code 0 means no errors, 1 means errors found, 2 means the scan didn't run or wrote no `scan.json`
+(Unity not found, compile errors, project already open in another editor: see the `.log` next to it).
+The menu item is greyed out in Play Mode.
 
 ## 8. Benchmark mode (sandbox)
 

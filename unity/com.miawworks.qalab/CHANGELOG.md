@@ -2,7 +2,7 @@
 
 All notable changes to this package. Format: [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.1.0] - unreleased
+## [Unreleased]: planned as 0.1.0
 
 ### Added
 - Run folder writer: `run.json`, thread-safe `events.jsonl` (logs, metrics, markers), `labels.json`
@@ -14,6 +14,6 @@ All notable changes to this package. Format: [Keep a Changelog](https://keepacha
 - ProjectScanner (Tools > QA Lab > Scan Project, or `-executeMethod MiawWorks.QALab.Editor.ProjectScanner.RunFromCommandLine`):
   missing scripts, broken and unassigned references, empty material slots, error shaders, missing Build
   Settings scenes; writes `scan.json`, exit 1 on errors.
-- Bot contracts for adapters: `IBotAdapter`, `BotContext` (`LogAction`), `BotAdapterRegistry`,
-  `SeededRandom`. The bot runner that calls them comes in a later version.
+- Bot contracts for adapters: `IBotAdapter`, `BotContext` (`LogAction`), `BotAdapterRegistry` (snake_case
+  names, the same rule as `-qalabAdapter`), `SeededRandom`. The bot runner that calls them comes in a later version.
 - Sample "Game adapter template": a turn-based game adapter driven through the game's own commands.

@@ -59,7 +59,7 @@ Runtime/
   Labels/   LabelRecorder · LabelBook · SeedCatalogEntry
   Bot/      IBotAdapter · BotContext · BotAdapterRegistry · NamedRegistry · SeededRandom · BotActionData · IBotMover
 Editor/     QALabMenu · Scanner/ProjectScanner (Unity side) · Scanner/ScanReport (engine-free)
-Samples~/GameAdapterTemplate/   IGameCommands · MyGameAdapter · MyGameQALabBootstrap
+Samples~/GameAdapterTemplate/   IGameCommands · TurnPolicy (YOU WRITE, tested in cs-check) · MyGameAdapter · MyGameQALabBootstrap
 Tests/EditMode (engine-free ones also run in tools/cs-check) · Tests/PlayMode
 ```
 

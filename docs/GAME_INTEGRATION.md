@@ -71,17 +71,23 @@ changes, and its action log reads like a tester's notes.
 1. **Package Manager → QA Lab → Samples → Game adapter template → Import.** The files land in
    `Assets/Samples/QA Lab/<version>/Game adapter template/`. Move them next to your game scripts if you
    like. They have no `.asmdef`, so they compile into your game's assembly and can see its code.
-2. Implement `IGameCommands` on the script that owns turns (for example your `TurnManager`):
+2. Write the decision rule, `TurnPolicy.Decide` (YOU WRITE). It's engine-free, so its tests run
+   without Unity: `dotnet test tools\cs-check -c Release --filter "FullyQualifiedName~TurnPolicy"`
+   (`tools/cs-check/SampleTests/TurnPolicyTests.cs`). Write it in the repo's copy
+   (`unity/com.miawworks.qalab/Samples~/GameAdapterTemplate/TurnPolicy.cs`) until the tests pass, then
+   import the sample.
+3. Implement `IGameCommands` on the script that owns turns (for example your `TurnManager`):
    - `CanAct`: the player's turn and no animation or dialog in progress;
    - `ActiveUnits()` and `LegalOrders(unit)`: read them from your game rules;
    - `Issue(unit, order)`: the same method a player's click ends up calling;
    - `EndTurn()`.
 
    In `Awake`, set `GameCommandsLocator.Current = this`; clear it in `OnDestroy`.
-3. Rename `MyGameAdapter` and its `AdapterName` (for example `crimson_tactics`). Keep every random
-   choice on `ctx.Random`, so the same `-qalabSeed` replays the same decisions.
-4. Log what the bot did with `ctx.LogAction("order", new Dictionary<string, object> { ... })`. Triage
-   turns these action events into the report's "steps to reproduce".
+4. Rename `MyGameAdapter` and its `AdapterName`, which must be snake_case like `-qalabAdapter` (for
+   example `crimson_tactics`). Every random choice comes from `ctx.Random`, so a seed gives the same
+   random sequence. The game's state and timing still vary, so the action log is the repro record.
+   `MyGameAdapter` carries each decision out and logs it with `ctx.LogAction`; triage turns those action
+   events into the report's "steps to reproduce".
 5. Run with `-qalabAdapter crimson_tactics` (or set **Adapter** in the settings asset). Until the M4 bot
    runner exists, the name is recorded in `run.json` but the adapter isn't called.
 
@@ -110,8 +116,8 @@ scripts\scan_project.ps1 -ProjectPath D:\Games\CrimsonTactics -Out out\crimson_s
 ```
 
 It checks the enabled Build Settings scenes and every prefab for missing scripts, broken references,
-empty material slots and error shaders. Unassigned script fields are listed as info. Exit 1 means it
-found errors.
+empty material slots and error shaders. Unassigned fields of scripts outside Unity's own packages are
+listed as info. Exit 1 means it found errors; 2 means it didn't run (see the `.log` next to the output).
 
 ## 7. Write it up
 
@@ -129,8 +135,8 @@ Only numbers you measured go in it.
 | Symptom | Fix |
 |---|---|
 | "Unable to add package … git" | Install Git and restart Unity Hub so it's on `PATH`. |
-| Compile errors about Newtonsoft | Let the Package Manager upgrade `com.unity.nuget.newtonsoft-json` to 3.2.x. |
+| CS0012 "Newtonsoft.Json … not referenced" in your adapter | Your adapter sits in an asmdef with **Override References** on: add `Newtonsoft.Json.dll` to its precompiled references (game code without an asmdef already has it). |
 | No run folder after Play | Auto-start is off, or Unity runs tests (auto-start is skipped under the Test Runner). |
 | `run.json` has no `ended_at` | The game crashed or was killed: triage flags the run as a suspected crash. |
-| Adapter not found | The name doesn't match `-qalabAdapter`, or the bootstrap file sits in an assembly that isn't loaded. |
-| Too many `unassigned_reference` lines in the scan | They're info only; optional fields in your scripts show up there. |
+| Adapter not found | The name isn't snake_case or doesn't match `-qalabAdapter`, or the bootstrap file sits in an assembly that isn't loaded. |
+| Too many `unassigned_reference` lines in the scan | They're info only: optional fields of your (and third-party) scripts show up there; Unity's own packages are skipped. |
