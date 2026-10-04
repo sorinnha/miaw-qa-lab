@@ -90,21 +90,29 @@ namespace MiawWorks.QALab.Tests
         [Test]
         public void ManyThreadsGetUniqueGaplessSeqs()
         {
-            const int threads = 8, perThread = 2000;
+            // Deterministic interleaving (no timing assumptions): every producer enqueues half its
+            // events and waits; the "main thread" drains exactly that half while all producers are
+            // alive, releases them, and keeps draining while they enqueue the second half.
+            const int threads = 8, perThread = 2000, half = perThread / 2;
             var output = new StringWriter();
             var writer = new EventWriter("r", new FakeClock(), new FakeState(), output);
-            var done = 0;
+            var halfwayDone = new CountdownEvent(threads);
+            var release = new ManualResetEventSlim(false);
             var producers = Enumerable.Range(0, threads).Select(_ => Task.Run(() =>
             {
-                for (var i = 0; i < perThread; i++) writer.Log("error", "x", null);
-                Interlocked.Increment(ref done);
+                for (var i = 0; i < half; i++) writer.Log("error", "x", null);
+                halfwayDone.Signal();
+                release.Wait(TimeSpan.FromSeconds(30));
+                for (var i = half; i < perThread; i++) writer.Log("error", "x", null);
             })).ToArray();
-            var batches = 0;
-            while (Volatile.Read(ref done) < threads)
+
+            Assert.IsTrue(halfwayDone.Wait(TimeSpan.FromSeconds(30)), "producers reached halfway");
+            Assert.AreEqual(threads * half, writer.Drain(), "a drain while every producer is alive");
+            release.Set();
+            while (!Task.WaitAll(producers, 1))
             {
-                if (writer.Drain() > 0) batches++;   // the "main thread" drains while producers run
+                writer.Drain();   // drains race with the producers' second half
             }
-            Task.WaitAll(producers);
             writer.Dispose();
 
             var lines = output.ToString().Split('\n').Where(l => l.Length > 0).ToList();
@@ -112,7 +120,6 @@ namespace MiawWorks.QALab.Tests
             var seqs = lines.Select(l => (long)Json.Parse(l)["seq"]).ToList();
             CollectionAssert.AreEquivalent(Enumerable.Range(0, threads * perThread).Select(i => (long)i), seqs);
             Assert.AreEqual(threads * perThread, (int)writer.Written);
-            Assert.GreaterOrEqual(batches, 1);
         }
 
         [Test]
