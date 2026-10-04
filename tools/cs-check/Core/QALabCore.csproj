@@ -30,6 +30,20 @@
     <Compile Include="$(PackageRoot)/Metrics/RingBuffer.cs" Link="Package/Metrics/RingBuffer.cs" />
     <Compile Include="$(PackageRoot)/Labels/SeedCatalogEntry.cs" Link="Package/Labels/SeedCatalogEntry.cs" />
     <Compile Include="$(PackageRoot)/Labels/LabelBook.cs" Link="Package/Labels/LabelBook.cs" />
+    <Compile Include="$(PackageRoot)/Labels/VisualLabels.cs" Link="Package/Labels/VisualLabels.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/DetectorNames.cs" Link="Package/Detectors/DetectorNames.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/IDetector.cs" Link="Package/Detectors/IDetector.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/RateLimiter.cs" Link="Package/Detectors/RateLimiter.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/DetectorHub.cs" Link="Package/Detectors/DetectorHub.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/ExceptionBurstCounter.cs" Link="Package/Detectors/ExceptionBurstCounter.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/ExceptionBurstDetector.cs" Link="Package/Detectors/ExceptionBurstDetector.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/PerfSpikeDetector.cs" Link="Package/Detectors/PerfSpikeDetector.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/FallDetector.cs" Link="Package/Detectors/FallDetector.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/StuckCalculator.cs" Link="Package/Detectors/StuckCalculator.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/StuckDetector.cs" Link="Package/Detectors/StuckDetector.cs" />
+    <Compile Include="$(PackageRoot)/Capture/Shots.cs" Link="Package/Capture/Shots.cs" />
+    <Compile Include="$(PackageRoot)/Results/ExitCodes.cs" Link="Package/Results/ExitCodes.cs" />
+    <Compile Include="$(PackageRoot)/Results/JUnitWriter.cs" Link="Package/Results/JUnitWriter.cs" />
     <Compile Include="$(PackageRoot)/Bot/SeededRandom.cs" Link="Package/Bot/SeededRandom.cs" />
     <Compile Include="$(PackageRoot)/Bot/NamedRegistry.cs" Link="Package/Bot/NamedRegistry.cs" />
     <Compile Include="$(PackageRoot)/Bot/BotActionData.cs" Link="Package/Bot/BotActionData.cs" />

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using MiawWorks.QALab;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
@@ -80,6 +81,50 @@ namespace MiawWorks.QALab.Tests
             {
                 File.Delete(path);
             }
+        }
+
+        [Test]
+        public void ScreenshotsAreListedInOrderAndVisibleSeedsCountAsTriggered()
+        {
+            var visual = new SeedCatalogEntry
+            {
+                BugId = "SB09", Type = "visual", Title = "magenta", Feature = "Art assets", ExpectedSeverity = "S3",
+                Match = new MatchRule { VisualLabel = VisualLabels.MissingTexture },
+            };
+            var book = new LabelBook(new[] { visual, Entry("SB01") });
+            book.AddScreenshot("shots/000001.png", 5.0, new string[0], new string[0], "Sandbox_Level01");
+            book.AddScreenshot("shots/000002.png", 30.0004, new[] { "missing_texture", "missing_texture" }, new[] { "SB09" }, "Sandbox_Level01");
+
+            var json = book.ToJson("r");
+            var shots = (JArray)json["screenshots"];
+            Assert.AreEqual(2, shots.Count);
+            Json.AssertSame("{\"path\":\"shots/000001.png\",\"t\":5.0,\"labels\":[]}", shots[0].ToString());
+            Json.AssertSame("{\"path\":\"shots/000002.png\",\"t\":30.0,\"labels\":[\"missing_texture\"],\"bug_ids\":[\"SB09\"]}", shots[1].ToString());
+            var bug = (JObject)((JArray)json["seeded_bugs"]).Single();
+            Assert.AreEqual("SB09", (string)bug["bug_id"]);
+            Assert.AreEqual(30.0, (double)bug["triggers"][0]["t"]);
+        }
+
+        [Test]
+        public void ScreenshotLabelsMustBeInTheVocabulary()
+        {
+            var book = new LabelBook(new[] { Entry("SB01") });
+            Assert.Throws<ArgumentException>(() => book.AddScreenshot("shots/1.png", 1, new[] { "magenta" }, null, null));
+            Assert.Throws<ArgumentException>(() => book.AddScreenshot("", 1, null, null, null));
+        }
+
+        [Test]
+        public void SampleScreenshotLabelsRoundTrip()
+        {
+            // The C# writer produces exactly the screenshots block of samples/sample_run/labels.json.
+            var sample = (JObject)Json.Parse(RepoPaths.ReadText("samples", "sample_run", "labels.json"));
+            var book = new LabelBook(new SeedCatalogEntry[0]);
+            foreach (JObject shot in (JArray)sample["screenshots"])
+            {
+                book.AddScreenshot((string)shot["path"], (double)shot["t"], shot["labels"].ToObject<string[]>(),
+                    shot["bug_ids"]?.ToObject<string[]>(), "Sandbox_Level01");
+            }
+            Json.AssertSame(sample["screenshots"].ToString(), book.ToJson("r")["screenshots"].ToString());
         }
 
         [Test]

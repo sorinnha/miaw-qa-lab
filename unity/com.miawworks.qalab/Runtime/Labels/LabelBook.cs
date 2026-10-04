@@ -11,7 +11,8 @@ namespace MiawWorks.QALab
     /// <summary>
     /// Collects seed triggers during a benchmark run and builds <c>labels.json</c> (qalab.labels/1).
     /// Only seeds that fired at least once are listed: a seed that was enabled but never reached is
-    /// not ground truth for that run. Nothing here ever goes into <c>events.jsonl</c>.
+    /// not ground truth for that run. Every screenshot is listed with the visual labels that were true
+    /// when it was taken (an empty list = a clean frame). Nothing here ever goes into <c>events.jsonl</c>.
     /// Thread-safe: seeded scripts may trigger from any thread.
     /// </summary>
     public sealed class LabelBook
@@ -22,6 +23,7 @@ namespace MiawWorks.QALab
         private readonly List<string> _order = new List<string>();
         private readonly Dictionary<string, List<JObject>> _triggers = new Dictionary<string, List<JObject>>(StringComparer.Ordinal);
         private readonly HashSet<string> _unknown = new HashSet<string>(StringComparer.Ordinal);
+        private readonly List<JObject> _screenshots = new List<JObject>();
         private readonly object _lock = new object();
 
         public LabelBook(IEnumerable<SeedCatalogEntry> catalog)
@@ -73,13 +75,52 @@ namespace MiawWorks.QALab
             }
         }
 
-        /// <summary>The labels document; seeded bugs sorted by id, screenshots empty until M4.</summary>
+        /// <summary>
+        /// Record a screenshot's ground truth: the run-relative <paramref name="path"/>, run time
+        /// <paramref name="t"/>, the visual <paramref name="labels"/> visible in it and the seeds that caused
+        /// them. A visual seed seen in a shot also counts as triggered at <paramref name="t"/>.
+        /// </summary>
+        public void AddScreenshot(string path, double t, IEnumerable<string> labels, IEnumerable<string> bugIds, string scene)
+        {
+            if (string.IsNullOrEmpty(path)) throw new ArgumentException("path is required", nameof(path));
+            var labelSet = new List<string>();
+            foreach (var label in labels ?? Array.Empty<string>())
+            {
+                if (!VisualLabels.IsKnown(label)) throw new ArgumentException($"unknown visual label '{label}'", nameof(labels));
+                if (!labelSet.Contains(label)) labelSet.Add(label);
+            }
+            labelSet.Sort(StringComparer.Ordinal);
+            var ids = new List<string>();
+            foreach (var id in bugIds ?? Array.Empty<string>())
+            {
+                if (id != null && !ids.Contains(id)) ids.Add(id);
+            }
+            ids.Sort(StringComparer.Ordinal);
+
+            var shot = new JObject { ["path"] = path, ["t"] = Math.Round(t, 3), ["labels"] = new JArray(labelSet) };
+            if (ids.Count > 0) shot["bug_ids"] = new JArray(ids);
+            lock (_lock)
+            {
+                _screenshots.Add(shot);
+            }
+            foreach (var id in ids)
+            {
+                Trigger(id, t, scene);
+            }
+        }
+
+        /// <summary>The labels document; seeded bugs sorted by id, screenshots in the order they were taken.</summary>
         public JObject ToJson(string runId)
         {
             var serializer = JsonSerializer.CreateDefault();
             var bugs = new JArray();
+            var shots = new JArray();
             lock (_lock)
             {
+                foreach (var shot in _screenshots)
+                {
+                    shots.Add(shot.DeepClone());
+                }
                 var ids = new List<string>(_order);
                 ids.Sort(StringComparer.Ordinal);
                 foreach (var id in ids)
@@ -94,7 +135,7 @@ namespace MiawWorks.QALab
                 ["schema"] = SchemaId,
                 ["run_id"] = runId,
                 ["seeded_bugs"] = bugs,
-                ["screenshots"] = new JArray(),
+                ["screenshots"] = shots,
             };
         }
 
