@@ -2,17 +2,48 @@
 
 Fill the `[ ]` placeholders from `EVAL_RESULTS.md` and `REAL_GAME.md` as results come in. Never quote a number you didn't measure.
 
+Until M4–M6 are done, pitch only what is built. The section "What's actually built" below lists it, with file paths.
+
 ## 60-second pitch (practise out loud)
 
 > I built Miaw QA Lab, a small version of a QC automation stack for Unity.
 >
 > A C# package records logs, metrics and screenshots, and runs a seeded bot that explores levels and clicks through menus. Detectors catch falls through the world, stuck players, frame spikes and tunnelling.
 >
-> A Python tool groups thousands of log lines into unique bugs, ranks them with an explainable score, and uses a local LLM with RAG over design docs and code to draft Jira-ready reports. Every field cites evidence, and reproduction steps come from the bot's action log, so the model can't invent them.
+> A Python tool groups thousands of log lines into unique bugs, ranks them with an explainable score, and uses an LLM (Gemini, or a local model when the data is unreleased) with RAG over design docs and code to draft Jira-ready reports. Every field cites evidence, and reproduction steps come from the bot's action log, so the model can't invent them.
 >
 > A vision module flags missing textures, black screens and broken UI with heuristics and a VLM.
 >
 > To measure it honestly I seeded 16 known bugs. Clustering reaches [F1] and visual detection [recall]. On my own game it found [N] real issues.
+
+## What's actually built (as of 2026-10-04)
+
+These are things you can open and explain. Decisions are in `docs/DECISIONS.md` (D-xxx).
+
+| Area | Files | What to say | Decisions |
+|---|---|---|---|
+| Data contracts | `schemas/*.json`, `samples/sample_run/`, `python/tests/models/test_contracts.py` | Unity and Python share only these schemas; both sides test against the same examples | D-001, D-007 |
+| Loading runs | `python/src/qalab/io/runs.py` | Validates raw JSON first so errors name the schema rule; bad lines are reported, not fatal; no `ended_at` → suspected crash | D-007, D-014 |
+| Normalize, stacks, signatures | `triage/normalize.py` (yours), `triage/stack.py`, `triage/signature.py` | Message + top 3 app frames, no line numbers; why SB01 and SB04 stay apart | D-009 |
+| Clustering | `triage/cluster.py` | Exact signatures, then optional TF-IDF/embedding merges with union-find; four variants for E1 | D-009, D-013 |
+| Ranking | `triage/rank.py`, `qalab.toml [rank]` | Explainable formula, priority computed, never from the LLM | D-004, D-012 |
+| Context + RAG | `triage/context.py`, `rag/chunk.py`, `rag/index.py`, `rag/retrieve.py` (`cosine_top_k` is yours), `rag/code_context.py` | E/A/L/D ids, a character budget, heading chunks, TF-IDF fallback | D-009, D-011 |
+| LLM layer | `llm/base.py`, `llm/fake.py`, `llm/ollama.py`, `llm/gemini.py`, `llm/cache.py`, `llm/factory.py` | Protocol (like a C# interface), JSON-schema output, temperature 0, retries, SQLite cache | D-002, D-008, D-021 |
+| Reports | `triage/report_llm.py`, `triage/report_template.py`, `report/html.py`, `report/jira_csv.py` | Grounding checks drop unknown ids and flag `needs_review`; template fallback; offline HTML | D-010, D-013 |
+| CLI | `python/src/qalab/cli.py` | typer; exit 0 / 3 on P1 / 2 on error | — |
+| Unity event writer | `unity/com.miawworks.qalab/Runtime/Core/EventWriter.cs`, `QALabHost.cs`, `MainThreadCache.cs` | Any thread enqueues; the main thread drains every 0.5 s and sorts by `seq`; `Close` seals, waits for in-flight producers, writes `run_end` last | D-022, D-023 |
+| Log capture + metrics | `Runtime/Logging/LogCapture.cs`, `Runtime/Metrics/MetricsSampler.cs`, `RingBuffer.cs` | Threaded callback, `[QALab]` filter, p95 from a preallocated ring buffer, no per-frame allocations | D-022 |
+| Seeded sandbox | `unity/QALabSandbox/Assets/Sandbox/Scripts/SeededBugs/*`, `SandboxSeedCatalog.cs` | Real NullReferenceExceptions from plain objects; one code path per seed; catalog rules checked to be disjoint | D-017, D-020, D-023 |
+| ProjectScanner | `Editor/Scanner/ProjectScanner.cs`, `Editor/Scanner/ScanReport.cs`, `scripts/scan_project.ps1` | Missing vs unassigned reference via instance id; scenes opened additively and closed; exit codes for CI | D-024 |
+| Bot contracts | `Runtime/Bot/IBotAdapter.cs`, `BotContext.cs`, `BotAdapterRegistry.cs`, `SeededRandom.cs`, `Samples~/GameAdapterTemplate/` | Strategy + registry; seeded RNG; action events become repro steps | D-024 |
+| C# outside Unity | `tools/cs-check/` | netstandard2.1 + C# 9 like Unity, NUnit on .NET 8 in CI; what it does and doesn't prove | D-006, D-018 |
+| CI | `.github/workflows/python-ci.yml`, `scripts/ci_smoke.py`, `ci/Jenkinsfile` | Windows + Ubuntu, smoke triage with the fake provider; Jenkinsfile is an example | D-015, D-016 |
+
+**Not built yet (don't claim it):**
+- the bot runner and built-in adapters, detectors, screenshots, JUnit output, `run_pipeline.ps1` (M4);
+- evaluation numbers (M5);
+- vision (M6);
+- the real-game run (M7).
 
 ## Job description → your evidence
 
@@ -71,18 +102,26 @@ Fill the `[ ]` placeholders from `EVAL_RESULTS.md` and `REAL_GAME.md` as results
 28. Merge vs rebase; why a branch per milestone; Conventional Commits.
 29. *What does your Jenkinsfile do, and when does it fail the build?* Exit code 3 means a P1 bug.
 
+### Things that happened while building it
+
+31. *How do you end a run without losing a log written on another thread?* Producers increment an in-flight counter, then check a "sealed" flag. `Close` sets the flag, then waits for the counter to reach 0. Both sides use `Interlocked` (a full fence) before reading the other's value, so either `Close` sees the producer or the producer sees the seal. Then `run_end` gets the last seq. Know the 1 s cap and why it exists.
+32. *How did you find out your ground truth was wrong?* A review found that SB03's real stack ran through `SpawnWave`, so it also matched SB04's match rule: one exception would have counted as two bugs. The fix moved target assignment to `Update`, and a test now checks that every seed's real event matches only its own rule.
+33. *A test was flaky in CI. What did you do?* A multi-threaded test assumed the producers would still be running when the drain started. I reproduced it with a forced delay and rewrote it with a handshake (no timing assumptions); it passed 40/40.
+34. *Why test Unity C# outside Unity?* Fast feedback in CI with no license. netstandard2.1 + C# 9 catches APIs Unity doesn't have. It can't check Unity APIs, scenes or serialization, so those stay as EditMode/PlayMode tests.
+35. *Missing vs unassigned in your scanner, and why unassigned is only info?* Instance id ≠ 0 with a null value means a deleted target; id 0 means never set, often optional. Built-in components have many optional slots, so only your own scripts get the info line.
+
 ### C++ refresh (they list it as nice-to-have)
 
-30. RAII, `unique_ptr` vs `shared_ptr`, references vs pointers, virtual functions and vtables, `std::map` vs `std::unordered_map` (asked in a past R&D interview).
+36. RAII, `unique_ptr` vs `shared_ptr`, references vs pointers, virtual functions and vtables, `std::map` vs `std::unordered_map` (asked in a past R&D interview).
 
 ## Design patterns you used (covers the gap from your last interview)
 
 | Pattern | Where in QA Lab |
 |---|---|
-| Strategy | `IBotAdapter`, `LLMProvider`, clustering variants |
+| Strategy | `IBotAdapter` (contract built, runner in M4), `LLMProvider`, clustering variants |
 | Adapter | Game adapters wrap a game's own commands for the bot |
-| Observer | Unity log callback, `activeSceneChanged`, detectors reporting to `DetectorHub` |
-| Factory / Registry | `BotAdapterRegistry`, `llm/factory.py` |
+| Observer | Unity log callback, `activeSceneChanged` (built); detectors reporting to `DetectorHub` (M4) |
+| Factory / Registry | `BotAdapterRegistry` over `NamedRegistry<T>`, `llm/factory.py` |
 | Facade | `QALab` static API |
 | Producer–consumer | Event queue → main-thread flush |
 | Fallback / Null Object | Template report when the LLM fails; FakeProvider in tests |
@@ -90,7 +129,7 @@ Fill the `[ ]` placeholders from `EVAL_RESULTS.md` and `REAL_GAME.md` as results
 
 ## STAR stories to prepare (write them in LEARNING.md)
 
-1. The hardest bug you hit while building this, and how you found it.
+1. The hardest bug you hit while building this, and how you found it. Real candidates from this repo: the run-end race (Q31), the SB03/SB04 rule overlap (Q32), the flaky thread test (Q33), and terminal colour codes breaking the CI smoke check on Ubuntu (`scripts/ci_smoke.py`).
 2. A decision you made from data (E1, E3 or H3).
 3. Learning Python quickly while shipping.
 4. Something that didn't work (for example, VLM false positives) and what you changed.

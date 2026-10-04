@@ -1,48 +1,26 @@
 # Architecture
 
-Claude Code keeps this page current, and adds a proper diagram image in M7.
-
-```
- Unity game or QALabSandbox ─ package com.miawworks.qalab (C#)
- ┌──────────────────────────────────────────────────────────────────┐
- │ BotRunner ── IBotAdapter: NavMeshExplorer · UICrawler · GameAdapter│
- │              SeededRandom(seed) → action events (repro steps)     │
- │ LogCapture · MetricsSampler · DetectorHub (stuck, fall, perf,     │
- │ exception burst, tunneling) · ScreenshotService                   │
- │ LabelRecorder + VisualLabelProbe (benchmark mode only)            │
- └───────────────┬──────────────────────────────────────────────────┘
-                 │  runs/<run_id>/ run.json · events.jsonl · shots/*.png
-                 │                 results.xml · labels.json (benchmark only)
-                 ▼
- Python package qalab
-   qalab vision analyze ──► visual_findings.jsonl ──┐
-                                                    ▼
-   qalab triage run:
-     validate → normalize → parse stacks → signature → cluster → rank
-       → context (events, bot actions, logs, RAG docs, code)
-       → LLM draft (JSON schema) → validate + grounding checks → template fallback
-       → reports/<name>/ bugs.json · report.md · bugs_jira.csv · report.html
-   qalab eval (triage | vision) ◄── labels.json ──► docs/EVAL_RESULTS.md
-
- CI: GitHub Actions (ruff, pytest, smoke run with FakeProvider)
-     ci/Jenkinsfile (example nightly: Unity tests → build → playtests → triage → publish)
-```
+The system diagram (Mermaid) is in the [README, section 4](../README.md#4-architecture). Dashed boxes there
+are planned. This page keeps the component list, the module boundaries on both sides and the design
+principles. Reasons for specific choices are in `docs/DECISIONS.md`.
 
 ## Components
 
-| Component | Language | Responsibility | Spec |
-|---|---|---|---|
-| Event writer, log capture, metrics | C# | Thread-safe JSONL event stream | 01 |
-| Bot + adapters | C# | Seeded, reproducible exploration; action log | 01 |
-| Detectors | C# | Gameplay-level bug signals (falls, stuck, perf, tunneling) | 01 |
-| Screenshots + labels | C# | Frames for vision; ground truth from engine state | 01 |
-| Project scanner | C# (Editor) | Static checks: missing scripts, broken references, null materials | 01 |
-| Triage | Python | Deduplicate, rank and explain bugs with evidence | 02 |
-| RAG | Python | Design-doc and code context for reports | 02 |
-| LLM layer | Python | Pluggable providers, structured output, cache | 02 |
-| Vision | Python | Heuristics / VLM / ML / hybrid glitch detection | 03 |
-| Eval | Python | Benchmarks against seeded ground truth | 02, 03 |
-| Scripts + CI | PowerShell, YAML, Groovy | One-command pipeline, CI, releases | 04 |
+| Component | Language | Responsibility | Spec | Status |
+|---|---|---|---|---|
+| Event writer, log capture, metrics | C# | Thread-safe JSONL event stream, run.json | 01 | Built (M1) |
+| Labels + seeded sandbox | C# | Ground truth from engine state (benchmark mode) | 01 | Built for log seeds (M1) |
+| Bot contracts | C# | `IBotAdapter`, `BotContext`, `BotAdapterRegistry`, `SeededRandom` | 01 | Built (M7 polish) |
+| Bot runner + built-in adapters | C# | Seeded exploration (NavMesh, UI crawler); action log | 01 | Planned (M4) |
+| Detectors | C# | Falls, stuck, perf spikes, exception bursts, tunneling | 01 | Planned (M4) |
+| Screenshots + visual labels | C# | Frames for vision; labels from engine state | 01 | Planned (M4) |
+| Project scanner | C# (Editor) | Missing scripts, broken references, null materials, error shaders | 01 | Built (M7) |
+| Triage | Python | Deduplicate, rank and explain bugs with evidence | 02 | Built (M2–M3) |
+| RAG | Python | Design-doc and code context for reports | 02 | Built (M3) |
+| LLM layer | Python | Pluggable providers (fake, Ollama, Gemini), structured output, cache | 02 | Built (M3) |
+| Vision | Python | Heuristics / VLM / ML / hybrid glitch detection | 03 | Planned (M6) |
+| Eval | Python | Benchmarks against seeded ground truth | 02, 03 | Planned (M5–M6) |
+| Scripts + CI | PowerShell, YAML, Groovy | Unity tests, scanner, CI; pipeline scripts in M4 | 04 | Partly built |
 
 ## Design principles
 
@@ -50,7 +28,7 @@ Claude Code keeps this page current, and adds a proper diagram image in M7.
 2. **Works without AI.** Template reports always work. The LLM improves them but is never required.
 3. **Evidence or it didn't happen.** Every report field traces to events, actions, docs or code.
 4. **Measure.** Seeded bugs give ground truth; every claim in the README comes from an eval script.
-5. **Local by default.** Unreleased game data stays on the machine unless the user chooses otherwise.
+5. **The user decides where data goes.** The configured provider (Gemini, D-021) is for sandbox data; real-game runs use `--provider none` or a local model, so unreleased game data stays on the machine.
 
 ## Python module boundaries (triage side)
 
@@ -65,7 +43,25 @@ triage.cluster.Cluster ──► triage.context.build_context ──► ClusterC
       │                                     triage.report_template (fallback, --provider none)
       ▼                                                        │
 models.bug.BugReport ◄─────────────────────────────────────────┘
-llm: base.LLMProvider ← fake | ollama (| hosted later); cache.CachedProvider wraps them all.
+llm: base.LLMProvider ← fake | ollama | gemini; cache.CachedProvider wraps them all.
 ```
 
 See `docs/DECISIONS.md` for the reasoning behind specific choices.
+
+## Unity package map (`unity/com.miawworks.qalab`)
+
+```
+Runtime/
+  Core/     QALab (facade + bootstrap) · QALabHost (run lifecycle) · EventWriter · QAEvent · CommandLine
+            RunInfo/RunContext (run.json) · MainThreadCache · Clock · QALabSettings
+  Logging/  LogCapture (threaded callback) · LogLevels
+  Metrics/  MetricsSampler · RingBuffer (p95)
+  Labels/   LabelRecorder · LabelBook · SeedCatalogEntry
+  Bot/      IBotAdapter · BotContext · BotAdapterRegistry · NamedRegistry · SeededRandom · BotActionData · IBotMover
+Editor/     QALabMenu · Scanner/ProjectScanner (Unity side) · Scanner/ScanReport (engine-free)
+Samples~/GameAdapterTemplate/   IGameCommands · MyGameAdapter · MyGameQALabBootstrap
+Tests/EditMode (engine-free ones also run in tools/cs-check) · Tests/PlayMode
+```
+
+Files marked "Engine-free" in their header have no `UnityEngine`/`UnityEditor` and are compiled by
+`tools/cs-check` too (D-018). Everything else compiles only in Unity.

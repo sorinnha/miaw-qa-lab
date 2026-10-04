@@ -14,9 +14,25 @@ runs/<run_id>/labels.json     benchmark runs only (-qalabBenchmark)
 
 - Sandbox: `"com.miawworks.qalab": "file:../../com.miawworks.qalab"` in
   `unity/QALabSandbox/Packages/manifest.json`, plus `"testables": ["com.miawworks.qalab"]`.
-- Other games: `"com.miawworks.qalab": "https://github.com/sorinnha/miaw-qa-lab.git?path=/unity/com.miawworks.qalab#v0.2.0"`.
+- Other games: `"com.miawworks.qalab": "https://github.com/sorinnha/miaw-qa-lab.git?path=/unity/com.miawworks.qalab"`,
+  pinned with `#<tag>` once releases exist (or `#<commit>`). Walkthrough: `docs/GAME_INTEGRATION.md`.
 
 Register the player once so events carry a position: `QALab.RegisterPlayer(transform, mover)`.
+
+## Project scanner
+
+**Tools > QA Lab > Scan Project** checks the enabled Build Settings scenes and every prefab under
+`Assets/` for missing scripts, broken references, empty material slots and error shaders, plus
+unassigned script fields (as info). It writes `Logs/qalab/scan.json`. Batch mode:
+`-executeMethod MiawWorks.QALab.Editor.ProjectScanner.RunFromCommandLine [-qalabScanOut <file>]`; exit
+code 0 means clean, 1 means errors, 2 means the scan failed.
+
+## Bot adapters
+
+An adapter (`IBotAdapter`) is the bot's strategy. Register one by name with `BotAdapterRegistry`
+and select it with `-qalabAdapter <name>`. It gets a `BotContext` with the run's `SeededRandom` and
+`LogAction` for repro steps. Import the **Game adapter template** sample (Package Manager > QA Lab >
+Samples) to write one for your game. The bot runner that calls adapters comes in a later version (M4).
 
 ## Flags
 
