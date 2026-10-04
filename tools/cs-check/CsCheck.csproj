@@ -28,6 +28,7 @@
     <Compile Include="$(PackageTests)/LogLevelsTests.cs" Link="Tests/LogLevelsTests.cs" />
     <Compile Include="$(PackageTests)/RingBufferTests.cs" Link="Tests/RingBufferTests.cs" />
     <Compile Include="$(PackageTests)/LabelBookTests.cs" Link="Tests/LabelBookTests.cs" />
+    <Compile Include="$(PackageTests)/BotFrameworkTests.cs" Link="Tests/BotFrameworkTests.cs" />
     <Compile Include="$(SandboxTests)/SandboxSeedCatalogTests.cs" Link="Tests/SandboxSeedCatalogTests.cs" />
   </ItemGroup>
   <ItemGroup>

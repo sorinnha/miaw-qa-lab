@@ -28,6 +28,9 @@
     <Compile Include="$(PackageRoot)/Metrics/RingBuffer.cs" Link="Package/Metrics/RingBuffer.cs" />
     <Compile Include="$(PackageRoot)/Labels/SeedCatalogEntry.cs" Link="Package/Labels/SeedCatalogEntry.cs" />
     <Compile Include="$(PackageRoot)/Labels/LabelBook.cs" Link="Package/Labels/LabelBook.cs" />
+    <Compile Include="$(PackageRoot)/Bot/SeededRandom.cs" Link="Package/Bot/SeededRandom.cs" />
+    <Compile Include="$(PackageRoot)/Bot/NamedRegistry.cs" Link="Package/Bot/NamedRegistry.cs" />
+    <Compile Include="$(PackageRoot)/Bot/BotActionData.cs" Link="Package/Bot/BotActionData.cs" />
     <Compile Include="$(SandboxScripts)/SandboxSeedCatalog.cs" Link="Sandbox/SandboxSeedCatalog.cs" />
   </ItemGroup>
   <ItemGroup>
