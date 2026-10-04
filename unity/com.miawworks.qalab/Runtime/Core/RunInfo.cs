@@ -38,8 +38,9 @@ namespace MiawWorks.QALab
 
         /// <summary>
         /// Write <c>run.json</c> through a temp file, UTF-8 without BOM, LF. An existing file is swapped in
-        /// one step (<see cref="File.Replace(string, string, string)"/>), so a crash while the run ends
-        /// never leaves the folder without a run.json.
+        /// one call (<see cref="File.Replace(string, string, string)"/>) instead of delete + move, so a
+        /// crash between two steps can't leave the folder without a run.json. (If the OS swap itself
+        /// fails halfway, the new content is still in <c>run.json.tmp</c>.)
         /// </summary>
         public void WriteTo(string path)
         {
