@@ -15,8 +15,8 @@ implementation of both stubs the same run is `134 passed, 48 xpassed`.
 - `qalab.io.runs` — load/validate/stream runs, invalid lines recorded, `suspected_crash`; never opens
   `labels.json`. `qalab.io.writers` — bugs.json, clusters.json, screenshot copies.
 - `qalab.config` + `qalab.toml` — spec §12 defaults plus `[rag] tfidf_min_score`.
-- `qalab.llm` — `LLMProvider`/`LLMResult`, `FakeProvider`, `OllamaProvider`, `LLMCache` + `CachedProvider`,
-  `make_provider` (`none` → None; hosted names → `ValueError`).
+- `qalab.llm` — `LLMProvider`/`LLMResult`, `FakeProvider`, `OllamaProvider`, `GeminiProvider` (`[gemini]`
+  extra, D-021), `LLMCache` + `CachedProvider`, `make_provider` (`none` → None; openai/anthropic → `ValueError`).
 - `qalab.triage` — `normalize` (**YOU WRITE stub**), `stack`, `signature`, `cluster` (`Cluster` type,
   exact + DBSCAN cells + variants with union-find), `rank`, `context`, `prompts`, `report_template`,
   `report_llm` (retries, grounding, crash flag), `pipeline` (`run_triage`).
@@ -44,15 +44,16 @@ Until `normalize_message` exists, `qalab triage run` raises `NotImplementedError
 - **M2 close-out (PC):** Sora writes `normalize_message`; `/review-mine` drops the markers; run
   `pytest python -q --cov=qalab.triage --cov-report=term-missing` and record ≥ 80% on normalize/stack/signature
   in PLAN.md; tick M2.
-- **M3 close-out (PC):** Sora writes `cosine_top_k`; a real Ollama run on the sample with
+- **M3 close-out (PC):** Sora writes `cosine_top_k`; a real Gemini run (`GEMINI_API_KEY` in `.env`,
+  `pip install -e ".\python[dev,gemini]"`) on the sample with
   `--docs docs/sandbox_design.md`; check evidence resolves and steps cite actions; tag v0.1.0 (ask first).
-- **Not built / deferred:** hosted providers (`llm/gemini.py`, `openai_.py`, `anthropic_.py`); streaming
+- **Not built / deferred:** hosted providers `llm/openai_.py`, `anthropic_.py` (Gemini is built); streaming
   pipeline for 100k events (D-014); `qalab eval` (M5); README demo GIF and measured numbers (M5/M7).
   CI (`.github/workflows/python-ci.yml`, with `--cov`) was added on the M0 branch.
 
 ## Open questions
 
 - Rank weights vs EXPECTED.md "SB13 last" (D-012): keep the spec formula or raise `minor` to 3?
-- Default Ollama embed model name (`nomic-embed-text` in `make_provider`): confirm on the PC and move to
-  `qalab.toml [llm] embed_model`.
+- Gemini model names (`gemini-2.5-flash`, `gemini-embedding-001` in `qalab.toml`): confirm they are
+  available on Sora's key with one real run; change `[llm] model` / `embed_model` if not.
 - Branch naming: CLAUDE.md wants `m<N>-<slug>`; this work spans M0/M2/M3, hence `core-foundation`.

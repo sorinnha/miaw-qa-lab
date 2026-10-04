@@ -123,9 +123,13 @@ def test_unknown_cluster_variant_is_exit_2(tmp_path: Path) -> None:
 
 def test_hosted_provider_and_missing_config_are_exit_2(tmp_path: Path) -> None:
     hosted = runner.invoke(
-        app, ["triage", "run", str(SAMPLE_RUN), "--provider", "gemini", "--out", str(tmp_path)]
+        app, ["triage", "run", str(SAMPLE_RUN), "--provider", "openai", "--out", str(tmp_path)]
     )
     assert hosted.exit_code == 2 and "not built yet" in hosted.output
+    no_key = runner.invoke(
+        app, ["triage", "run", str(SAMPLE_RUN), "--provider", "gemini", "--out", str(tmp_path)]
+    )
+    assert no_key.exit_code == 2 and "GEMINI_API_KEY is not set" in no_key.output
     missing = runner.invoke(
         app,
         [
