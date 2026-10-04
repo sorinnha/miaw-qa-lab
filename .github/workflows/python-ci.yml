@@ -68,3 +68,19 @@ jobs:
           name: coverage-${{ matrix.os }}
           path: coverage.xml
           if-no-files-found: ignore
+
+  csharp-check:
+    # Engine-free package code compiled like Unity (netstandard2.1, C# 9) and its EditMode tests
+    # run outside Unity (spec 04, D-006). YOU WRITE tests are excluded until Sora writes them.
+    name: csharp-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Test
+        run: dotnet test tools/cs-check -c Release --filter "TestCategory!=YouWrite"

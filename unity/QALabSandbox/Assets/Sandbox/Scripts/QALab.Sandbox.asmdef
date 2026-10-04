@@ -1,0 +1,16 @@
+{
+    "name": "QALab.Sandbox",
+    "rootNamespace": "QALab.Sandbox",
+    "references": ["MiawWorks.QALab", "UnityEngine.UI", "Unity.InputSystem"],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        { "name": "com.unity.inputsystem", "expression": "1.0.0", "define": "QALAB_INPUT_SYSTEM" }
+    ],
+    "noEngineReferences": false
+}

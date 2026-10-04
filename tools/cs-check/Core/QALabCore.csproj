@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The engine-free part of the QA Lab package, compiled like Unity compiles it:
+    .NET Standard 2.1 API surface and C# 9. Nothing is copied: every file is linked from
+    unity/com.miawworks.qalab (and the sandbox) so Unity and this check build the same source.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>MiawWorks.QALab.Core</AssemblyName>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PackageRoot>../../../unity/com.miawworks.qalab/Runtime</PackageRoot>
+    <SandboxScripts>../../../unity/QALabSandbox/Assets/Sandbox/Scripts</SandboxScripts>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(PackageRoot)/Core/CommandLine.cs" Link="Package/Core/CommandLine.cs" />
+    <Compile Include="$(PackageRoot)/Core/Clock.cs" Link="Package/Core/Clock.cs" />
+    <Compile Include="$(PackageRoot)/Core/MainThreadState.cs" Link="Package/Core/MainThreadState.cs" />
+    <Compile Include="$(PackageRoot)/Core/QAEvent.cs" Link="Package/Core/QAEvent.cs" />
+    <Compile Include="$(PackageRoot)/Core/EventWriter.cs" Link="Package/Core/EventWriter.cs" />
+    <Compile Include="$(PackageRoot)/Core/RunInfo.cs" Link="Package/Core/RunInfo.cs" />
+    <Compile Include="$(PackageRoot)/Logging/LogLevels.cs" Link="Package/Logging/LogLevels.cs" />
+    <Compile Include="$(PackageRoot)/Metrics/RingBuffer.cs" Link="Package/Metrics/RingBuffer.cs" />
+    <Compile Include="$(PackageRoot)/Labels/SeedCatalogEntry.cs" Link="Package/Labels/SeedCatalogEntry.cs" />
+    <Compile Include="$(PackageRoot)/Labels/LabelBook.cs" Link="Package/Labels/LabelBook.cs" />
+    <Compile Include="$(SandboxScripts)/SandboxSeedCatalog.cs" Link="Sandbox/SandboxSeedCatalog.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Unity's com.unity.nuget.newtonsoft-json 3.2.x ships Newtonsoft.Json 13.0.2. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+  </ItemGroup>
+</Project>

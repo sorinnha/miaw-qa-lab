@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    .NET 8 NUnit 3 runner for QA Lab's engine-free EditMode tests (spec 04, D-006).
+    The test files are linked from unity/**/Tests/EditMode, so Unity's Test Runner and this
+    project run the very same tests. Run from the repo root (see README "Checks"):
+      dotnet test tools/cs-check -c Release, filtered with TestCategory!=YouWrite
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PackageTests>../../unity/com.miawworks.qalab/Tests/EditMode</PackageTests>
+    <SandboxTests>../../unity/QALabSandbox/Assets/Sandbox/Tests/EditMode</SandboxTests>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(PackageTests)/TestSupport.cs" Link="Tests/TestSupport.cs" />
+    <Compile Include="$(PackageTests)/CommandLineTests.cs" Link="Tests/CommandLineTests.cs" />
+    <Compile Include="$(PackageTests)/QAEventJsonTests.cs" Link="Tests/QAEventJsonTests.cs" />
+    <Compile Include="$(PackageTests)/EventWriterTests.cs" Link="Tests/EventWriterTests.cs" />
+    <Compile Include="$(PackageTests)/RunInfoTests.cs" Link="Tests/RunInfoTests.cs" />
+    <Compile Include="$(PackageTests)/LogLevelsTests.cs" Link="Tests/LogLevelsTests.cs" />
+    <Compile Include="$(PackageTests)/RingBufferTests.cs" Link="Tests/RingBufferTests.cs" />
+    <Compile Include="$(PackageTests)/LabelBookTests.cs" Link="Tests/LabelBookTests.cs" />
+    <Compile Include="$(SandboxTests)/SandboxSeedCatalogTests.cs" Link="Tests/SandboxSeedCatalogTests.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="Core/QALabCore.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+  </ItemGroup>
+</Project>

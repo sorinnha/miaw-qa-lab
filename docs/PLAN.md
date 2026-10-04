@@ -202,3 +202,4 @@ Write the hypotheses first. Record tables, 2 charts, conclusions and limitations
 |---|---|---|
 | 2026-10-03 | Plan created | Kick-off |
 | 2026-10-03 | Cloud mode: milestones can be built in cloud sessions; `tools/cs-check` tests engine-free C# (D-006) | Faster build while keeping YOU WRITE and honest checks |
+| 2026-10-03 | M1: the SB02 YOU WRITE catalog entry is C# (`SandboxSeedCatalog.SB02`), not a ScriptableObject entry (D-017) | Reviewable, schema-checked in cs-check |

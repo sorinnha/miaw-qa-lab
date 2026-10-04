@@ -44,10 +44,10 @@ coverage.xml
 htmlcov/
 
 # ---- .NET check project (tools/cs-check): keep the project file, ignore build output ----
-!/tools/cs-check/*.csproj
-/tools/cs-check/bin/
-/tools/cs-check/obj/
-/tools/cs-check/TestResults/
+!/tools/cs-check/**/*.csproj
+/tools/cs-check/**/bin/
+/tools/cs-check/**/obj/
+/tools/cs-check/**/TestResults/
 
 # ---- QA Lab outputs (regenerate, never commit) ----
 # Anchored to the repo root with "/" so source folders like python/src/qalab/eval/ are NOT ignored.
