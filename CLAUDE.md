@@ -47,6 +47,7 @@ Every milestone should produce evidence for one of those.
 
 ```
 CLAUDE.md                 this file
+CHANGELOG.md              Keep a Changelog; versions bump only at a release tag (D-024)
 qalab.toml                tool config (created in M2)
 schemas/                  JSON Schemas + examples/ (contract tests)
 samples/sample_run/       hand-made run folder + EXPECTED.md (fixture, README demo)
@@ -54,12 +55,14 @@ docs/
   PLAN.md                 milestones M0–M8, acceptance criteria, change log
   ARCHITECTURE.md  DECISIONS.md  LEARNING.md  EVAL_RESULTS.md  ENVIRONMENT.md (M0)
   INTERVIEW_PREP.md  OUTREACH.md  PROMPTS.md  sandbox_design.md (RAG source)
+  USER_GUIDE.md (QC testers)  GAME_INTEGRATION.md (package in a real game)
+  progress/PC_CHECKLIST.md  hand-off note: code state + every PC step, M0–M8
   specs/00_contracts.md 01_unity_qalab.md 02_triage.md 03_vision.md 04_pipeline_ci.md
 unity/
-  com.miawworks.qalab/    UPM package: Runtime/ Editor/ Tests/
+  com.miawworks.qalab/    UPM package: Runtime/ Editor/ Tests/ Samples~/ (game adapter template)
   QALabSandbox/           Unity project with seeded bugs (Sora creates it in Unity Hub in M1)
 python/                   pyproject.toml, src/qalab/, tests/
-scripts/                  PowerShell: unity_tests, build_sandbox, run_playtest, run_pipeline, benchmark
+scripts/                  PowerShell: find_unity, unity_tests, scan_project (+ M4: build_sandbox, run_playtest, run_pipeline, benchmark)
 tools/cs-check/           .NET 8 test project: engine-free package C# + its EditMode tests, outside Unity (M1)
 ci/Jenkinsfile            example nightly pipeline (M7)
 .github/workflows/        python-ci.yml

@@ -203,3 +203,5 @@ Write the hypotheses first. Record tables, 2 charts, conclusions and limitations
 | 2026-10-03 | Plan created | Kick-off |
 | 2026-10-03 | Cloud mode: milestones can be built in cloud sessions; `tools/cs-check` tests engine-free C# (D-006) | Faster build while keeping YOU WRITE and honest checks |
 | 2026-10-03 | M1: the SB02 YOU WRITE catalog entry is C# (`SandboxSeedCatalog.SB02`), not a ScriptableObject entry (D-017) | Reviewable, schema-checked in cs-check |
+| 2026-10-04 | M7 code built before M4–M6 in a polish session: ProjectScanner, the bot contracts from spec 01 (M4 interfaces) with a game adapter template, `ci/Jenkinsfile`, `USER_GUIDE.md`, `GAME_INTEGRATION.md`, final README outline (D-024) | Polish request; the template needs the contracts; the bot runner stays in M4 |
+| 2026-10-04 | Versions stay 0.1.0 until the first tag; `CHANGELOG.md` lists the work as Unreleased (D-024) | No release has been cut yet |

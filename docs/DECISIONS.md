@@ -130,3 +130,34 @@ One entry per real choice: what we decided, why, what else we considered, and wh
 - **`run.json`** replaces an existing file with `File.Replace` (one call) instead of delete + move; if the OS swap fails halfway, the new content is still in `run.json.tmp`.
 - **`unity_tests.ps1`** waits for the Unity process only (`WaitForExit`), not `Start-Process -Wait`, which also waits for child processes such as Unity's licensing client.
 - **PC setup:** the project is created as `QALabSandbox_new` and its ProjectSettings are copied, so Player Settings → Product Name must be set back to `QALabSandbox` (it becomes run.json `project` and the persistentDataPath folder). This is a PC checklist step.
+
+## D-024 · 2026-10-04 · Polish session: M7 code before M4–M6, scanner report format, versions stay 0.1.0 (M7)
+- **Built early:**
+  - ProjectScanner (spec 01, M7).
+  - The bot contracts from spec 01's M4 section (`IBotAdapter`, `BotStepResult`, `BotContext`, `BotAdapterRegistry`, `SeededRandom`), so the M7 game-adapter template compiles against the real API.
+  - The bot runner, built-in adapters, detectors and screenshots stay in M4.
+- **Bot contract details the spec leaves open:**
+  - `BotStepResult` is `Continue | Done`.
+  - Adapter names are letters, digits, `_ - .`, matched ignoring case; a later registration replaces an earlier one, so a game can override a built-in.
+  - `BotContext.LogAction` also takes a plain dictionary, so game code in Assembly-CSharp doesn't need Newtonsoft. The package references Newtonsoft explicitly, so it may not be visible to game code.
+  - Action data goes through the engine-free `BotActionData`, which is checked against the schema example.
+- **`scan.json` is not a contract.** It's a Unity-side report that Python never reads, so it has no schema in `schemas/`. It carries `tool` and `format_version: 1`, and its format is documented in `docs/USER_GUIDE.md`. If Python ever reads it, it gets a schema first (contracts first).
+- **Scanner rules:**
+  - unassigned references are reported for MonoBehaviours only (built-in components have many optional slots);
+  - a material slot is reported once, as `null_material`, not also as a broken reference;
+  - for a `ParticleSystemRenderer` only slot 0 is checked (slot 1 is the trail material, empty unless trails are used);
+  - a Build Settings scene whose file is gone is an error (`missing_scene`);
+  - open scenes are scanned in place and others are opened additively and closed; the scanner never modifies or saves anything;
+  - the default output is `Logs/qalab/scan.json` (outside Assets, gitignored by Unity's template);
+  - exit codes are 0 clean, 1 errors, 2 scanner failure.
+- **Packaging:**
+  - The editor asmdef references `Newtonsoft.Json.dll` explicitly, like the runtime.
+  - The adapter template is a UPM sample (`Samples~`, listed in `package.json`) with no asmdef, so after import it compiles into the game's assembly and can call game code.
+  - `scripts/scan_project.ps1` (not in spec 04's list) runs the scanner on any project.
+- **Jenkinsfile:**
+  - stages for M4/M6 scripts are guarded with `fileExists`, and triage falls back to `samples/sample_run` as a dry run;
+  - the provider parameter defaults to `none`;
+  - a Gate stage fails the build after publishing when triage exits 3;
+  - it's an example: parse-checked with Groovy, never run on Jenkins.
+- **Versions stay 0.1.0** (Python package, Unity package). No release has been cut. Spec 04 ties version bumps to tags, the first tag is v0.1.0 after M3's PC acceptance, and v1.0.0 needs M4–M7. Everything is listed under `[Unreleased]` in `CHANGELOG.md`. Bumping now would claim releases that don't exist.
+- **Hand-off notes:** `docs/progress/` is now one file, `PC_CHECKLIST.md`, with the code state for the next session and every PC step for M0–M8 (`core.md` and `unity.md` are folded in).

@@ -17,7 +17,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 from qalab.io.runs import LoadedRun
 from qalab.llm.base import LLMProvider
-from qalab.models.bug import BugKind, EventRef, Priority
+from qalab.models.bug import BugKind, Priority
 from qalab.models.event import DetectorSeverity, Event, Level
 from qalab.triage.signature import detector_signature, is_candidate, log_signature
 from qalab.triage.stack import Frame, app_frames_of
@@ -40,10 +40,6 @@ class ClusterMember:
     @classmethod
     def from_event(cls, event: Event) -> ClusterMember:
         return cls(event=event, frames=app_frames_of(event.stack))
-
-    @property
-    def ref(self) -> EventRef:
-        return EventRef(run_id=self.event.run_id, seq=self.event.seq)
 
     @property
     def sort_key(self) -> tuple[str, int]:
