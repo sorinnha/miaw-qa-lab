@@ -40,6 +40,14 @@ pipeline {
             }
         }
 
+        stage('Prepare') {
+            steps {
+                // runs/, reports/ and out/ are gitignored, so checkout doesn't clear them: start each
+                // night empty, or last night's runs would be triaged (and gated) again.
+                powershell 'Remove-Item -Recurse -Force -ErrorAction SilentlyContinue runs\\nightly, reports\\nightly, out'
+            }
+        }
+
         stage('Python setup') {
             steps {
                 powershell '''

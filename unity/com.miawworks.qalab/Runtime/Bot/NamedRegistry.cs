@@ -1,29 +1,32 @@
 // Engine-free: compiled by Unity and by tools/cs-check (.NET). No UnityEngine here.
 using System;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 
 namespace MiawWorks.QALab
 {
     /// <summary>
-    /// Name → factory map behind <c>BotAdapterRegistry</c>. Names are matched ignoring case (they come
-    /// from <c>-qalabAdapter</c>); registering a name again replaces it, so a game can override a
-    /// built-in. Thread-safe: games may register from any static initializer.
+    /// Name → factory map behind <c>BotAdapterRegistry</c>. A name must pass the rule given to the
+    /// constructor (for adapters, <see cref="CommandLine.IsAdapterName"/>, the same rule as
+    /// <c>-qalabAdapter</c>), so every registered name can be selected from the command line.
+    /// Registering a name again replaces it, so a game can override a built-in. Thread-safe: games may
+    /// register from any static initializer.
     /// </summary>
     public sealed class NamedRegistry<T> where T : class
     {
-        // "navmesh_explorer", "crimson-tactics", "ui.crawler" ok; "my game" or "" rejected (flag-friendly).
-        private static readonly Regex ValidName = new Regex("^[A-Za-z0-9_.-]+$", RegexOptions.Compiled);
-
-        private readonly Dictionary<string, Func<T>> _factories =
-            new Dictionary<string, Func<T>>(StringComparer.OrdinalIgnoreCase);
+        private readonly Func<string, bool> _isValidName;
+        private readonly Dictionary<string, Func<T>> _factories = new Dictionary<string, Func<T>>(StringComparer.Ordinal);
         private readonly object _gate = new object();
+
+        public NamedRegistry(Func<string, bool> isValidName)
+        {
+            _isValidName = isValidName ?? throw new ArgumentNullException(nameof(isValidName));
+        }
 
         public void Register(string name, Func<T> factory)
         {
-            if (name == null || !ValidName.IsMatch(name))
+            if (name == null || !_isValidName(name))
             {
-                throw new ArgumentException($"bad name '{name}' (letters, digits, '_', '-', '.')", nameof(name));
+                throw new ArgumentException($"bad name '{name}'", nameof(name));
             }
             if (factory == null)
             {
@@ -65,7 +68,7 @@ namespace MiawWorks.QALab
                 {
                     names = new List<string>(_factories.Keys);
                 }
-                names.Sort(StringComparer.OrdinalIgnoreCase);
+                names.Sort(StringComparer.Ordinal);
                 return names;
             }
         }

@@ -54,31 +54,55 @@ namespace MiawWorks.QALab.Tests
             public string Label;
         }
 
+        private static NamedRegistry<Dummy> AdapterRegistry() => new NamedRegistry<Dummy>(CommandLine.IsAdapterName);
+
         [Test]
-        public void RegistryCreatesByNameIgnoringCaseAndLaterRegistrationsWin()
+        public void RegistryCreatesByNameAndLaterRegistrationsWin()
         {
-            var registry = new NamedRegistry<Dummy>();
+            var registry = AdapterRegistry();
             registry.Register("my_game", () => new Dummy { Label = "first" });
-            Assert.IsTrue(registry.IsRegistered("MY_GAME"));
-            Assert.AreEqual("first", registry.Create("My_Game").Label);
+            Assert.IsTrue(registry.IsRegistered("my_game"));
+            Assert.AreEqual("first", registry.Create("my_game").Label);
             Assert.AreNotSame(registry.Create("my_game"), registry.Create("my_game"), "a new adapter per run");
 
             registry.Register("my_game", () => new Dummy { Label = "override" });
             Assert.AreEqual("override", registry.Create("my_game").Label);
-            registry.Register("crimson-tactics", () => new Dummy());
-            CollectionAssert.AreEqual(new[] { "crimson-tactics", "my_game" }, registry.Names);
+            registry.Register("crimson_tactics", () => new Dummy());
+            CollectionAssert.AreEqual(new[] { "crimson_tactics", "my_game" }, registry.Names);
         }
 
         [Test]
-        public void RegistryRejectsBadNamesAndReturnsNullForUnknownOnes()
+        public void EveryRegisteredAdapterNameIsAcceptedByTheCommandLine()
         {
-            var registry = new NamedRegistry<Dummy>();
+            var registry = AdapterRegistry();
+            registry.Register("crimson_tactics", () => new Dummy());
+            var errors = new List<string>();
+            var options = CommandLine.Parse(new[] { "-qalab", "-qalabAdapter", registry.Names[0] }, errors);
+            Assert.IsEmpty(errors);
+            Assert.AreEqual("crimson_tactics", options.Adapter);
+        }
+
+        [TestCase("my game")]
+        [TestCase("crimson-tactics")]
+        [TestCase("My_Game")]
+        [TestCase("")]
+        public void RegistryRejectsNamesTheCommandLineWouldReject(string name)
+        {
+            Assert.Throws<ArgumentException>(() => AdapterRegistry().Register(name, () => new Dummy()));
+            var errors = new List<string>();
+            CommandLine.Parse(new[] { "-qalab", "-qalabAdapter", name }, errors);
+            Assert.IsNotEmpty(errors, "the command line rejects it too");
+        }
+
+        [Test]
+        public void RegistryReturnsNullForUnknownNamesAndNeedsAFactory()
+        {
+            var registry = AdapterRegistry();
             Assert.IsNull(registry.Create("nothing"));
             Assert.IsNull(registry.Create(null));
             Assert.IsFalse(registry.IsRegistered(null));
-            Assert.Throws<ArgumentException>(() => registry.Register("my game", () => new Dummy()));
-            Assert.Throws<ArgumentException>(() => registry.Register("", () => new Dummy()));
             Assert.Throws<ArgumentNullException>(() => registry.Register("ok", null));
+            Assert.Throws<ArgumentNullException>(() => new NamedRegistry<Dummy>(null));
         }
 
         private static JObject ActionExample()

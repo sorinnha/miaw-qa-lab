@@ -10,11 +10,11 @@ namespace MiawWorks.QALab
     /// [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterAssembliesLoaded)]
     /// static void RegisterAdapter() => BotAdapterRegistry.Register("my_game", () => new MyGameAdapter());
     /// </code>
-    /// Names ignore case; registering a name again replaces it.
+    /// Names are snake_case, the same rule as <c>-qalabAdapter</c>; registering a name again replaces it.
     /// </summary>
     public static class BotAdapterRegistry
     {
-        private static readonly NamedRegistry<IBotAdapter> Adapters = new NamedRegistry<IBotAdapter>();
+        private static readonly NamedRegistry<IBotAdapter> Adapters = new NamedRegistry<IBotAdapter>(CommandLine.IsAdapterName);
 
         public static void Register(string name, Func<IBotAdapter> factory) => Adapters.Register(name, factory);
 

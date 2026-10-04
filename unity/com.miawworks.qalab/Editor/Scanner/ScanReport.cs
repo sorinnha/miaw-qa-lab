@@ -16,7 +16,7 @@ namespace MiawWorks.QALab.Editor
         public const string MissingScript = "missing_script";
         /// <summary>An object field that was set, but its target is gone ("Missing" in the Inspector).</summary>
         public const string BrokenReference = "broken_reference";
-        /// <summary>A script's object field that was never set ("None"). Often intended, so info only.</summary>
+        /// <summary>A script's object field that was never set ("None"). Often intended, so info only; see <see cref="ReportsUnassigned"/>.</summary>
         public const string UnassignedReference = "unassigned_reference";
         /// <summary>A renderer material slot that is empty or points at a deleted material (renders magenta).</summary>
         public const string NullMaterial = "null_material";
@@ -41,6 +41,18 @@ namespace MiawWorks.QALab.Editor
             if (!valueIsNull) return null;
             return instanceId != 0 ? BrokenReference : UnassignedReference;
         }
+
+        /// <summary>
+        /// Whether unassigned fields of a script are worth listing: yes for the game's scripts and
+        /// third-party ones, no for Unity's own packages (<c>Packages/com.unity.*</c>: uGUI, TextMeshPro,
+        /// AI Navigation...), whose optional slots would bury the real ones. Built-in components (Light,
+        /// Camera...) have no script asset and aren't asked.
+        /// </summary>
+        public static bool ReportsUnassigned(string scriptAssetPath) =>
+            !string.IsNullOrEmpty(scriptAssetPath)
+            && !scriptAssetPath.StartsWith(UnityPackagesPrefix, StringComparison.OrdinalIgnoreCase);
+
+        private const string UnityPackagesPrefix = "Packages/com.unity.";
 
         /// <summary>True for no shader at all or Unity's error shader.</summary>
         public static bool IsErrorShader(string shaderName) =>

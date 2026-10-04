@@ -12,7 +12,8 @@ namespace MiawWorks.QALab.Editor
     /// Static checks on a project (spec 01, "Editor tools", M7): every enabled scene in Build Settings and
     /// every prefab under Assets/ is checked for missing scripts, broken and unassigned references, empty
     /// material slots and error shaders. Results go to <c>scan.json</c> (format in docs/USER_GUIDE.md)
-    /// and the console. Nothing is modified: scenes that weren't open are opened additively and closed.
+    /// and the console. Nothing is modified: open scenes are scanned in place, others are opened additively
+    /// and closed again (a scene that was in the Hierarchy but unloaded is unloaded again).
     /// <list type="bullet">
     /// <item>Menu: Tools > QA Lab > Scan Project (writes <c>Logs/qalab/scan.json</c> and shows it).</item>
     /// <item>Batch: <c>Unity.exe -batchmode -projectPath &lt;p&gt; -executeMethod
@@ -33,6 +34,10 @@ namespace MiawWorks.QALab.Editor
             Print(report, path);
             EditorUtility.RevealInFinder(path);
         }
+
+        /// <summary>Greys the menu item out in Play Mode, where scenes can't be opened from the editor.</summary>
+        [MenuItem("Tools/QA Lab/Scan Project", true)]
+        private static bool CanScanFromMenu() => !EditorApplication.isPlaying;
 
         /// <summary>Entry point for <c>-executeMethod</c>; always exits the editor with the scan's code.</summary>
         public static void RunFromCommandLine()
@@ -63,6 +68,10 @@ namespace MiawWorks.QALab.Editor
         /// <summary>Scan the enabled Build Settings scenes and all prefabs under Assets/.</summary>
         public static ScanReport Scan(bool showProgress)
         {
+            if (EditorApplication.isPlaying)
+            {
+                throw new InvalidOperationException("leave Play Mode before scanning the project");
+            }
             var report = new ScanReport(PlayerSettings.productName, Application.unityVersion, DateTime.UtcNow);
             var scenes = EditorBuildSettings.scenes;
             var prefabGuids = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets" });
@@ -94,7 +103,8 @@ namespace MiawWorks.QALab.Editor
 
         private static void ScanScene(string path, ScanReport report)
         {
-            if (!File.Exists(path))
+            // AssetDatabase, not File.Exists: scenes in registry/git packages live under Library/PackageCache.
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(path) == null)
             {
                 report.Add(new ScanFinding
                 {
@@ -102,10 +112,12 @@ namespace MiawWorks.QALab.Editor
                 });
                 return;
             }
-            // Leave the user's open scenes alone: scan an open scene in place, open the others additively.
-            var open = SceneManager.GetSceneByPath(path);
-            var wasOpen = open.IsValid() && open.isLoaded;
-            var scene = wasOpen ? open : EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
+            // Leave the user's setup as it was: scan a loaded scene in place, open the others additively,
+            // and afterwards unload a scene that was in the Hierarchy unloaded, or remove one that wasn't there.
+            var existing = SceneManager.GetSceneByPath(path);
+            var inHierarchy = existing.IsValid();
+            var wasLoaded = inHierarchy && existing.isLoaded;
+            var scene = wasLoaded ? existing : EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
             try
             {
                 report.ScenesScanned++;
@@ -116,7 +128,7 @@ namespace MiawWorks.QALab.Editor
             }
             finally
             {
-                if (!wasOpen) EditorSceneManager.CloseScene(scene, true);
+                if (!wasLoaded) EditorSceneManager.CloseScene(scene, removeScene: !inHierarchy);
             }
         }
 
@@ -149,9 +161,11 @@ namespace MiawWorks.QALab.Editor
         private static void ScanReferences(Component component, bool isRenderer, string assetPath, string objectPath,
             ScanReport report)
         {
-            // Unassigned slots are reported for the game's own scripts only: built-in components have many
-            // optional ones (a Light's cookie, a Camera's target texture) that are not bugs.
-            var reportUnassigned = component is MonoBehaviour;
+            // Unassigned slots only for scripts outside Unity's own packages (ScanRules.ReportsUnassigned):
+            // built-in components and uGUI/TMP have many optional slots that are not bugs.
+            var behaviour = component as MonoBehaviour;
+            var script = behaviour == null ? null : MonoScript.FromMonoBehaviour(behaviour);
+            var reportUnassigned = script != null && ScanRules.ReportsUnassigned(AssetDatabase.GetAssetPath(script));
             using (var serialized = new SerializedObject(component))
             {
                 var property = serialized.GetIterator();

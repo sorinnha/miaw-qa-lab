@@ -57,10 +57,29 @@ namespace MiawWorks.QALab
         }
 
         /// <summary>
-        /// <see cref="LogAction(string, Vector3?, string, JObject)"/> with plain details, so game code
-        /// doesn't need Newtonsoft: <c>LogAction("order", new Dictionary&lt;string, object&gt; { ["unit"] = "Archer_1" })</c>.
+        /// <see cref="LogAction(string, Vector3?, string, JObject)"/> with the details as a plain dictionary,
+        /// so adapters don't build JSON: <c>LogAction("order", new Dictionary&lt;string, object&gt; { ["unit"] = "Archer_1" })</c>.
+        /// Strings, numbers and bools are written as they are, a <c>Vector3</c> as <c>[x, y, z]</c>, anything
+        /// else as its <c>ToString()</c>. (Calling either overload still needs a reference to Newtonsoft.Json,
+        /// which game code has by default; see docs/GAME_INTEGRATION.md if your own asmdef overrides references.)
         /// </summary>
         public void LogAction(string action, IDictionary<string, object> args) =>
-            LogAction(action, null, null, args == null ? null : JObject.FromObject(args));
+            LogAction(action, null, null, args == null ? null : ToJson(args));
+
+        private static JObject ToJson(IDictionary<string, object> args)
+        {
+            var json = new JObject();
+            foreach (var pair in args)
+            {
+                json[pair.Key] = pair.Value switch
+                {
+                    null => JValue.CreateNull(),
+                    string or bool or int or long or float or double or decimal => JToken.FromObject(pair.Value),
+                    Vector3 v => new JArray(v.x, v.y, v.z),
+                    _ => new JValue(pair.Value.ToString()),
+                };
+            }
+            return json;
+        }
     }
 }

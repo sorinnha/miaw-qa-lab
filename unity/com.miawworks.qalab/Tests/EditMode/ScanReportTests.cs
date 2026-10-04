@@ -38,6 +38,19 @@ namespace MiawWorks.QALab.Tests
             }
         }
 
+        [TestCase("Assets/Scripts/Patrol.cs", true)]
+        [TestCase("Assets/Plugins/ThirdParty/Spawner.cs", true)]
+        [TestCase("Packages/com.miawworks.qalab/Tests/EditMode/ScannerProbe.cs", true)]
+        [TestCase("Packages/com.unity.ugui/Runtime/UI/Core/Image.cs", false)]
+        [TestCase("Packages/com.unity.textmeshpro/Scripts/Runtime/TMP_Text.cs", false)]
+        [TestCase("Packages/com.unity.ai.navigation/Runtime/NavMeshSurface.cs", false)]
+        [TestCase("", false)]
+        [TestCase(null, false)]
+        public void UnassignedFieldsAreListedForScriptsOutsideUnitysPackages(string scriptPath, bool expected)
+        {
+            Assert.AreEqual(expected, ScanRules.ReportsUnassigned(scriptPath));
+        }
+
         [Test]
         public void ErrorShaderIsUnitysErrorShaderOrNone()
         {

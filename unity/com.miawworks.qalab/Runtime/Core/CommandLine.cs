@@ -110,8 +110,11 @@ namespace MiawWorks.QALab
     /// </summary>
     public static class CommandLine
     {
-        // "navmesh_explorer" ok; "NavMesh Explorer" rejected.
+        // "navmesh_explorer" ok; "NavMesh Explorer" or "crimson-tactics" rejected.
         private static readonly Regex AdapterName = new Regex("^[a-z0-9_]+$", RegexOptions.Compiled);
+
+        /// <summary>The one rule for adapter names (snake_case), shared by <c>-qalabAdapter</c> and BotAdapterRegistry.</summary>
+        public static bool IsAdapterName(string name) => name != null && AdapterName.IsMatch(name);
 
         public static QALabOptions Parse(IList<string> args, List<string> errors)
         {
@@ -155,7 +158,7 @@ namespace MiawWorks.QALab
                     case "-qalabadapter":
                         if (TakeValue(args, ref i, flag, errors, out var adapter))
                         {
-                            if (AdapterName.IsMatch(adapter)) options.Adapter = adapter;
+                            if (IsAdapterName(adapter)) options.Adapter = adapter;
                             else errors.Add($"{flag}: '{adapter}' must be snake_case");
                         }
                         break;
