@@ -27,6 +27,8 @@ Register the player once so events carry a position: `QALab.RegisterPlayer(trans
 ## Guarantees and limits
 
 - Thread-safe: log callbacks from any thread only enqueue; the main thread writes every 0.5 s.
+- Clean end: the run's last event is `run_end`, with the last `seq` and no gaps, even if another
+  thread is logging at that moment (`EventWriter.Close` waits for it).
 - `seq` is assigned when an event is created, so lines can be slightly out of order; readers sort
   by `seq` (the Python tools do).
 - Crash tolerance: at most about 0.5 s of events can be lost if the process dies. `run.json` gets
