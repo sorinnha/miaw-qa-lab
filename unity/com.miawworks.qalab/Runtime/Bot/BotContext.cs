@@ -8,10 +8,12 @@ namespace MiawWorks.QALab
     /// <summary>
     /// What an <see cref="IBotAdapter"/> gets each call (spec 01): the seeded RNG, the registered player
     /// and its <see cref="IBotMover"/>, the time left, and <c>LogAction</c> for repro steps.
-    /// The bot runner (M4) builds one per run and passes a writer for action events.
+    /// The <see cref="BotRunner"/> builds one per run and passes a writer for action events.
     /// </summary>
     public sealed class BotContext
     {
+        private readonly Func<Transform> _player;
+        private readonly Func<IBotMover> _mover;
         private readonly Func<float> _timeLeft;
         private readonly Action<JObject> _writeAction;
 
@@ -19,11 +21,21 @@ namespace MiawWorks.QALab
         /// the run's event writer).</param>
         public BotContext(string adapterName, SeededRandom random, Transform player, IBotMover mover,
             Func<float> timeLeft, Action<JObject> writeAction)
+            : this(adapterName, random, () => player, () => mover, timeLeft, writeAction)
+        {
+        }
+
+        /// <summary>
+        /// The bot runner's constructor: the player and mover are looked up on every access, because the
+        /// game registers its player after the run starts and again after every scene reload.
+        /// </summary>
+        public BotContext(string adapterName, SeededRandom random, Func<Transform> player, Func<IBotMover> mover,
+            Func<float> timeLeft, Action<JObject> writeAction)
         {
             AdapterName = adapterName;
             Random = random ?? throw new ArgumentNullException(nameof(random));
-            Player = player;
-            Mover = mover;
+            _player = player ?? throw new ArgumentNullException(nameof(player));
+            _mover = mover ?? throw new ArgumentNullException(nameof(mover));
             _timeLeft = timeLeft ?? throw new ArgumentNullException(nameof(timeLeft));
             _writeAction = writeAction ?? throw new ArgumentNullException(nameof(writeAction));
         }
@@ -33,10 +45,11 @@ namespace MiawWorks.QALab
         /// <summary>The only RNG bot code may use (never <c>UnityEngine.Random</c>).</summary>
         public SeededRandom Random { get; }
 
-        /// <summary>The player registered with <see cref="QALab.RegisterPlayer"/>; null if none.</summary>
-        public Transform Player { get; }
+        /// <summary>The player registered with <see cref="QALab.RegisterPlayer"/>; null if none (yet).</summary>
+        public Transform Player => _player();
 
-        public IBotMover Mover { get; }
+        /// <summary>The registered player's mover; null if none (yet).</summary>
+        public IBotMover Mover => _mover();
 
         /// <summary>Seconds until the run ends.</summary>
         public float TimeLeft => _timeLeft();

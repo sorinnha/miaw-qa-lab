@@ -11,10 +11,13 @@ namespace MiawWorks.QALab
     /// static void RegisterAdapter() => BotAdapterRegistry.Register("my_game", () => new MyGameAdapter());
     /// </code>
     /// Names are snake_case, the same rule as <c>-qalabAdapter</c>; registering a name again replaces it.
+    /// Built-ins: <c>navmesh_explorer</c> and <c>ui_crawler</c> (when the project has the AI module and uGUI).
     /// </summary>
     public static class BotAdapterRegistry
     {
         private static readonly NamedRegistry<IBotAdapter> Adapters = new NamedRegistry<IBotAdapter>(CommandLine.IsAdapterName);
+
+        static BotAdapterRegistry() => BuiltInAdapters.RegisterAll();
 
         public static void Register(string name, Func<IBotAdapter> factory) => Adapters.Register(name, factory);
 

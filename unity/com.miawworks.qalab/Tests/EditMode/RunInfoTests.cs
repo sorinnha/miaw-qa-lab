@@ -88,4 +88,41 @@ namespace MiawWorks.QALab.Tests
             }
         }
     }
+
+    /// <summary>The build stamp BuildRunner writes and run.json → build.git_sha reads.</summary>
+    public class BuildStampTests
+    {
+        [Test]
+        public void StampRoundTripsAndRejectsJunk()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "qalab-stamp-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            try
+            {
+                Assert.IsNull(BuildStamp.ReadGitSha(dir), "no file: unknown, not an error");
+                var path = Path.Combine(dir, BuildStamp.FileName);
+                File.WriteAllText(path, BuildStamp.ToJson("4bd741f0c2a9"));
+                Assert.AreEqual("4bd741f0c2a9", BuildStamp.ReadGitSha(dir));
+                File.WriteAllText(path, BuildStamp.ToJson("not a sha"));
+                Assert.IsNull(BuildStamp.ReadGitSha(dir));
+                File.WriteAllText(path, "{ broken");
+                Assert.IsNull(BuildStamp.ReadGitSha(dir), "a broken stamp never stops a run");
+                Assert.IsNull(BuildStamp.ReadGitSha(null));
+            }
+            finally
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+
+        [TestCase("4bd741f", true)]
+        [TestCase("4bd741f0c2a94bd741f0c2a94bd741f0c2a94bd7", true)]
+        [TestCase("4BD741F", false)]
+        [TestCase("4bd74", false)]
+        [TestCase(null, false)]
+        public void ShaIsSevenToFortyLowercaseHexDigits(string value, bool expected)
+        {
+            Assert.AreEqual(expected, BuildStamp.IsSha(value));
+        }
+    }
 }

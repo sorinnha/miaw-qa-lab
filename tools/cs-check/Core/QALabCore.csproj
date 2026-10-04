@@ -26,6 +26,7 @@
     <Compile Include="$(PackageRoot)/Core/QAEvent.cs" Link="Package/Core/QAEvent.cs" />
     <Compile Include="$(PackageRoot)/Core/EventWriter.cs" Link="Package/Core/EventWriter.cs" />
     <Compile Include="$(PackageRoot)/Core/RunInfo.cs" Link="Package/Core/RunInfo.cs" />
+    <Compile Include="$(PackageRoot)/Core/BuildStamp.cs" Link="Package/Core/BuildStamp.cs" />
     <Compile Include="$(PackageRoot)/Logging/LogLevels.cs" Link="Package/Logging/LogLevels.cs" />
     <Compile Include="$(PackageRoot)/Metrics/RingBuffer.cs" Link="Package/Metrics/RingBuffer.cs" />
     <Compile Include="$(PackageRoot)/Labels/SeedCatalogEntry.cs" Link="Package/Labels/SeedCatalogEntry.cs" />

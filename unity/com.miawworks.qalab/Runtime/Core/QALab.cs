@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -29,8 +30,15 @@ namespace MiawWorks.QALab
         /// <summary>The registered player (events take their <c>pos</c> from it), or null.</summary>
         public static Transform Player { get; private set; }
 
-        /// <summary>The registered player's mover, used by the M4 bot; null until registered.</summary>
+        /// <summary>The registered player's mover, used by the bot; null until registered.</summary>
         public static IBotMover Mover { get; private set; }
+
+        /// <summary>
+        /// The height below which the player has fallen out of the world (the fall detector). Null = the
+        /// lowest renderer in the scene − 5 m. Set it above your game's own respawn height, or the game
+        /// teleports the player before QA Lab sees the fall.
+        /// </summary>
+        public static float? KillPlaneY { get; set; }
 
         /// <summary>Games call this once their player exists, so events carry the player's position.</summary>
         public static void RegisterPlayer(Transform player, IBotMover mover)
@@ -45,7 +53,19 @@ namespace MiawWorks.QALab
         /// </summary>
         public static bool IsSeedEnabled(string bugId) => !IsRunning || Options.Seeds.IsEnabled(bugId);
 
-        /// <summary>End the run now (writes run_end, run.json with ended_at, labels.json).</summary>
+        /// <summary>
+        /// Report a problem from game code, the same way the built-in detectors do: rate-limited (same
+        /// detector, same 4 m cell, once per 10 s), with a screenshot, counted in results.xml. Severity is
+        /// one of <see cref="DetectorSeverity"/>; blocker and critical make the run exit with code 1.
+        /// Returns the event, or null when QA Lab isn't running or the report was rate-limited.
+        /// </summary>
+        public static QAEvent ReportDetector(string detector, string severity, JObject details = null) =>
+            _host != null ? _host.ReportDetector(detector, severity, details) : null;
+
+        /// <summary>Take a screenshot at the end of this frame (reason <c>manual</c>); returns its path or null.</summary>
+        public static string RequestScreenshot() => _host != null ? _host.RequestScreenshot() : null;
+
+        /// <summary>End the run now (writes run_end, run.json with ended_at, results.xml, labels.json).</summary>
         public static void EndRun(string exitReason = ExitReasons.TestFinished)
         {
             if (_host != null) _host.EndRun(exitReason);
@@ -60,7 +80,9 @@ namespace MiawWorks.QALab
             Options = new QALabOptions();
             Player = null;
             Mover = null;
+            KillPlaneY = null;
             LabelRecorder.Reset();
+            VisualLabelProbe.Clear();
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]

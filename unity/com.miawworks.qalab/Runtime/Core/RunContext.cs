@@ -30,7 +30,7 @@ namespace MiawWorks.QALab
                     Version = Application.version,
                     Platform = PlatformName(),
                     Unity = Application.unityVersion,
-                    GitSha = null,   // M4: BuildRunner stamps the commit into the build
+                    GitSha = Application.isEditor ? null : BuildStamp.ReadGitSha(Application.streamingAssetsPath),
                     Development = Debug.isDebugBuild,
                 },
                 Mode = Application.isEditor ? "editor_playmode" : "player",

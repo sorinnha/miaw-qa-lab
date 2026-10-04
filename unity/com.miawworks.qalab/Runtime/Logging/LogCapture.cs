@@ -13,12 +13,16 @@ namespace MiawWorks.QALab
         private readonly EventWriter _writer;
         private readonly string _minLevel;
         private bool _listening;
+        private long _exceptions;
 
         public LogCapture(EventWriter writer, string minLevel)
         {
             _writer = writer ?? throw new ArgumentNullException(nameof(writer));
             _minLevel = minLevel;
         }
+
+        /// <summary>Exception events written so far (any thread; read by the exception burst detector).</summary>
+        public long ExceptionCount => System.Threading.Interlocked.Read(ref _exceptions);
 
         /// <summary>Start listening to Unity's log callback (idempotent).</summary>
         public void Start()
@@ -73,7 +77,11 @@ namespace MiawWorks.QALab
                     return;
                 }
                 // Unity ends stack traces with "\n"; the contract has frames separated by "\n" only.
-                _writer.Log(level, condition, stackTrace?.TrimEnd('\n', '\r'));
+                var written = _writer.Log(level, condition, stackTrace?.TrimEnd('\n', '\r'));
+                if (written != null && level == LogLevels.Exception)
+                {
+                    System.Threading.Interlocked.Increment(ref _exceptions);
+                }
             }
             catch (Exception)
             {
