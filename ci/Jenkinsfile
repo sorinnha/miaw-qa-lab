@@ -1,0 +1,155 @@
+// Example nightly QA Lab pipeline (spec 04, M7) for a Windows agent with Unity, Python 3.12 and Git.
+//
+// EXAMPLE: this file has not been run on a Jenkins server. It mirrors how a studio would run QA Lab
+// every night: Unity tests, a build, seeded bot playtests, triage, published report.
+//
+// Plugins: Pipeline, Git, NUnit (Unity's NUnit XML) and HTML Publisher (report.html).
+// Agent label: 'windows && unity'. The agent's Unity version must match
+// unity/QALabSandbox/ProjectSettings/ProjectVersion.txt, or set UNITY_EXE in the agent's environment.
+//
+// Stages whose scripts arrive in later milestones skip themselves until the files exist:
+// build_sandbox.ps1 and run_playtest.ps1 (M4), qalab vision (M6). Without playtest runs, triage runs on
+// samples/sample_run as a dry run.
+pipeline {
+    agent { label 'windows && unity' }
+
+    triggers { cron('H 2 * * *') }
+
+    options {
+        timeout(time: 90, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '30'))
+        disableConcurrentBuilds()
+    }
+
+    parameters {
+        string(name: 'SEEDS', defaultValue: '1,2,3', description: 'Bot seeds; one playtest each, in parallel.')
+        string(name: 'DURATION', defaultValue: '120', description: 'Seconds per playtest.')
+        choice(name: 'PROVIDER', choices: ['none', 'ollama', 'gemini'],
+               description: 'none = template reports, no model. gemini sends data to Google: sandbox only.')
+    }
+
+    environment {
+        PYTHONUTF8 = '1'
+        QALAB = '.venv\\Scripts\\qalab.exe'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Python setup') {
+            steps {
+                powershell '''
+                    $ErrorActionPreference = "Stop"
+                    py -3.12 -m venv .venv
+                    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+                    .venv\\Scripts\\python.exe -m pip install --quiet -e ".\\python[dev]"
+                    exit $LASTEXITCODE
+                '''
+            }
+        }
+
+        stage('Unity EditMode tests') {
+            steps {
+                powershell '.\\scripts\\unity_tests.ps1 -Platform EditMode'
+            }
+            post {
+                always {
+                    nunit testResultsPattern: 'out/EditMode.xml', failIfNoResults: false
+                }
+            }
+        }
+
+        stage('Build sandbox') {
+            when { expression { fileExists('scripts/build_sandbox.ps1') } }
+            steps {
+                powershell '.\\scripts\\build_sandbox.ps1'
+            }
+        }
+
+        stage('Playtests') {
+            when { expression { fileExists('scripts/run_playtest.ps1') } }
+            steps {
+                script {
+                    def branches = [:]
+                    for (seed in params.SEEDS.split(',')) {
+                        def s = seed.trim()
+                        branches["seed ${s}"] = {
+                            // Exit 1 = a blocker/critical detector fired: a finding, not a broken build.
+                            // Triage reports it; only 2 (QA Lab internal error) or worse stops the pipeline.
+                            def code = powershell(returnStatus: true,
+                                script: ".\\scripts\\run_playtest.ps1 -Seed ${s} -Duration ${params.DURATION} -Benchmark -Out runs\\nightly")
+                            if (code > 1) {
+                                error("playtest seed ${s} failed (exit ${code})")
+                            }
+                        }
+                    }
+                    parallel branches
+                }
+            }
+        }
+
+        stage('Vision') {
+            when {
+                expression { fileExists('python/src/qalab/vision/__init__.py') && fileExists('runs/nightly') }
+            }
+            steps {
+                // Arguments as planned in spec 04; M6 fixes the final command line.
+                powershell "& ${env.QALAB} vision analyze 'runs\\nightly\\*'; exit \$LASTEXITCODE"
+            }
+        }
+
+        stage('Triage') {
+            steps {
+                script {
+                    def runs = 'runs\\nightly\\*'
+                    if (!fileExists('runs/nightly')) {
+                        echo 'No playtest runs yet (M4 scripts missing): triaging samples/sample_run as a dry run.'
+                        runs = 'samples\\sample_run'
+                    }
+                    def code = powershell(returnStatus: true,
+                        script: "& ${env.QALAB} triage run '${runs}' --provider ${params.PROVIDER} --docs docs\\sandbox_design.md --out reports\\nightly; exit \$LASTEXITCODE")
+                    env.TRIAGE_EXIT = "${code}"
+                    if (code != 0 && code != 3) {
+                        error("qalab triage run failed (exit ${code})")
+                    }
+                }
+            }
+        }
+
+        stage('Publish') {
+            steps {
+                archiveArtifacts artifacts: 'reports/**, runs/**/run.json, runs/**/results.xml, out/*.xml',
+                                 allowEmptyArchive: true
+                publishHTML(target: [
+                    reportDir: 'reports/nightly',
+                    reportFiles: 'report.html',
+                    reportName: 'QA Lab report',
+                    keepAll: true,
+                    alwaysLinkToLastBuild: true,
+                    allowMissing: true,
+                ])
+            }
+        }
+
+        stage('Gate') {
+            steps {
+                script {
+                    // Spec 04: the nightly fails when triage found a P1 bug (exit 3), after publishing it.
+                    if (env.TRIAGE_EXIT == '3') {
+                        error('QA Lab found a P1 bug: see "QA Lab report" on this build.')
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo 'Nightly QA failed: check the stage log, the NUnit results and the QA Lab report.'
+        }
+    }
+}

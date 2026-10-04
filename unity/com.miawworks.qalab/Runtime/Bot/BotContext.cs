@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 
@@ -6,7 +7,7 @@ namespace MiawWorks.QALab
 {
     /// <summary>
     /// What an <see cref="IBotAdapter"/> gets each call (spec 01): the seeded RNG, the registered player
-    /// and its <see cref="IBotMover"/>, the time left, and <see cref="LogAction"/> for repro steps.
+    /// and its <see cref="IBotMover"/>, the time left, and <c>LogAction</c> for repro steps.
     /// The bot runner (M4) builds one per run and passes a writer for action events.
     /// </summary>
     public sealed class BotContext
@@ -54,5 +55,12 @@ namespace MiawWorks.QALab
             var position = target.HasValue ? new[] { target.Value.x, target.Value.y, target.Value.z } : null;
             _writeAction(BotActionData.Build(action, Step, AdapterName, position, uiPath, args));
         }
+
+        /// <summary>
+        /// <see cref="LogAction(string, Vector3?, string, JObject)"/> with plain details, so game code
+        /// doesn't need Newtonsoft: <c>LogAction("order", new Dictionary&lt;string, object&gt; { ["unit"] = "Archer_1" })</c>.
+        /// </summary>
+        public void LogAction(string action, IDictionary<string, object> args) =>
+            LogAction(action, null, null, args == null ? null : JObject.FromObject(args));
     }
 }

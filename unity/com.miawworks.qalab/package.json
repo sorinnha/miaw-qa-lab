@@ -7,6 +7,13 @@
   "author": { "name": "Miaw Works" },
   "license": "MIT",
   "keywords": ["qa", "testing", "automation", "playtest"],
+  "samples": [
+    {
+      "displayName": "Game adapter template",
+      "description": "A bot adapter that plays a turn-based game through its own commands, plus the bootstrap that registers it.",
+      "path": "Samples~/GameAdapterTemplate"
+    }
+  ],
   "dependencies": {
     "com.unity.nuget.newtonsoft-json": "3.2.1",
     "com.unity.test-framework": "1.1.33"
