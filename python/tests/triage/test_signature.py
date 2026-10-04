@@ -32,7 +32,7 @@ def test_candidates(events: dict[int, Event]) -> None:
 
 def test_detector_signature_cells(events: dict[int, Event]) -> None:
     signature, detector, cell = detector_signature(events[23])
-    assert detector == "fell_out_of_world" and cell == (6, 3)  # pos (26.4, -12, 14.1) / 4
+    assert detector == "fell_out_of_world" and cell == (8, 0)  # pos (35.2, -12, 1.1) / 4
     assert len(signature) == 12 and int(signature, 16) >= 0
     assert detector_signature(events[23])[0] == signature  # stable
     assert detector_signature(events[21])[0] != signature
