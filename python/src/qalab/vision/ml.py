@@ -62,12 +62,16 @@ class MlModel:
         return out
 
     def predict(self, rgb: np.ndarray) -> list[FoundLabel]:
+        """The labels whose probability reaches their val-tuned threshold, with the score rescaled
+        so the threshold sits at 0.5: triage keeps scores ≥ 0.5, like eval keeps p ≥ threshold."""
         probs = self.probabilities(features(rgb).reshape(1, -1))
-        return [
-            FoundLabel(label=label, score=round(float(p[0]), 4))  # type: ignore[arg-type]
-            for label, p in probs.items()
-            if p[0] >= self.thresholds.get(label, 0.5)
-        ]
+        found = []
+        for label, p in probs.items():
+            threshold = self.thresholds.get(label, 0.5)
+            if p[0] >= threshold:
+                score = calibrated(float(p[0]), threshold)
+                found.append(FoundLabel(label=label, score=score))  # type: ignore[arg-type]
+        return found
 
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -79,6 +83,20 @@ class MlModel:
         if not isinstance(model, MlModel) or model.feature_version != FEATURE_VERSION:
             raise ValueError(f"{path} is not a qalab ML model of feature version {FEATURE_VERSION}")
         return model
+
+
+def calibrated(p: float, threshold: float) -> float:
+    """Map a probability to a score with the threshold at 0.5: [0, t) → [0, 0.5), [t, 1] → [0.5, 1].
+
+    Example: threshold 0.2 → p 0.2 scores 0.5, p 0.6 scores 0.75, p 0.1 scores 0.25.
+    """
+    if threshold <= 0.0:
+        return 1.0
+    if p < threshold:
+        return round(0.5 * p / threshold, 4)
+    if threshold >= 1.0:
+        return 1.0
+    return round(0.5 + 0.5 * (p - threshold) / (1.0 - threshold), 4)
 
 
 def _f1(truth: np.ndarray, predicted: np.ndarray) -> float:

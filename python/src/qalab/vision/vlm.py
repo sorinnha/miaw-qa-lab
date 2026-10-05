@@ -1,7 +1,8 @@
 """Spec 03 VLM classifier: one screenshot → labels, through any ``LLMProvider`` that takes images.
 
-Structured output (``schemas/llm_vision.schema.json``) at temperature 0; the cache keys on the image
-bytes' hash, the model and the prompt version (``CachedProvider``), so re-running is free.
+Structured output (``schemas/llm_vision.schema.json``) at temperature 0. ``CachedProvider`` keys on
+the prompt text (which names the screenshot path), the image bytes' hash, the model and the prompt
+version, so re-running a run is free; the same pixels under another path are a new call.
 """
 
 from __future__ import annotations
@@ -9,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from qalab.llm.base import LLMError, LLMProvider
@@ -46,7 +48,12 @@ class VlmVerdict:
 
 
 def analyze(
-    rgb, provider: LLMProvider, shot: str, scene: str | None, t: float | None, max_retries: int = 2
+    rgb: np.ndarray,
+    provider: LLMProvider,
+    shot: str,
+    scene: str | None,
+    t: float | None,
+    max_retries: int = 2,
 ) -> VlmVerdict:
     """Ask the model about one frame. Bad JSON is retried; after that the frame gets no labels and
     ``error`` says why (a vision failure must not stop the analysis of the other frames)."""

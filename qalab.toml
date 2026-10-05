@@ -38,6 +38,8 @@ tfidf_min_score = 0.1        # --provider none: TF-IDF cosines run lower than em
 [vision]
 # qalab vision analyze: heuristic (free, offline) | vlm | ml | hybrid (spec 03).
 method = "heuristic"
+black_ratio = 0.90           # heuristic thresholds: spec 03 starting values until qalab eval vision
+magenta_ratio = 0.003        # prints val-tuned ones; copy those here so analyze uses what was measured
 hybrid_every_n = 5           # hybrid: call the VLM on every Nth frame the heuristics passed ...
 hybrid_window_s = 2.0        # ... and on frames within this many seconds of a UI action or detector event
 # cost_per_1k_images = 0.0   # fill in from your provider's pricing page; left out = no cost column

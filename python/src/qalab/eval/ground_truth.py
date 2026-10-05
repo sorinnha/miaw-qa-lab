@@ -17,7 +17,9 @@ from qalab.models.event import Event
 from qalab.models.labels import Labels, MatchRule, SeededBug
 
 LABELS_FILE = "labels.json"
-EventKey = tuple[str, int]  # (run_id, seq)
+# (run_id, seq, visual detector or ""). Vision events share their screenshot's seq, so one frame
+# with two labels gives two events with the same seq: the detector name keeps them apart.
+EventKey = tuple[str, int, str]
 
 # "## Doors" → "Doors"
 _H2 = re.compile(r"^## (.+?)\s*$")
@@ -75,8 +77,14 @@ class GroundTruth:
     runs_with_labels: list[str] = field(default_factory=list)
     runs_without_labels: list[str] = field(default_factory=list)
 
-    def bug_of(self, run_id: str, seq: int) -> str | None:
-        return self.event_bug.get((run_id, seq))
+    def bug_of(self, event: Event) -> str | None:
+        return self.event_bug.get(event_key(event))
+
+
+def event_key(event: Event) -> EventKey:
+    """The ground-truth key of an event: ``visual:<label>`` events are told apart by label."""
+    label = _visual_label(event)
+    return (event.run_id, event.seq, f"visual:{label}" if label is not None else "")
 
 
 def build_ground_truth(
@@ -111,9 +119,9 @@ def build_ground_truth(
             else:
                 hits = [b.bug_id for b in rules if rule_matches(b.match, event)]
             if len(hits) == 1:
-                truth.event_bug[(run_id, event.seq)] = hits[0]
+                truth.event_bug[event_key(event)] = hits[0]
             elif len(hits) > 1:
-                truth.ambiguous.append((run_id, event.seq))
+                truth.ambiguous.append(event_key(event))
     truth.runs_with_labels.sort()
     truth.runs_without_labels.sort()
     return truth

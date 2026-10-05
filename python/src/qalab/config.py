@@ -65,6 +65,10 @@ class RagConfig:
 @dataclass
 class VisionConfig:
     method: str = "heuristic"  # heuristic | vlm | ml | hybrid (qalab vision analyze)
+    # Heuristic thresholds (spec 03 starting values). qalab eval vision prints the val-tuned ones;
+    # copy them here so qalab vision analyze uses what was measured.
+    black_ratio: float = 0.90
+    magenta_ratio: float = 0.003
     hybrid_every_n: int = 5  # spec 03: call the VLM on every Nth frame nothing else flagged
     hybrid_window_s: float = 2.0  # ... and on frames this close to a UI action or detector event
     # From the provider's pricing page, filled in by hand; None = no cost reported (never invented).

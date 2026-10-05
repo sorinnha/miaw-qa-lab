@@ -58,7 +58,6 @@ def test_sample_run_ground_truth_matches_expected_md(tmp_path: Path) -> None:
     truth = build_ground_truth(
         {run.run.run_id: run.events}, {run.run.run_id: load_labels(SAMPLE_RUN)}
     )
-    rid = run.run.run_id
     expected = {
         8: "SB01",
         11: "SB02",
@@ -74,9 +73,10 @@ def test_sample_run_ground_truth_matches_expected_md(tmp_path: Path) -> None:
         30: "SB14",
         31: "SB14",
     }
+    by_seq = {e.seq: e for e in run.events}
     for seq, bug in expected.items():
-        assert truth.bug_of(rid, seq) == bug, seq
-    assert truth.bug_of(rid, 34) is None, "the info checkpoint log is no bug"
+        assert truth.bug_of(by_seq[seq]) == bug, seq
+    assert truth.bug_of(by_seq[34]) is None, "the info checkpoint log is no bug"
     assert truth.ambiguous == []
     assert {"SB09", "SB10"} <= set(truth.bugs), (
         "visual seeds are known even though no event matches them"
@@ -97,7 +97,7 @@ def test_a_seed_that_did_not_fire_in_a_run_is_not_its_ground_truth(tmp_path: Pat
     labels.seeded_bugs = [b for b in labels.seeded_bugs if b.bug_id != "SB01"]
     run = load_run(run_dir)
     truth = build_ground_truth({run.run.run_id: run.events}, {run.run.run_id: labels})
-    assert truth.bug_of(run.run.run_id, 8) is None
+    assert truth.bug_of(next(e for e in run.events if e.seq == 8)) is None
 
 
 def test_feature_components_from_the_design_doc() -> None:

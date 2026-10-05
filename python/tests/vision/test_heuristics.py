@@ -85,9 +85,12 @@ def test_magenta_ratio_matches_the_spec_rule() -> None:
 @pytest.mark.youwrite
 def test_magenta_edges_and_the_uint8_trap() -> None:
     assert magenta_ratio(frame((181, 79, 181))) == 1.0, "just inside every bound"
-    assert magenta_ratio(frame((180, 0, 255))) == 0.0, "R must be > 180"
+    assert magenta_ratio(frame((180, 0, 200))) == 0.0, "R must be > 180 (180 is not)"
+    assert magenta_ratio(frame((200, 0, 180))) == 0.0, "B must be > 180 (180 is not)"
+    assert magenta_ratio(frame((200, 0, 150))) == 0.0, "B too low, though |R − B| = 50 is close"
     assert magenta_ratio(frame((255, 80, 255))) == 0.0, "G must be < 80"
-    assert magenta_ratio(frame((250, 0, 189))) == 0.0, "|R − B| = 61 is too far apart"
+    assert magenta_ratio(frame((250, 0, 190))) == 0.0, "|R − B| = 60 is not < 60"
+    assert magenta_ratio(frame((249, 0, 190))) == 1.0, "|R − B| = 59 is"
     # |200 − 250| = 50 counts. With uint8 arithmetic 200 − 250 wraps around to 206 and it wouldn't.
     assert magenta_ratio(frame((200, 0, 250))) == 1.0
 

@@ -11,9 +11,9 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from qalab.config import NO_DOTENV_ENV, load_config, load_dotenv
+from qalab.config import NO_DOTENV_ENV, Config, load_config, load_dotenv
 from qalab.io.runs import discover_runs, validate_labels_file, validate_run
-from qalab.llm.base import LLMError
+from qalab.llm.base import LLMError, LLMProvider
 from qalab.llm.factory import make_provider
 from qalab.report.html import rerender_html
 from qalab.triage.cluster import VARIANTS
@@ -263,7 +263,9 @@ def eval_triage(
     console.print("wrote " + ", ".join(str(p) for p in written))
 
 
-def _vision_provider(name: str | None, model: str | None, no_cache: bool, config_path: Path | None):
+def _vision_provider(
+    name: str | None, model: str | None, no_cache: bool, config_path: Path | None
+) -> tuple[Config, LLMProvider | None]:
     """The provider for vision commands: --provider, QALAB_PROVIDER or qalab.toml, cache-wrapped."""
     from qalab.triage.prompts import load_prompt
 
@@ -295,6 +297,7 @@ def vision_analyze(
 ) -> None:
     """Label every screenshot; writes visual_findings.jsonl into each run folder."""
     from qalab.vision.analyze import METHODS, AnalyzeOptions, analyze_run
+    from qalab.vision.heuristics import Thresholds
     from qalab.vision.ml import MlModel
 
     try:
@@ -309,6 +312,9 @@ def vision_analyze(
             method=chosen,  # type: ignore[arg-type]
             provider=llm,
             ml_model=MlModel.load(ml_model) if ml_model else None,
+            thresholds=Thresholds(
+                black_ratio=cfg.vision.black_ratio, magenta_ratio=cfg.vision.magenta_ratio
+            ),
             hybrid_every_n=cfg.vision.hybrid_every_n,
             hybrid_window_s=cfg.vision.hybrid_window_s,
             max_retries=cfg.llm.max_retries,
@@ -404,6 +410,7 @@ def eval_vision(
     """Per-label P/R/F1, macro F1, FP/100 frames, VLM calls and latency per method (H1–H4)."""
     from qalab.eval.vision_eval import METHODS as EVAL_METHODS
     from qalab.eval.vision_eval import VisionEvalOptions, evaluate_vision, to_markdown, write_result
+    from qalab.vision.heuristics import Thresholds
 
     chosen = [m.strip() for m in methods.split(",") if m.strip()]
     unknown = [m for m in chosen if m not in EVAL_METHODS]
@@ -423,11 +430,14 @@ def eval_vision(
             provider=llm,
             cost_per_1k_images=cfg.vision.cost_per_1k_images,
             max_retries=cfg.llm.max_retries,
+            configured=Thresholds(
+                black_ratio=cfg.vision.black_ratio, magenta_ratio=cfg.vision.magenta_ratio
+            ),
         )
         result = evaluate_vision(dataset_dir, options)
         written = write_result(result, dataset_dir, out, label)
     except USER_ERRORS as exc:
         console.print(f"[red]error:[/red] {exc}")
         raise typer.Exit(EXIT_ERROR) from exc
-    console.print(to_markdown(result))
+    console.print(to_markdown(result), soft_wrap=True, markup=False, highlight=False)
     console.print("wrote " + ", ".join(str(p) for p in written))

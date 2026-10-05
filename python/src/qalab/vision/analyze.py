@@ -19,7 +19,7 @@ from qalab.llm.base import LLMProvider
 from qalab.models.event import Event
 from qalab.models.visual import FoundLabel, VisualFinding
 from qalab.vision import heuristics, vlm
-from qalab.vision.findings import write_findings
+from qalab.vision.findings import MIN_SCORE, write_findings
 from qalab.vision.hybrid import HybridPolicy, event_gaps
 from qalab.vision.images import load_rgb
 from qalab.vision.ml import MlModel
@@ -47,7 +47,7 @@ class RunSummary:
     path: Path
     frames: int
     missing: int  # screenshot events whose file is gone
-    labels: Counter[str]
+    labels: Counter[str]  # labels with score ≥ 0.5, the ones triage turns into bugs
     vlm_calls: int
     vlm_errors: int
     seconds: float
@@ -96,20 +96,17 @@ def analyze_run(loaded: LoadedRun, options: AnalyzeOptions) -> RunSummary:
         if options.method == "heuristic":
             found = heuristics.analyze(rgb, options.thresholds)
         elif options.method == "ml":
-            found = options.ml_model.predict(rgb)  # type: ignore[union-attr]
+            assert options.ml_model is not None  # checked at the top
+            found = options.ml_model.predict(rgb)
             model = "logistic-regression"
         else:
             found = (
                 heuristics.analyze(rgb, options.thresholds) if options.method == "hybrid" else []
             )
             if options.method == "vlm" or policy.should_call_vlm(bool(found), gap):
+                assert options.provider is not None  # checked at the top
                 verdict = vlm.analyze(
-                    rgb,
-                    options.provider,
-                    shot,
-                    event.scene,
-                    event.t,
-                    options.max_retries,  # type: ignore[arg-type]
+                    rgb, options.provider, shot, event.scene, event.t, options.max_retries
                 )
                 calls += 1
                 errors += verdict.error is not None
@@ -118,7 +115,7 @@ def analyze_run(loaded: LoadedRun, options: AnalyzeOptions) -> RunSummary:
                 model, cached, latency = verdict.model, verdict.cached, verdict.latency_ms
         if latency is None:
             latency = round((time.perf_counter() - frame_started) * 1000, 2)
-        labels.update(f.label for f in found)
+        labels.update(f.label for f in found if f.score >= MIN_SCORE)  # what triage will see
         findings.append(
             VisualFinding(
                 run_id=loaded.run.run_id,

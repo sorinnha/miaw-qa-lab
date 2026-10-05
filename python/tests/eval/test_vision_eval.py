@@ -28,7 +28,7 @@ from qalab.eval.vision_eval import (
     write_result,
 )
 from qalab.llm.fake import FakeProvider
-from qalab.vision.heuristics import Stats
+from qalab.vision.heuristics import Stats, Thresholds
 
 from .bench import make_benchmark
 
@@ -56,6 +56,9 @@ def test_scores_on_a_hand_checked_example() -> None:
     assert score.macro_f1 == pytest.approx((0.6667 + 0.0) / 2, abs=1e-4), "labels with support only"
     assert score.macro_recall == 0.5
     assert score.fp_per_100 == pytest.approx(100 * 2 / 3, abs=1e-3), "2 false positives, 3 frames"
+    assert mt.fp_per_100 == bs.fp_per_100 == pytest.approx(100 / 3, abs=1e-3), (
+        "1 each (H1 per label)"
+    )
 
 
 def test_scores_reject_mismatched_lengths() -> None:
@@ -88,8 +91,8 @@ def test_hybrid_calls_near_events_every_nth_frame_and_restarts_per_run() -> None
     ]
     heuristic = [{"black_screen"}, set(), set(), set(), set(), set()]
     vlm = [set(), {"ui_overflow"}, set(), {"ui_overflow"}, set(), set()]
-    predicted, calls = simulate_hybrid(frames, heuristic, vlm, every_n=2, window_s=1.0)
-    assert calls == 4
+    predicted, called = simulate_hybrid(frames, heuristic, vlm, every_n=2, window_s=1.0)
+    assert called == [False, True, True, False, True, True]
     assert predicted == [{"black_screen"}, {"ui_overflow"}, set(), set(), set(), set()]
 
 
@@ -200,6 +203,39 @@ def test_full_evaluation_with_the_fake_vlm(tmp_path: Path) -> None:
     assert result.hybrid_test_curve and result.hybrid_val
     assert set(result.ml_overfit) == {"train_macro_f1", "test_macro_f1"}
     assert len(provider.calls) == 10, "one VLM answer per val and test frame, reused by the hybrid"
+    assert hybrid.latency_p95_ms is not None, "heuristics plus the VLM where it was called"
+    assert all(e["method"] == "hybrid" for e in result.errors), "examples come from the hybrid"
+
+
+def test_vlm_only_asks_about_test_frames_and_leads_the_error_examples(tmp_path: Path) -> None:
+    dataset = _dataset(tmp_path)
+    provider = FakeProvider(vision_labels=_seen(dataset))
+    result = evaluate_vision(dataset, VisionEvalOptions(methods=("vlm",), provider=provider))
+    assert [s.method for s in result.scores] == ["vlm"]
+    assert len(provider.calls) == 5, "no hybrid to tune: val frames are not sent"
+    assert result.thresholds == {}, "no heuristics requested, none computed"
+    assert [(e["kind"], e["label"], e["method"]) for e in result.errors] == [
+        ("false_positive", "ui_overflow", "vlm")
+    ]
+
+
+def test_unusable_vlm_answers_are_counted_and_flagged(tmp_path: Path) -> None:
+    dataset = _dataset(tmp_path)
+    broken = FakeProvider(invalid_json_times=1000)
+    result = evaluate_vision(dataset, VisionEvalOptions(methods=("vlm",), provider=broken))
+    assert result.vlm_errors == {"test": 5}
+    assert result.scores[0].macro_recall == 0.0
+    assert "Warning: 5 test frame(s) got no usable VLM answer" in to_markdown(result)
+
+
+@pytest.mark.youwrite
+def test_the_shipped_thresholds_get_their_own_row_when_they_differ(tmp_path: Path) -> None:
+    dataset = _dataset(tmp_path)
+    options = VisionEvalOptions(
+        methods=("heuristic",), configured=Thresholds(black_ratio=0.5, magenta_ratio=0.05)
+    )
+    rows = [s.method for s in evaluate_vision(dataset, options).scores]
+    assert rows == ["heuristic", "heuristic (qalab.toml)"]
 
 
 @pytest.mark.youwrite

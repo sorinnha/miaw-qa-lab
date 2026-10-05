@@ -6,7 +6,7 @@ import joblib
 import numpy as np
 import pytest
 
-from qalab.vision.ml import FEATURE_VERSION, MlModel, features, train
+from qalab.vision.ml import FEATURE_VERSION, MlModel, calibrated, features, train
 
 
 def _frames(n: int, seed: int) -> tuple[list[np.ndarray], list[list[str]]]:
@@ -49,6 +49,23 @@ def test_training_learns_an_easy_label_and_skips_labels_without_positives() -> N
     t_imgs, t_y = _frames(9, seed=3)
     predicted = [[f.label for f in model.predict(img)] for img in t_imgs]
     assert predicted == t_y, "black vs grass is separable from the histograms alone"
+
+
+def test_scores_put_the_tuned_threshold_at_one_half() -> None:
+    # Triage keeps scores ≥ 0.5, eval keeps p ≥ threshold: the rescale makes them agree.
+    assert calibrated(0.2, 0.2) == 0.5
+    assert calibrated(0.6, 0.2) == 0.75
+    assert calibrated(0.1, 0.2) == 0.25
+    assert calibrated(1.0, 0.9) == 1.0 and calibrated(0.0, 0.9) == 0.0
+
+
+def test_predicted_scores_reach_triage(tmp_path: Path) -> None:
+    x_imgs, y = _frames(30, seed=1)
+    x = np.array([features(i) for i in x_imgs])
+    model = train(x, y, x, y)
+    model.thresholds["black_screen"] = 0.15  # a low val-tuned threshold
+    found = model.predict(np.zeros((36, 64, 3), dtype=np.uint8))
+    assert [f.label for f in found] == ["black_screen"] and found[0].score >= 0.5
 
 
 def test_save_and_load_round_trip(tmp_path: Path) -> None:

@@ -138,6 +138,24 @@ def test_the_report_leads_with_the_clearest_screenshot(tmp_path: Path) -> None:
     ], "score 0.97 first, although 000002 came earlier"
 
 
+def test_two_labels_on_one_frame_get_their_own_ground_truth(tmp_path: Path) -> None:
+    rid = "20261005T103000Z-s42"
+    run_dir = copy_run(tmp_path, rid)
+    findings = [
+        _finding("shots/000005.png", ("black_screen", 0.97), ("placeholder_ui", 0.8), run_id=rid)
+    ]
+    write_findings(run_dir, findings)
+    run = load_run(run_dir)
+    truth = build_ground_truth({rid: run.events}, {rid: load_labels(run_dir)})
+    visual = {
+        e.data["detector"]: truth.bug_of(e)
+        for e in run.events
+        if e.kind == "detector" and e.data["detector"].startswith("visual:")
+    }
+    # Same screenshot, same seq: the white box on a black frame must not inherit SB10.
+    assert visual == {"visual:black_screen": "SB10", "visual:placeholder_ui": None}
+
+
 def test_visual_ground_truth_needs_the_labelled_screenshot(tmp_path: Path) -> None:
     run_dir = copy_run(tmp_path, "20261005T103000Z-s42")
     rid = "20261005T103000Z-s42"
@@ -159,7 +177,7 @@ def test_visual_ground_truth_needs_the_labelled_screenshot(tmp_path: Path) -> No
         for e in run.events
         if e.kind == "detector" and e.data["detector"] == "visual:missing_texture"
     ]
-    assert [truth.bug_of(rid, e.seq) for e in visual] == [None, "SB09"]
+    assert [truth.bug_of(e) for e in visual] == [None, "SB09"]
 
 
 def test_vlm_analysis_writes_valid_findings(tmp_path: Path) -> None:
@@ -168,9 +186,11 @@ def test_vlm_analysis_writes_valid_findings(tmp_path: Path) -> None:
         run, AnalyzeOptions(method="vlm", provider=FakeProvider(vision_labels=SEEN))
     )
     assert summary.frames == 5 and summary.vlm_calls == 5 and summary.missing == 0
-    assert dict(summary.labels) == {"missing_texture": 1, "black_screen": 1, "ui_overflow": 1}
+    # ui_overflow at 0.3 is below triage's 0.5 cut: kept in the file, not counted as found.
+    assert dict(summary.labels) == {"missing_texture": 1, "black_screen": 1}
     assert validate_findings_file(run.run_dir) == []
     lines = [json.loads(line) for line in summary.path.read_text("utf-8").splitlines()]
+    assert {"label": "ui_overflow", "score": 0.3} in lines[4]["labels"]
     assert {line["method"] for line in lines} == {"vlm"} and lines[0]["model"] == "fake-1"
 
 
@@ -228,7 +248,9 @@ def test_heuristic_and_hybrid_analysis(tmp_path: Path) -> None:
     )
     # The heuristics flag 000004 and 000005, so the VLM sees only the other three frames, and
     # only those near an event or the 1st of every N.
-    assert hybrid.vlm_calls < 5
+    # Shot 1 (16 s from any event) is the 1st of every 100 remaining frames; shot 2 (11 s) is not;
+    # shot 3 is 0.01 s after the fall detector, inside the 2 s window.
+    assert hybrid.vlm_calls == 2
     assert hybrid.labels["missing_texture"] == 1 and hybrid.labels["black_screen"] == 1
 
 
@@ -248,7 +270,7 @@ def test_visual_bugs_reach_the_report(tmp_path: Path) -> None:
     assert result.exit_code in (0, 3), result.output
     bugs = json.loads((out / "bugs.json").read_text("utf-8"))
     visual = [b for b in bugs if b["kind"] == "visual"]
-    assert {b["title"].split(":")[0] for b in visual} or visual
+    assert len(visual) == 2, "the magenta crate (000004) and the black frame (000005)"
     assert all(b["attachments"] for b in visual), "each visual bug carries its screenshot"
     html = (out / "report.html").read_text("utf-8")
     assert all(b["id"] in html for b in visual)

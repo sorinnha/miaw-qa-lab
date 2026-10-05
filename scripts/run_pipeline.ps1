@@ -73,7 +73,7 @@ if ($Provider) { $visionArgs += @("--provider", $Provider) }
 $vision = $LASTEXITCODE
 $ErrorActionPreference = "Stop"
 if ($vision -ne 0) {
-    Write-Host "run_pipeline: vision failed (exit $vision); triaging without visual findings" -ForegroundColor Yellow
+    Write-Host "run_pipeline: vision failed (exit $vision); triaging with whatever findings were written" -ForegroundColor Yellow
 }
 
 # 4. Triage

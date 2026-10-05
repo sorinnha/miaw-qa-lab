@@ -112,7 +112,7 @@ def score_clusters(
     bugs_in_cluster: dict[str, Counter[str]] = defaultdict(Counter)
     for cluster in clusters:
         for member in cluster.members:
-            bug = truth.bug_of(member.event.run_id, member.event.seq)
+            bug = truth.bug_of(member.event)
             if bug is None:
                 unlabelled += 1
                 continue
@@ -212,7 +212,7 @@ def majority_bug(cluster: Cluster, truth: GroundTruth) -> str | None:
     """The seeded bug that more than half of the cluster's labelled members belong to, else None."""
     bugs: Counter[str] = Counter()
     for member in cluster.members:
-        bug = truth.bug_of(member.event.run_id, member.event.seq)
+        bug = truth.bug_of(member.event)
         if bug is not None:
             bugs[bug] += 1
     if not bugs:
