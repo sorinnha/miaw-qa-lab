@@ -127,6 +127,25 @@ namespace MiawWorks.QALab.Tests
         }
 
         [Test]
+        public void TimeGoingBackwardsStartsANewWindow()
+        {
+            var calc = new StuckCalculator();
+            calc.Add(0.0, 0f, 0f, true);
+            calc.Add(4.0, 0f, 0f, true);
+            Assert.IsFalse(calc.Add(1.0, 0f, 0f, true), "a clock reset is not 4 s of standing still");
+            Assert.AreEqual(1, calc.SampleCount);
+        }
+
+        [Test]
+        public void ANaNTimeIsIgnoredAndMemoryStaysBounded()
+        {
+            var calc = new StuckCalculator();
+            Assert.IsFalse(calc.Add(double.NaN, 0f, 0f, true));
+            for (int i = 0; i <= 60 * 20; i++) calc.Add(i / 60.0, 0f, 0f, true);
+            Assert.LessOrEqual(calc.SampleCount, 4 * 64 + 2, "a NaN sample must not block the queue");
+        }
+
+        [Test]
         public void CustomWindowAndDistance()
         {
             var calc = new StuckCalculator(windowS: 2.0, minDistanceM: 1.0f);

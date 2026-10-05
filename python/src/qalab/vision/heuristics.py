@@ -44,16 +44,16 @@ def black_ratio(rgb: np.ndarray) -> float:
 def magenta_ratio(rgb: np.ndarray) -> float:
     """Share of pixels that look like Unity's missing-material magenta (``missing_texture``).
 
-    Learning task, written by Claude at Sora's request (D-030). A pixel counts when, with
-    ``r, g, b`` as ints:
-    ``r > 180 and g < 80 and b > 180 and abs(r - b) < 60``. Return the share of such pixels in the
-    whole image as a plain ``float`` between 0 and 1; an empty image (no pixels) returns 0.0.
+    (Learning task, written by Claude at Sora's request, D-030.) A pixel counts when, with
+    ``r, g, b`` as ints: ``r > 180 and g < 80 and b > 180 and abs(r - b) < 60``. Returns the share
+    of such pixels in the whole image as a plain ``float`` between 0 and 1; an empty image (no
+    pixels) returns 0.0.
 
-    Do it with numpy masks, not a Python loop over pixels (a 640×360 frame has 230 400 of them):
-    ``r = rgb[..., 0].astype(np.int16)`` gives the red channel as a 2-D array; comparisons like
-    ``r > 180`` give boolean arrays you combine with ``&``; ``np.mean`` of a boolean array is the
-    share of True. Why ``int16``: ``uint8`` arithmetic wraps around, so ``r - b`` with r = 200 and
-    b = 250 would be 206, not −50, and a real magenta pixel would be missed.
+    It uses numpy masks, not a Python loop over pixels (a 640×360 frame has 230 400 of them):
+    ``rgb[..., 0]`` is the red channel as a 2-D array; comparisons like ``r > 180`` give boolean
+    arrays combined with ``&``; ``np.mean`` of a boolean array is the share of True. Why ``int16``:
+    ``uint8`` arithmetic wraps around, so ``r - b`` with r = 200 and b = 250 would be 206, not −50,
+    and a real magenta pixel would be missed.
 
     C# comparison: the same as ``pixels.Count(p => p.R > 180 && ...) / (double)pixels.Length``,
     vectorized.

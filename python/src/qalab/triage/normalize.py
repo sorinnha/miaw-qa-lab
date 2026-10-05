@@ -18,8 +18,9 @@ QUOTED = re.compile(r"'[^']*'|\"[^\"]*\"")
 # "enemy_9b03d27f spawned" → "enemy_<id> spawned"   (6+ hex chars after "_" with ≥ 1 digit)
 HEX_ID_AFTER_UNDERSCORE = re.compile(r"(?<=_)(?=[0-9a-f]*\d)[0-9a-f]{6,}\b")
 # "slot 7 out of range (size 5)" → "slot <n> out of range (size <n>)"   ("Door_02" → "Door_<n>",
-# but "Vector3" stays because the digit follows a letter)
-NUMBER = re.compile(r"(?<![A-Za-z])\d+(?:\.\d+)?")
+# but "Vector3" and "Wave10" stay: a number glued to a letter is part of a name. The lookbehind also
+# rejects a digit, or "Wave10" would match from its second digit and become "Wave1<n>".)
+NUMBER = re.compile(r"(?<![A-Za-z\d])\d+(?:\.\d+)?")
 # "  extra   spaces  " → "extra spaces"
 WHITESPACE = re.compile(r"\s+")
 

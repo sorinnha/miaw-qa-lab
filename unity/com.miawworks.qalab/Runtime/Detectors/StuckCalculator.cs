@@ -33,6 +33,9 @@ namespace MiawWorks.QALab
         // The newest sample at least one window old, or null until the bot has moved for a window.
         private Sample? _anchor;
 
+        // Time of the newest sample (the back of the queue, which Queue can't peek at).
+        private double _newestT;
+
         /// <summary>
         /// Learning task (M4), written by Claude at Sora's request (D-030). How many samples are remembered
         /// right now. Tests use it to check that memory stays bounded: at 60 fps it never holds much more
@@ -55,26 +58,30 @@ namespace MiawWorks.QALab
         /// <item>Return true if the ground distance from the anchor to (x, z), √(dx² + dz²), is less than
         /// MinDistanceM.</item>
         /// </list>
-        /// y is not passed in: falling or climbing in place still counts as stuck.
-        /// Hint: samples arrive in time order, so a <c>Queue</c> (or a <c>List</c> you trim from the front)
-        /// keeps the oldest one at the front. Compare to the RingBuffer in Metrics/.
+        /// y is not passed in: falling or climbing in place still counts as stuck. Samples arrive in time
+        /// order, so a <c>Queue</c> keeps the oldest at the front (compare the RingBuffer in Metrics/). A time
+        /// that is NaN or earlier than the newest sample (a clock reset) starts over, so memory can't grow.
         /// </summary>
         public bool Add(double t, float x, float z, bool moving)
         {
-            if (!moving)
+            if (!moving || double.IsNaN(t))
             {
                 Reset();
                 return false;
             }
+            if (_recent.Count > 0 && t < _newestT) Reset();   // time went backwards: a new window
 
             _recent.Enqueue(new Sample(t, x, z));
+            _newestT = t;
             // Every sample at least one window old moves out of the queue; the last one to leave is the
             // newest such sample, so it becomes the anchor and the older ones are dropped for good.
             double cutoff = t - WindowS;
             while (_recent.Count > 0 && _recent.Peek().T <= cutoff) _anchor = _recent.Dequeue();
             if (!_anchor.HasValue) return false;
 
-            double dx = (double)x - _anchor.Value.X;   // in double, so 0.5 - 0 is exactly 0.5
+            // Differences, squares and sum in double: float rounding near the 0.5 m threshold could
+            // flip the answer (dx 0.3f, dz 0.4f is exactly 0.5 in float but 0.500000012 in double).
+            double dx = (double)x - _anchor.Value.X;
             double dz = (double)z - _anchor.Value.Z;
             return Math.Sqrt(dx * dx + dz * dz) < MinDistanceM;
         }
