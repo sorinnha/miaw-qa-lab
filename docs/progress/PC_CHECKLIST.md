@@ -1,7 +1,7 @@
 # What Sora does on the PC: every milestone
 
 The one hand-off note. Cloud sessions build and test code without Unity, Windows or a real model. Everything
-that needs those, plus the learning tasks, `/teach` and releases, is listed here in order. Tick items as
+that needs those, plus studying the learning tasks, `/teach` and releases, is listed here in order. Tick items as
 you go. When a milestone's list is done, tick it in `docs/PLAN.md` → Checklist.
 
 Run commands in PowerShell from the repo root with the virtual environment active
@@ -9,39 +9,39 @@ Run commands in PowerShell from the repo root with the virtual environment activ
 
 ## State of the code (for the next session)
 
-- **On `main`:**
-  - M0: contracts, CLI, CI;
-  - M1: Unity package recording, sandbox log seeds, scripts;
-  - M2–M3: triage, LLM layer with fake/Ollama/Gemini, RAG, reports;
-  - M7 code: ProjectScanner, bot contracts, game adapter template, `ci/Jenkinsfile`, USER_GUIDE, GAME_INTEGRATION, final README outline.
-- **On the M4 branch (`m4-bot-pipeline`, draft PR):** bot runner, NavMesh explorer (coverage-biased), UI crawler, detector hub and the fall / perf / exception-burst / tunneling detectors, screenshots with visual labels, results.xml and exit codes, BuildRunner, the QA Lab window, seeds SB06–SB12, SB15, SB16, `build_sandbox.ps1` / `run_playtest.ps1` / `run_pipeline.ps1`. The stuck detector is your YOU WRITE task; until then it is skipped at runtime.
-- **On the M5 branch (`m5-eval`, draft PR stacked on M4):** `qalab eval triage` (E1 clustering P/R/F1, E2/E3 report quality, D-028) and `scripts\benchmark.ps1`. `pairwise_prf` is your YOU WRITE task.
-- **On the M6 branch (`m6-vision`, draft PR stacked on M5):** `qalab vision analyze` (heuristics, VLM, ML, hybrid), `qalab vision dataset` / `train-ml`, `qalab eval vision` (H1–H4, D-029), visual bugs in triage reports, a non-fatal vision step in `run_pipeline.ps1` and the Jenkinsfile. `magenta_ratio` is your YOU WRITE task.
+- **On `main`: everything M0–M6 plus the M7 code.**
+  - M0: contracts, CLI, CI. M1: Unity package recording, sandbox log seeds, scripts.
+  - M2–M3: triage, LLM layer with fake/Ollama/Gemini, RAG, reports.
+  - M4: bot runner, NavMesh explorer, UI crawler, detectors (fall, stuck, perf, exception burst, tunneling), screenshots and visual labels, results.xml, seeds SB06–SB16, build/playtest/pipeline scripts.
+  - M5: `qalab eval triage`, `benchmark.ps1`. M6: `qalab vision analyze/dataset/train-ml`, `qalab eval vision`, visual bugs in reports.
+  - M7 code: ProjectScanner, bot contracts, game adapter template, `ci/Jenkinsfile`.
+- **All eight learning tasks are written** (by Claude, at your request, D-030). `pytest python -q` (320 tests) and `dotnet test tools\cs-check -c Release` (196 tests) pass with nothing skipped. Study them (table below).
 - **Never run in Unity yet:** everything under `unity/` except the engine-free files, which `tools/cs-check` compiles and tests. The first Unity session will likely surface compile errors. Paste them to Claude.
-- **Decisions to know:** D-021 (Gemini is the configured provider, sandbox data only), D-023 (clean run end, disjoint seed rules), D-024 (M7 code before M4, versions stay 0.1.0 until the first tag), D-025–D-027 (M4 runtime, sandbox seeds, scripts).
+- **Decisions to know:** D-021 (Gemini, sandbox data only), D-023 (clean run end, disjoint seed rules), D-025–D-027 (M4), D-028 (M5 metrics), D-029 (M6 vision), D-030 (learning tasks written by Claude).
 
-### Open learning tasks (YOU WRITE)
+### Learning tasks to study (written by Claude, D-030)
 
-| Milestone | File | Function | Check it with |
+Read each one, then re-write it from memory on a scratch branch and run its tests. That is what lets
+you explain it in an interview.
+
+| Milestone | File | Function | Its tests |
 |---|---|---|---|
-| M0 | `scripts/hello_events.py` | `count_events`, `main` | `pytest python/tests/test_hello_events.py -rxX`, then `python scripts/hello_events.py` matches the docstring |
-| M1 | `unity/QALabSandbox/Assets/Sandbox/Scripts/SeededBugs/SeededInventory.cs` | `GetSlot` (SB02) | `scripts\unity_tests.ps1 -Platform EditMode -IncludeYouWrite` |
-| M1 | `unity/QALabSandbox/Assets/Sandbox/Scripts/SandboxSeedCatalog.cs` | `SB02()` | `dotnet test tools\cs-check -c Release --filter TestCategory=YouWrite` |
-| M2 | `python/src/qalab/triage/normalize.py` | `normalize_message` | `pytest python/tests/triage/test_normalize.py -rxX` |
-| M3 | `python/src/qalab/rag/retrieve.py` | `cosine_top_k` | `pytest python/tests/rag/test_retrieve.py -rxX` |
-| M4 | `unity/com.miawworks.qalab/Runtime/Detectors/StuckCalculator.cs` and `StuckDetector.cs` | `StuckCalculator.Add`, `Reset`, `SampleCount`; `StuckDetector.Tick` | `dotnet test tools\cs-check -c Release --filter "FullyQualifiedName~StuckCalculatorTests"` (11 tests), then in Unity `scripts\unity_tests.ps1 -Platform EditMode -IncludeYouWrite` |
-| M5 | `python/src/qalab/eval/metrics.py` | `pairwise_prf` | `pytest python/tests/eval -m youwrite -rxX` |
-| M6 | `python/src/qalab/vision/heuristics.py` | `magenta_ratio` | `pytest python/tests/vision -m youwrite -rxX` (the uint8 trap is tested) |
+| M0 | `scripts/hello_events.py` | `count_events`, `main` | `pytest python/tests/test_hello_events.py` |
+| M1 | `unity/QALabSandbox/Assets/Sandbox/Scripts/SeededBugs/SeededInventory.cs`, `SandboxSeedCatalog.cs` | `GetSlot`, `SB02()` | `scripts\unity_tests.ps1 -Platform EditMode`; `dotnet test tools\cs-check -c Release` |
+| M2 | `python/src/qalab/triage/normalize.py` | `normalize_message` | `pytest python/tests/triage/test_normalize.py` |
+| M3 | `python/src/qalab/rag/retrieve.py` | `cosine_top_k` | `pytest python/tests/rag/test_retrieve.py` |
+| M4 | `unity/com.miawworks.qalab/Runtime/Detectors/StuckCalculator.cs`, `StuckDetector.cs` | `Add`, `Reset`, `SampleCount`; `Tick` | `dotnet test tools\cs-check -c Release --filter "FullyQualifiedName~StuckCalculatorTests"` |
+| M5 | `python/src/qalab/eval/metrics.py` | `pairwise_prf` | `pytest python/tests/eval/test_metrics.py` |
+| M6 | `python/src/qalab/vision/heuristics.py` | `magenta_ratio` | `pytest python/tests/vision/test_heuristics.py` |
 | M7 | `unity/com.miawworks.qalab/Samples~/GameAdapterTemplate/TurnPolicy.cs`, then your game | `TurnPolicy.Decide`, then `IGameCommands` for the real game | `dotnet test tools\cs-check -c Release --filter "FullyQualifiedName~TurnPolicy"`; `docs/GAME_INTEGRATION.md` §4 |
 
-`pytest python -m youwrite -rxX` lists the open Python ones (x = still open, X = passing, awaiting
-`/review-mine`). After each task: `/review-mine`, then `/teach`, then a line in `docs/LEARNING.md`.
+After each: `/teach` on it, then a line in `docs/LEARNING.md`.
 
 ## Every session
 
 - [ ] `git checkout main ; git pull`, then a new branch `m<N>-<slug>` for your own changes.
-- [ ] `pytest python -q` passes, with xfails only for open learning tasks.
-- [ ] Optional: `dotnet test tools\cs-check -c Release --filter "TestCategory!=YouWrite"` (needs the .NET 8 SDK).
+- [ ] `pytest python -q` passes (no xfails left).
+- [ ] Optional: `dotnet test tools\cs-check -c Release` (needs the .NET 8 SDK).
 
 ## M0: Setup and contracts
 
@@ -49,7 +49,7 @@ Run commands in PowerShell from the repo root with the virtual environment activ
 - [ ] `py -3.12 -m venv .venv ; .\.venv\Scripts\Activate.ps1 ; pip install -e ".\python[dev]"`
 - [ ] `qalab validate samples\sample_run` prints `ok`. `pytest python -q` passes.
 - [ ] GitHub → Actions: `python-ci` is green on the latest `main`, and the README badge shows it.
-- [ ] YOU WRITE `hello_events.py` (table above), then `/review-mine`, `/teach`, LEARNING.md.
+- [ ] Study `hello_events.py` (table above): `python scripts\hello_events.py` matches its docstring. `/teach`, LEARNING.md.
 
 ## M1: Unity package and sandbox
 
@@ -71,11 +71,11 @@ Run commands in PowerShell from the repo root with the virtual environment activ
   - `qalab validate runs\<newest>` prints `ok`.
   - In `events.jsonl`, `run_start` is seq 0 and `run_end` is last with the highest seq. `labels.json` lists SB03 and SB04 separately.
 - [ ] Commit the generated files: `unity/QALabSandbox/**` (ProjectSettings, Packages, Assets with `.meta`, scenes, materials, the NavMesh asset) and every new `.meta` under `unity/com.miawworks.qalab/`.
-- [ ] YOU WRITE `GetSlot` and `SB02()`, then `/review-mine`, `/teach`, LEARNING.md.
+- [ ] Study `GetSlot` and `SB02()` (table above). `/teach`, LEARNING.md.
 
 ## M2: Triage core
 
-- [ ] YOU WRITE `normalize_message`; `/review-mine` removes the `youwrite` markers once it passes.
+- [ ] Study `normalize_message` (table above).
 - [ ] `qalab triage clusters samples\sample_run --cluster exact` shows 9 clusters. Check the ranking against D-012.
 - [ ] `qalab triage run samples\sample_run --provider fake --out out\sample_report` exits 3 or 0 and writes all seven files. Open `report.html`.
 - [ ] `pytest python -q --cov=qalab.triage --cov-report=term-missing` shows coverage ≥ 80% on normalize, stack and signature. Record the numbers in PLAN.md.
@@ -83,7 +83,7 @@ Run commands in PowerShell from the repo root with the virtual environment activ
 
 ## M3: AI reports and RAG → v0.1.0
 
-- [ ] YOU WRITE `cosine_top_k`, then `/review-mine`.
+- [ ] Study `cosine_top_k` (table above).
 - [ ] Put `GEMINI_API_KEY=...` in `.env` yourself (copy `.env.example`). Never paste the key into chat. Then `pip install -e ".\python[dev,gemini]"`.
 - [ ] `qalab triage run samples\sample_run --provider gemini --docs docs\sandbox_design.md --out out\gemini_report`. Check that:
   - every evidence id resolves;
@@ -110,7 +110,7 @@ Built in the cloud (D-025–D-027); none of it has run in Unity yet. Steps in or
   - once with `-batchmode` added to the player arguments (edit `run_playtest.ps1` locally, don't commit): shots are `camera_render`, without the HUD.
 - [ ] **F1 menu, one seed at a time** (Play Mode, settings asset on, adapter `manual`). After each, stop and look at `events.jsonl` / `labels.json`:
   - SB06 "Stand on tile T_17": the player falls and respawns at the start; a `fell_out_of_world` event, critical, near (35, 1);
-  - SB07 "Go to the narrow gap", then walk north (W): you can't pass. A `stuck` event only after your YOU WRITE task, and only when the bot is driving;
+  - SB07 "Go to the narrow gap", then walk north (W): you can't pass. A `stuck` event appears only when the bot is driving (it needs a move target);
   - SB08 "GC burst now": a `perf_spike` event. If not, raise GcZone's `megabytes` (Inspector) until it does and note the value in D-026;
   - SB09 "Look at Crate_07": the crate is magenta;
   - SB10 "Black out the camera now": 2 s of black with the HUD still drawn;
@@ -119,19 +119,19 @@ Built in the cloud (D-025–D-027); none of it has run in Unity yet. Steps in or
   - SB15: open `Sandbox_Menu`, Play, Settings → Apply: an InvalidOperationException in the Console.
 - [ ] Check the bot by hand: settings asset adapter `navmesh_explorer`, press Play: the player walks by itself, `action` events (`move_to`, `interact`) appear.
 - [ ] `scripts\unity_tests.ps1 -Platform EditMode` and `-Platform PlayMode`, both `failed=0`. New: `BotAndDetectorTests`, `BuiltInAdapterTests`, `SeededLevelTests` (the projectile tests check the SB16 premise on your PC's physics), `HudScoreTests`.
-- [ ] YOU WRITE `StuckCalculator` + `StuckDetector` (table above) until the 11 cs-check tests pass, then `/review-mine` (it drops `[Category("YouWrite")]`), `/teach`, LEARNING.md.
+- [ ] Study `StuckCalculator` + `StuckDetector` (table above). `/teach`, LEARNING.md.
 - [ ] Close the editor. `scripts\build_sandbox.ps1` prints `built ...\Builds\Sandbox\QALabSandbox.exe`.
 - [ ] `scripts\run_playtest.ps1 -Seed 42 -Duration 120` opens a 1280×720 window and prints `exit N, ... actions, ... detector events, ... screenshots` and the run folder. Expect ≥ 30 actions (if fewer, note the count and the seed in the PR, then try `-Seed 1` and `-Seed 7`: a bot that keeps giving up shows `give_up` actions in `events.jsonl`). `qalab validate runs\<id>` prints `ok`. `results.xml` lists the detectors; `labels.json` lists screenshots with labels.
-- [ ] **Acceptance:** `scripts\run_pipeline.ps1 -Seed 42 -Duration 120 -Open` goes from nothing to `report.html` with detector bugs and their screenshots. Triage needs your M2 and M3 YOU WRITE functions (`normalize_message`, `cosine_top_k`). The bot is random: if seed 42 misses SB06 or SB07, note which seeds find them; M5's benchmark measures the rates.
+- [ ] **Acceptance:** `scripts\run_pipeline.ps1 -Seed 42 -Duration 120 -Open` goes from nothing to `report.html` with detector bugs and their screenshots. The bot is random: if seed 42 misses SB06 or SB07, note which seeds find them; M5's benchmark measures the rates.
 - [ ] Commit what Unity generated: both scenes, `NavMesh-Sandbox_Level01.asset`, the new materials, `ProjectSettings/NavMeshAreas.asset`, and every new `.meta` file (package and sandbox).
 - [ ] Release v0.2.0 (ask first).
 
 ## M5: Triage evaluation → v0.3.0
 
 Built in the cloud (D-028); it has only run on copies of the sample run. Needs M4 working first (a
-built sandbox player and your M2/M3 YOU WRITE functions). Steps in order:
+built sandbox player). Steps in order:
 
-- [ ] YOU WRITE `pairwise_prf` (table above) until `pytest python/tests/eval -m youwrite -rxX` shows only `X`, then `/review-mine`, `/teach`, LEARNING.md.
+- [ ] Study `pairwise_prf` (table above). `/teach`, LEARNING.md.
 - [ ] Write the E2 and E3 hypotheses in `docs/EVAL_RESULTS.md` **before** running anything (E1's is there; adjust it if you disagree). Commit them first, so the git history shows they came before the numbers.
 - [ ] `scripts\benchmark.ps1 -Seeds (1..20) -Duration 120` (about an hour: 20 × (120 s + 30 s menu crawl + loading)). It ends with `benchmark: 40/40 playtests recorded`. If some failed, `manifest.json` lists their exit codes, and timed-out partial runs are in `benchmarks\seeded_v1\_failed\`. Re-run only those seeds with `-Seeds 3,7`: their manifest entries are replaced and the others kept.
 - [ ] Sanity check: `qalab eval triage benchmarks\seeded_v1 --variants exact --provider none --label check`. The first line lists the seeds that fired (labels.json) and the seeds with matching events (what triage can find). Expect most log and detector seeds in the second list (SB01–SB08, SB13–SB16; SB07 only once your stuck detector works, though it can fire without it; SB09–SB12 are visual and only count in M6). Bugs the bot never reached are absent, which is a finding for the README limitations, not an error. `ambiguous_events` in the JSON must be 0.
@@ -146,7 +146,7 @@ built sandbox player and your M2/M3 YOU WRITE functions). Steps in order:
 Built in the cloud (D-029). It has only run on the sample run's 160×90 shots. It needs the M5
 benchmark (`benchmarks\seeded_v1`). Steps in order:
 
-- [ ] YOU WRITE `magenta_ratio` (table above) until `pytest python/tests/vision -m youwrite -rxX` shows only `X`, then `/review-mine`, `/teach`, LEARNING.md.
+- [ ] Study `magenta_ratio` (table above). `/teach`, LEARNING.md.
 - [ ] Look at real frames first. Copy one benchmark run out of `benchmarks\seeded_v1` (findings written inside the benchmark would change later `eval triage` numbers), then `qalab vision analyze <the copy> --method heuristic` → `visual_findings.jsonl`. Open the shots of SB09 (Crate_07) and SB10. Spec 03's trap: URP bloom and tonemapping shift the magenta. If 000004-style frames are missed, write down the pixel colours you see and the decision in DECISIONS.md (don't loosen the rule silently).
 - [ ] Commit H1–H4 in `docs/EVAL_RESULTS.md` (adjust them if you disagree) **before** running.
 - [ ] `qalab vision dataset benchmarks\seeded_v1 --out datasets\vision_v1`. Copy the per-split counts and warnings into EVAL_RESULTS. Expect few `ui_overflow` frames before 80 s of a run (SB11 grows with the score).
@@ -167,7 +167,7 @@ benchmark (`benchmarks\seeded_v1`). Steps in order:
   - the EditMode tests include `ProjectScannerTests`, `ScanReportTests` and `BotFrameworkTests`.
 - [ ] Check the missing-script rule by hand: on a throwaway prefab, add a small script component, delete the script, scan, and expect `missing_script`. Then delete the prefab.
 - [ ] Install the package in Crimson Tactics by git URL (`docs/GAME_INTEGRATION.md` §1–2). Record a manual run and run `qalab validate` on it.
-- [ ] YOU WRITE `TurnPolicy.Decide` in the template until its cs-check tests pass, then `/review-mine` (it drops the `YouWrite` category).
+- [ ] Study `TurnPolicy.Decide` in the template; change it if your game needs a smarter rule, keeping its cs-check tests passing.
 - [ ] Import the **Game adapter template** sample into the game and implement `IGameCommands`, pairing with Claude (§4). Run it with `-qalabAdapter my_game` (the M4 bot runner calls it).
 - [ ] Triage 3 runs with `--provider none` (or `ollama`), **never Gemini**, plus `--repo <game>\Assets`.
 - [ ] `scripts\scan_project.ps1 -ProjectPath <game> -Out out\game_scan.json`.

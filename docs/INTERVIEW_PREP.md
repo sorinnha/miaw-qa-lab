@@ -24,10 +24,10 @@ These are things you can open and explain. Decisions are in `docs/DECISIONS.md` 
 |---|---|---|---|
 | Data contracts | `schemas/*.json`, `samples/sample_run/`, `python/tests/models/test_contracts.py` | Unity and Python share only these schemas; both sides test against the same examples | D-001, D-007 |
 | Loading runs | `python/src/qalab/io/runs.py` | Validates raw JSON first so errors name the schema rule; bad lines are reported, not fatal; no `ended_at` → suspected crash | D-007, D-014 |
-| Normalize, stacks, signatures | `triage/normalize.py` (yours), `triage/stack.py`, `triage/signature.py` | Message + top 3 app frames, no line numbers; why SB01 and SB04 stay apart | D-009 |
+| Normalize, stacks, signatures | `triage/normalize.py`, `triage/stack.py`, `triage/signature.py` | Message + top 3 app frames, no line numbers; why SB01 and SB04 stay apart | D-009 |
 | Clustering | `triage/cluster.py` | Exact signatures, then optional TF-IDF/embedding merges with union-find; four variants for E1 | D-009, D-013 |
 | Ranking | `triage/rank.py`, `qalab.toml [rank]` | Explainable formula, priority computed, never from the LLM | D-004, D-012 |
-| Context + RAG | `triage/context.py`, `rag/chunk.py`, `rag/index.py`, `rag/retrieve.py` (`cosine_top_k` is yours), `rag/code_context.py` | E/A/L/D ids, a character budget, heading chunks, TF-IDF fallback | D-009, D-011 |
+| Context + RAG | `triage/context.py`, `rag/chunk.py`, `rag/index.py`, `rag/retrieve.py` , `rag/code_context.py` | E/A/L/D ids, a character budget, heading chunks, TF-IDF fallback | D-009, D-011 |
 | LLM layer | `llm/base.py`, `llm/fake.py`, `llm/ollama.py`, `llm/gemini.py`, `llm/cache.py`, `llm/factory.py` | Protocol (like a C# interface), JSON-schema output, temperature 0, retries, SQLite cache | D-002, D-008, D-021 |
 | Reports | `triage/report_llm.py`, `triage/report_template.py`, `report/html.py`, `report/jira_csv.py` | Grounding checks drop unknown ids and flag `needs_review`; template fallback; offline HTML | D-010, D-013 |
 | CLI | `python/src/qalab/cli.py` | typer; exit 0 / 3 on P1 / 2 on error | — |
@@ -35,13 +35,13 @@ These are things you can open and explain. Decisions are in `docs/DECISIONS.md` 
 | Log capture + metrics | `Runtime/Logging/LogCapture.cs`, `Runtime/Metrics/MetricsSampler.cs`, `RingBuffer.cs` | Threaded callback, `[QALab]` filter, p95 from a preallocated ring buffer, no per-frame allocations | D-022 |
 | Seeded sandbox | `unity/QALabSandbox/Assets/Sandbox/Scripts/SeededBugs/*`, `SandboxSeedCatalog.cs` | Real NullReferenceExceptions from plain objects; one code path per seed; catalog rules checked to be disjoint | D-017, D-020, D-023 |
 | ProjectScanner | `Editor/Scanner/ProjectScanner.cs`, `Editor/Scanner/ScanReport.cs`, `scripts/scan_project.ps1` | Missing vs unassigned reference via instance id; scenes opened additively and closed; exit codes for CI | D-024 |
-| Bot contracts | `Runtime/Bot/IBotAdapter.cs`, `BotContext.cs`, `BotAdapterRegistry.cs`, `SeededRandom.cs`, `Samples~/GameAdapterTemplate/` (`TurnPolicy.Decide` is yours) | Strategy + registry; one snake_case name rule shared with `-qalabAdapter`; seeded RNG; action events become repro steps | D-024 |
+| Bot contracts | `Runtime/Bot/IBotAdapter.cs`, `BotContext.cs`, `BotAdapterRegistry.cs`, `SeededRandom.cs`, `Samples~/GameAdapterTemplate/` | Strategy + registry; one snake_case name rule shared with `-qalabAdapter`; seeded RNG; action events become repro steps | D-024 |
 | Bot runner + bots | `Runtime/Bot/BotRunner.cs`, `NavMeshExplorerAdapter.cs`, `UICrawlerAdapter.cs` | Host-owned runner, fixed order per frame; decisions every 0.25 s, move target re-issued every frame; explorer picks the least-visited of 6 reachable random targets; crawler logs the click before running it | D-025 |
-| Detectors + results | `Runtime/Detectors/DetectorHub.cs`, `RateLimiter.cs`, `FallDetector.cs`, `PerfSpikeDetector.cs`, `ExceptionBurstCounter.cs`, `StuckCalculator.cs` (yours), `TunnelingDetector.cs`, `Runtime/Results/JUnitWriter.cs` | Rules in plain C# fed a `DetectorFrame`; rate limit per 4 m cell (same cells as triage); a throwing detector is switched off, a stub is skipped; exit 2 beats 1 | D-025 |
+| Detectors + results | `Runtime/Detectors/DetectorHub.cs`, `RateLimiter.cs`, `FallDetector.cs`, `PerfSpikeDetector.cs`, `ExceptionBurstCounter.cs`, `StuckCalculator.cs`, `TunnelingDetector.cs`, `Runtime/Results/JUnitWriter.cs` | Rules in plain C# fed a `DetectorFrame`; rate limit per 4 m cell (same cells as triage); a throwing detector is switched off, a stub is skipped; exit 2 beats 1 | D-025 |
 | Screenshots + labels | `Runtime/Capture/Shots.cs` (planner), `ScreenshotService.cs`, `Labels/VisualLabelProbe.cs`, sandbox `SeededBugs/*` visual seeds | End-of-frame capture, one shot per frame, path reserved before the file exists; visual ground truth only when a shot shows it | D-025, D-026 |
 | Pipeline scripts | `scripts/build_sandbox.ps1`, `run_playtest.ps1`, `run_pipeline.ps1`, `Editor/BuildRunner.cs` | Run folder found from the player's own log (safe in parallel); exit codes passed through; commit stamped into builds | D-027 |
-| Triage evaluation | `python/src/qalab/eval/ground_truth.py`, `metrics.py` (`pairwise_prf` is yours), `triage_eval.py`, `scripts/benchmark.ps1` | Ground truth from catalog rules per run; pairwise P/R/F1 by counting pairs, not looping; report metrics defined so a script can compute them; one manual column where only a human can judge | D-028 |
-| Vision | `python/src/qalab/vision/heuristics.py` (`magenta_ratio` is yours), `vlm.py`, `hybrid.py`, `ml.py`, `analyze.py`, `findings.py`; `eval/vision_dataset.py`, `eval/vision_eval.py` | Heuristics first, VLM where pixels can't tell; split by run; thresholds and the hybrid's N tuned on val, numbers on test; findings join triage as in-memory events, `events.jsonl` untouched | D-029 |
+| Triage evaluation | `python/src/qalab/eval/ground_truth.py`, `metrics.py`, `triage_eval.py`, `scripts/benchmark.ps1` | Ground truth from catalog rules per run; pairwise P/R/F1 by counting pairs, not looping; report metrics defined so a script can compute them; one manual column where only a human can judge | D-028 |
+| Vision | `python/src/qalab/vision/heuristics.py`, `vlm.py`, `hybrid.py`, `ml.py`, `analyze.py`, `findings.py`; `eval/vision_dataset.py`, `eval/vision_eval.py` | Heuristics first, VLM where pixels can't tell; split by run; thresholds and the hybrid's N tuned on val, numbers on test; findings join triage as in-memory events, `events.jsonl` untouched | D-029 |
 | C# outside Unity | `tools/cs-check/` | netstandard2.1 + C# 9 like Unity, NUnit on .NET 8 in CI; what it does and doesn't prove | D-006, D-018 |
 | CI | `.github/workflows/python-ci.yml`, `scripts/ci_smoke.py`, `ci/Jenkinsfile` | Windows + Ubuntu, smoke triage with the fake provider; Jenkinsfile is an example | D-015, D-016 |
 
@@ -148,7 +148,9 @@ These are things you can open and explain. Decisions are in `docs/DECISIONS.md` 
 
 ## Being honest about AI help
 
-> I used Claude Code as a pair programmer. I designed the milestones and contracts with it, wrote [the normalizer, cosine retrieval, clustering metrics, magenta heuristic, stuck detector, game adapter] myself, and reviewed every change. I can walk you through any file.
+> I used Claude Code as a pair programmer. I designed the milestones and contracts with it and reviewed every change. I had planned to hand-write eight core functions (the normalizer, cosine retrieval, clustering metrics, the magenta heuristic, the stuck detector, the turn policy); in the end Claude wrote those too, and I studied each one until I could rebuild it. I can walk you through any file.
+
+Before an interview, re-write two or three of them from memory (start with `pairwise_prf` and `normalize_message`) and run their tests: being able to do that is what makes this answer true.
 
 ## Questions to ask them
 

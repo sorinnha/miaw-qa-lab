@@ -8,7 +8,8 @@ thousands of log lines into a short list of unique, ranked bugs, with reports th
 > **Status:** in development, nothing released yet. Built: run recording (M1), triage with AI reports
 > and RAG (M2–M3), the seeded bot, detectors, screenshots and one-command pipeline (M4, not yet run in
 > Unity), triage evaluation (M5) and vision (M6), both not yet run on a recorded benchmark, the
-> project scanner and game adapter contracts (M7). Next: measured results and the real game. See
+> project scanner and game adapter contracts (M7). The Python tool runs end to end from a fresh clone;
+> the Unity side needs a first open in Unity. Next: measured results and the real game. See
 > [Limitations](#8-limitations) and [docs/PLAN.md](docs/PLAN.md).
 
 ## 1. Problem
@@ -57,8 +58,7 @@ evidence.
   - every choice comes from a seeded RNG, so a seed gives the same random sequence. Physics and timing
     still vary, so the action log, where every action becomes a "step to reproduce", is the repro record.
 - **Watches for problems while it plays.** Detectors report `fell_out_of_world` (and respawn the
-  player), `perf_spike`, `exception_burst`, `tunneling` and `stuck` (a YOU WRITE task: it shows as
-  skipped in results.xml until written), rate-limited per 4 m cell, each with a screenshot. A blocker
+  player), `perf_spike`, `exception_burst`, `tunneling` and `stuck`, rate-limited per 4 m cell, each with a screenshot. A blocker
   or critical finding makes the player exit with code 1, so CI fails.
 - **Looks at the screenshots** (`qalab vision analyze`): flags `missing_texture` (magenta),
   `black_screen` and `placeholder_ui` (white boxes) with pixel heuristics, and `ui_overflow` with a
@@ -152,22 +152,31 @@ copy .env.example .env        # then put your key after GEMINI_API_KEY= in .env
 qalab triage run samples\sample_run --provider gemini --docs docs\sandbox_design.md --out out\sample_report
 ```
 
-> Two learning tasks still gate these commands (see [How it was built](#11-how-it-was-built)): every
-> `triage run` needs `normalize_message`, and `--docs` with an embedding provider (fake, Ollama, Gemini)
-> also needs `cosine_top_k` (`--provider none` uses TF-IDF instead). Until they're written, the run stops
-> with `NotImplementedError: YOU WRITE`. `qalab validate` and the test suite (`pytest python -q`) already work.
+> No key? `--provider none` writes template reports offline, and `--provider fake` runs the whole LLM
+> path with a deterministic stand-in (what the tests use).
 
-**A bot playtest of the sandbox** (Windows, Unity; first-time setup in `docs/progress/PC_CHECKLIST.md`):
+**Screenshots and evaluation, offline:**
 
 ```powershell
-scripts\run_pipeline.ps1 -Seed 42 -Duration 120 -Open   # build if needed → bot playtest + menu crawl → triage → report.html
+Copy-Item -Recurse samples\sample_run out\demo_run          # a copy: the sample is a test fixture
+qalab vision analyze out\demo_run --method heuristic         # writes out\demo_run\visual_findings.jsonl
+qalab triage run out\demo_run --provider fake --out out\demo_report   # now with 2 visual bugs
+qalab eval triage <benchmark folder> --provider none         # after scripts\benchmark.ps1, see docs/EVAL_RESULTS.md
+```
+
+**A bot playtest of the sandbox** (Windows, Unity). Once: open `unity\QALabSandbox` in Unity Hub, let it
+compile and run **Tools → QA Lab → Rebuild Sandbox Scenes** (details in `docs/progress/PC_CHECKLIST.md`,
+M1 and M4). Then:
+
+```powershell
+scripts\run_pipeline.ps1 -Seed 42 -Duration 120 -Open   # build if needed → bot playtest + menu crawl → vision → triage → report.html
 scripts\run_playtest.ps1 -Seed 7 -Duration 60           # one playtest; prints the run folder
 ```
 
 Exit code 3 means a P1 bug was found, so CI can fail on it. Tunables (priority thresholds, crash
 multiplier, clustering thresholds, model names) live in `qalab.toml`; the rank weights are fixed in
 `triage/rank.py`. The engine-free C# is tested outside Unity with
-`dotnet test tools/cs-check -c Release --filter "TestCategory!=YouWrite"`, and the Unity tests run with
+`dotnet test tools/cs-check -c Release`, and the Unity tests run with
 `scripts\unity_tests.ps1 -Platform EditMode|PlayMode`.
 
 ## 6. Results
@@ -229,8 +238,6 @@ The full list, with alternatives and consequences, is in [docs/DECISIONS.md](doc
     checklist (`docs/progress/PC_CHECKLIST.md`).
 - **The bot is random.** A given seed may not reach every seeded bug; detection rates per bug come from
   the 20-seed benchmark (M5), not from one run.
-- **Learning tasks gate the pipeline.** Several functions are written by hand as learning tasks;
-  until they exist, their tests are expected failures and the end-to-end triage run stops early.
 - **Grouping is signature-based.** It splits a bug whose message varies in ways normalization misses,
   and the TF-IDF/embedding variants can merge different bugs (E1 will measure both).
 - **Scale.** Events are held in memory per run (D-014). There is no database or streaming for millions
@@ -278,10 +285,10 @@ computer engineering student) with Claude Code as a pair programmer:
 - **The code:** each milestone's code and tests were written in Claude Code sessions. A separate
   reviewer agent with fresh context checked each diff against the specs, and its findings were fixed
   before Sora reviewed the pull request.
-- **Sora's part:** owning the design and reviewing every change. Sora also writes the learning tasks by
-  hand: the message normalizer, cosine retrieval, the SB02 seeded bug, the stuck detector, and
-  (planned) clustering metrics, the magenta heuristic and the game adapter's decision rule. Unity, the sandbox and the real-game
-  runs happen on Sora's PC.
+- **Sora's part:** owning the design and reviewing every change. Eight functions were set aside as
+  learning tasks for Sora to write by hand; at Sora's request Claude wrote them too, so the repo works
+  out of the box, and Sora studies them (D-030). Unity, the sandbox and the real-game runs happen on
+  Sora's PC.
 - **The record:** `docs/DECISIONS.md` keeps the reasoning, `docs/LEARNING.md` what was learned.
 
 Every number in this README will come from a script in this repo; none is filled in by hand.
