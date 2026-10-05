@@ -61,13 +61,19 @@ stay at version 0.1.0.
   - report quality (field completeness, grounding, repro-step match, severity agreement, component, retrieval hit@k, latency, tokens) for E2/E3;
   - JSON, Markdown tables and charts;
   - `scripts/benchmark.ps1` with a `manifest.json` (D-028).
+- **Vision (M6):**
+  - `qalab vision analyze` with four methods: heuristics (black ratio, magenta ratio, white boxes), a VLM through the provider layer, an optional logistic-regression baseline, and a hybrid;
+  - findings become `visual:<label>` bugs in triage, with the best screenshot first;
+  - `qalab vision dataset` (split by run), `qalab vision train-ml`;
+  - `qalab eval vision`: per-label P/R/F1, FP/100 frames, VLM calls, latency and cost, tuned on val and scored on test (D-029);
+  - a non-fatal vision step in `run_pipeline.ps1` and the Jenkinsfile.
 - **Engine-free C# checked outside Unity:** `tools/cs-check` builds it as netstandard2.1 / C# 9 and runs its NUnit tests on .NET 8.
 - **Scripts and CI:**
   - `find_unity.ps1`, `unity_tests.ps1`, `link_sandbox_package.py`;
   - `build_sandbox.ps1`, `run_playtest.ps1` and `run_pipeline.ps1` (build → bot playtest + menu crawl → triage → report, M4);
   - GitHub Actions running ruff, pytest on Windows and Ubuntu, a smoke triage with the fake provider, and cs-check;
   - an example `ci/Jenkinsfile`.
-- **Docs:** `USER_GUIDE.md`, `GAME_INTEGRATION.md`, `ARCHITECTURE.md`, decisions D-001–D-028, and a single PC checklist (`docs/progress/PC_CHECKLIST.md`).
+- **Docs:** `USER_GUIDE.md`, `GAME_INTEGRATION.md`, `ARCHITECTURE.md`, decisions D-001–D-029, and a single PC checklist (`docs/progress/PC_CHECKLIST.md`).
 
 ### Changed
 
@@ -77,5 +83,5 @@ stay at version 0.1.0.
 
 - M4 on the PC: the first Unity run of the bot, detectors and screenshots, the screenshot spike, the stuck detector (learning task).
 - M5 on the PC: recording the 20-seed benchmark, the E1–E3 numbers, `pairwise_prf` (learning task).
-- M6: vision.
+- M6 on the PC: the vision dataset from the benchmark, H1–H4 numbers, `magenta_ratio` (learning task).
 - M7 on the PC: real-game integration, demo video, measured README results.

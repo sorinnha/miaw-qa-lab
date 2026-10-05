@@ -65,22 +65,40 @@ and `eval\reports_e3-rag-on\report.md`. Count how many have an "expected" that m
 
 ## Vision (M6)
 
+Definitions and tuning rules: DECISIONS D-029. Thresholds and the hybrid's N and window are picked on
+**val**; every number below is on **test**. Build the dataset from the M5 benchmark first:
+```
+qalab vision dataset benchmarks\seeded_v1 --out datasets\vision_v1 --seed 7
+```
+It prints frames and labels per split. Copy any warning about thin test classes into Limitations.
+
 ### Hypotheses (from spec 03, adjusted before running)
-- H1 · H2 · H3 · H4
+- H1: heuristics reach recall ≥ 0.95 on `black_screen` and `missing_texture` with ≤ 1 false positive per 100 frames.
+- H2: heuristics can't find `ui_overflow` (recall < 0.2); the VLM reaches ≥ 0.6.
+- H3: the hybrid keeps ≥ 90% of VLM-only macro recall with ≥ 70% fewer VLM calls.
+- H4 (optional): the ML baseline beats heuristics on `placeholder_ui`.
 
 ### Results per label
+Reproduce:
+```
+qalab vision train-ml datasets\vision_v1                       # optional, for the ml row (H4)
+qalab eval vision datasets\vision_v1 --methods heuristic,vlm,ml,hybrid --provider gemini --label v1
+```
+Fill `cost_per_1k_images` in `qalab.toml [vision]` from the provider's pricing page first, or the cost
+column stays n/a. Paste the table from `eval\vision_v1.md`:
 
-| Method | missing_texture P/R | black_screen P/R | ui_overflow P/R | placeholder_ui P/R | Macro F1 | FP/100 frames | VLM calls | p95 latency |
-|---|---|---|---|---|---|---|---|---|
-| heuristic | | | | | | | 0 | |
-| vlm | | | | | | | | |
-| ml (optional) | | | | | | | 0 | |
-| hybrid | | | | | | | | |
+| Method | Split | missing_texture P/R | black_screen P/R | ui_overflow P/R | placeholder_ui P/R | Macro F1 | FP/100 frames | VLM calls | p95 latency ms | Est. cost |
+|---|---|---|---|---|---|---|---|---|---|---|
+| heuristic | test | | | | | | | 0 | | n/a |
+| vlm | test | | | | | | | | | |
+| ml | test | | | | | | | 0 | | n/a |
+| hybrid | test | | | | | | | | | |
 
-Charts: `docs/img/vision_prf.png`, `docs/img/hybrid_tradeoff.png`
+Charts: `eval\vision_v1_prf.png` → `docs/img/vision_prf.png`, `eval\vision_v1_hybrid_tradeoff.png` → `docs/img/hybrid_tradeoff.png`.
 
 ### Error analysis
-3 false positives and 3 misses with thumbnails and one-line reasons.
+`eval\vision_v1.md` lists 3 false positives and 3 misses, with thumbnails in `eval\vision_v1_errors\`.
+Copy the thumbnails to `docs/img/vision_errors/` and replace each `<one-line reason>` after looking at the image.
 
 ## Conclusions
 - [ ]

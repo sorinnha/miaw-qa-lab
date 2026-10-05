@@ -212,3 +212,6 @@ Write the hypotheses first. Record tables, 2 charts, conclusions and limitations
 | 2026-10-05 | Sample run SB06 moved to T_17's real position (35, 1) (D-022, D-026) | Ground truth follows the builder |
 | 2026-10-05 | M5 built in a cloud session: `qalab eval triage` + `benchmark.ps1`; `pairwise_prf` is the YOU WRITE task (D-028) | Plug-and-play request: everything but the benchmark recording on the PC |
 | 2026-10-05 | E2/E3 report table gains "component correct", "severity ±1" and the same columns for every setting; "expected filled correctly" stays a manual 10-report check; `--design-doc` scores RAG-off runs (D-028) | One table format, printed by the tool; "expected is correct" needs human judgment |
+| 2026-10-05 | M6 built in a cloud session; `magenta_ratio` is the YOU WRITE task (D-029) | Plug-and-play request: everything but the benchmark and real frames on the PC |
+| 2026-10-05 | Vision uses `scipy.ndimage` connected components and Sobel edges instead of OpenCV; `pillow`, `scipy`, `joblib` listed as core dependencies (already installed through matplotlib/scikit-learn); the `vision` extra removed (D-029) | No new package for one function each |
+| 2026-10-05 | Vision step in `run_pipeline.ps1` and the Jenkinsfile is non-fatal (warning / UNSTABLE) (D-029) | Triage on logs and detectors must not depend on the newest component |

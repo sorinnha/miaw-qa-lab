@@ -16,7 +16,7 @@ Run commands in PowerShell from the repo root with the virtual environment activ
   - M7 code: ProjectScanner, bot contracts, game adapter template, `ci/Jenkinsfile`, USER_GUIDE, GAME_INTEGRATION, final README outline.
 - **On the M4 branch (`m4-bot-pipeline`, draft PR):** bot runner, NavMesh explorer (coverage-biased), UI crawler, detector hub and the fall / perf / exception-burst / tunneling detectors, screenshots with visual labels, results.xml and exit codes, BuildRunner, the QA Lab window, seeds SB06–SB12, SB15, SB16, `build_sandbox.ps1` / `run_playtest.ps1` / `run_pipeline.ps1`. The stuck detector is your YOU WRITE task; until then it is skipped at runtime.
 - **On the M5 branch (`m5-eval`, draft PR stacked on M4):** `qalab eval triage` (E1 clustering P/R/F1, E2/E3 report quality, D-028) and `scripts\benchmark.ps1`. `pairwise_prf` is your YOU WRITE task.
-- **Not built (needs a cloud session first):** M6 vision.
+- **On the M6 branch (`m6-vision`, draft PR stacked on M5):** `qalab vision analyze` (heuristics, VLM, ML, hybrid), `qalab vision dataset` / `train-ml`, `qalab eval vision` (H1–H4, D-029), visual bugs in triage reports, a non-fatal vision step in `run_pipeline.ps1` and the Jenkinsfile. `magenta_ratio` is your YOU WRITE task.
 - **Never run in Unity yet:** everything under `unity/` except the engine-free files, which `tools/cs-check` compiles and tests. The first Unity session will likely surface compile errors. Paste them to Claude.
 - **Decisions to know:** D-021 (Gemini is the configured provider, sandbox data only), D-023 (clean run end, disjoint seed rules), D-024 (M7 code before M4, versions stay 0.1.0 until the first tag), D-025–D-027 (M4 runtime, sandbox seeds, scripts).
 
@@ -31,7 +31,7 @@ Run commands in PowerShell from the repo root with the virtual environment activ
 | M3 | `python/src/qalab/rag/retrieve.py` | `cosine_top_k` | `pytest python/tests/rag/test_retrieve.py -rxX` |
 | M4 | `unity/com.miawworks.qalab/Runtime/Detectors/StuckCalculator.cs` and `StuckDetector.cs` | `StuckCalculator.Add`, `Reset`, `SampleCount`; `StuckDetector.Tick` | `dotnet test tools\cs-check -c Release --filter "FullyQualifiedName~StuckCalculatorTests"` (11 tests), then in Unity `scripts\unity_tests.ps1 -Platform EditMode -IncludeYouWrite` |
 | M5 | `python/src/qalab/eval/metrics.py` | `pairwise_prf` | `pytest python/tests/eval -m youwrite -rxX` |
-| M6 | `python/src/qalab/vision/heuristics.py` (to be created) | `magenta_ratio` | after the M6 cloud session |
+| M6 | `python/src/qalab/vision/heuristics.py` | `magenta_ratio` | `pytest python/tests/vision -m youwrite -rxX` (the uint8 trap is tested) |
 | M7 | `unity/com.miawworks.qalab/Samples~/GameAdapterTemplate/TurnPolicy.cs`, then your game | `TurnPolicy.Decide`, then `IGameCommands` for the real game | `dotnet test tools\cs-check -c Release --filter "FullyQualifiedName~TurnPolicy"`; `docs/GAME_INTEGRATION.md` §4 |
 
 `pytest python -m youwrite -rxX` lists the open Python ones (x = still open, X = passing, awaiting
@@ -143,10 +143,19 @@ built sandbox player and your M2/M3 YOU WRITE functions). Steps in order:
 
 ## M6: Vision → v0.4.0
 
-- [ ] Cloud session first (M6).
-- [ ] Build the dataset from benchmark runs (split by run, not by frame).
-- [ ] YOU WRITE `magenta_ratio`.
-- [ ] `qalab eval vision` with hypotheses H1–H4 written first. Fill EVAL_RESULTS and README §6.
+Built in the cloud (D-029). It has only run on the sample run's 160×90 shots. It needs the M5
+benchmark (`benchmarks\seeded_v1`). Steps in order:
+
+- [ ] YOU WRITE `magenta_ratio` (table above) until `pytest python/tests/vision -m youwrite -rxX` shows only `X`, then `/review-mine`, `/teach`, LEARNING.md.
+- [ ] Look at real frames first: `qalab vision analyze runs\<a benchmark run> --method heuristic` → `visual_findings.jsonl`. Open the shots of SB09 (Crate_07) and SB10. Spec 03's trap: URP bloom and tonemapping shift the magenta. If 000004-style frames are missed, write down the pixel colours you see and the decision in DECISIONS.md (don't loosen the rule silently).
+- [ ] Commit H1–H4 in `docs/EVAL_RESULTS.md` (adjust them if you disagree) **before** running.
+- [ ] `qalab vision dataset benchmarks\seeded_v1 --out datasets\vision_v1`. Copy the per-split counts and warnings into EVAL_RESULTS. Expect few `ui_overflow` frames before 80 s of a run (SB11 grows with the score).
+- [ ] Optional H4: `qalab vision train-ml datasets\vision_v1`.
+- [ ] Set `cost_per_1k_images` in `qalab.toml [vision]` from your provider's pricing page, or leave it out (the cost column stays n/a).
+- [ ] `qalab eval vision datasets\vision_v1 --methods heuristic,vlm,ml,hybrid --provider gemini --label v1` (the exact command is in EVAL_RESULTS). Gemini's free tier is for sandbox frames only (D-021).
+- [ ] Paste the table, copy both charts to `docs/img/`, write the 6 error reasons, then say for each of H1–H4 whether it held, with the numbers. Then fill README §6.
+- [ ] Acceptance: `scripts\run_pipeline.ps1 -Seed 42 -Duration 120 -Open`. `report.html` shows `visual:missing_texture` / `visual:black_screen` bugs with their screenshots (if seed 42's bot saw them).
+- [ ] Commit `docs/` only (`datasets/` and `eval/` stay out of git).
 - [ ] Release v0.4.0 (ask first).
 
 ## M7: Real game → v1.0.0 (scanner, adapter contracts, template and Jenkinsfile are built)

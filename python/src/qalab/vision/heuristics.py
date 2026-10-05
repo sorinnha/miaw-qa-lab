@@ -51,8 +51,8 @@ def magenta_ratio(rgb: np.ndarray) -> float:
     Do it with numpy masks, not a Python loop over pixels (a 640×360 frame has 230 400 of them):
     ``r = rgb[..., 0].astype(np.int16)`` gives the red channel as a 2-D array; comparisons like
     ``r > 180`` give boolean arrays you combine with ``&``; ``np.mean`` of a boolean array is the
-    share of True. Why ``int16``: ``uint8`` arithmetic wraps around, so ``r - b`` with r = 10 and
-    b = 200 would be 66, not −190.
+    share of True. Why ``int16``: ``uint8`` arithmetic wraps around, so ``r - b`` with r = 200 and
+    b = 250 would be 206, not −50, and a real magenta pixel would be missed.
 
     C# comparison: the same as ``pixels.Count(p => p.R > 180 && ...) / (double)pixels.Length``,
     vectorized.

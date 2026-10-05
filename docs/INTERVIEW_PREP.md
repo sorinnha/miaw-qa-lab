@@ -41,13 +41,14 @@ These are things you can open and explain. Decisions are in `docs/DECISIONS.md` 
 | Screenshots + labels | `Runtime/Capture/Shots.cs` (planner), `ScreenshotService.cs`, `Labels/VisualLabelProbe.cs`, sandbox `SeededBugs/*` visual seeds | End-of-frame capture, one shot per frame, path reserved before the file exists; visual ground truth only when a shot shows it | D-025, D-026 |
 | Pipeline scripts | `scripts/build_sandbox.ps1`, `run_playtest.ps1`, `run_pipeline.ps1`, `Editor/BuildRunner.cs` | Run folder found from the player's own log (safe in parallel); exit codes passed through; commit stamped into builds | D-027 |
 | Triage evaluation | `python/src/qalab/eval/ground_truth.py`, `metrics.py` (`pairwise_prf` is yours), `triage_eval.py`, `scripts/benchmark.ps1` | Ground truth from catalog rules per run; pairwise P/R/F1 by counting pairs, not looping; report metrics defined so a script can compute them; one manual column where only a human can judge | D-028 |
+| Vision | `python/src/qalab/vision/heuristics.py` (`magenta_ratio` is yours), `vlm.py`, `hybrid.py`, `ml.py`, `analyze.py`, `findings.py`; `eval/vision_dataset.py`, `eval/vision_eval.py` | Heuristics first, VLM where pixels can't tell; split by run; thresholds and the hybrid's N tuned on val, numbers on test; findings join triage as in-memory events, `events.jsonl` untouched | D-029 |
 | C# outside Unity | `tools/cs-check/` | netstandard2.1 + C# 9 like Unity, NUnit on .NET 8 in CI; what it does and doesn't prove | D-006, D-018 |
 | CI | `.github/workflows/python-ci.yml`, `scripts/ci_smoke.py`, `ci/Jenkinsfile` | Windows + Ubuntu, smoke triage with the fake provider; Jenkinsfile is an example | D-015, D-016 |
 
 **Not built or not run yet (don't claim it):**
 - the M4 code has not run in Unity: no real bot run, no detection numbers, no screenshot spike result yet;
 - evaluation numbers (M5: the tool is built, but no benchmark has been recorded);
-- vision (M6);
+- vision numbers (M6: the tool is built, but it hasn't seen real sandbox frames);
 - the real-game run (M7).
 
 ## Job description → your evidence
@@ -99,6 +100,8 @@ These are things you can open and explain. Decisions are in `docs/DECISIONS.md` 
 22. *Precision or recall?* Recall for blockers (don't miss them); precision to avoid alert fatigue. It depends on the cost of each error.
 23. *Why heuristics before the VLM?* Cheap, fast and explainable; the VLM covers what pixels-math can't (ui_overflow). Show the hybrid trade-off (H3).
 24. *VLM failure modes?* Hallucinated glitches, confusing art style for bugs, prompt sensitivity. Mitigations: strict labels, examples in the prompt, thresholds, human review.
+    *Follow-up: why tune on val and report on test?* Picking a threshold is training. Scoring on the same frames you tuned on reports how well you memorized them, not how the tool will do tomorrow.
+    *Follow-up: why `int16` in `magenta_ratio`?* uint8 arithmetic wraps: `200 - 250` is 206, not −50, so a real magenta pixel with B > R fails `|R−B| < 60` and is missed. A test checks exactly that pixel.
 
 ### Python, QA, Git, CI
 

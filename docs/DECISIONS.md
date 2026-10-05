@@ -235,3 +235,67 @@ One entry per real choice: what we decided, why, what else we considered, and wh
   - `benchmark.ps1` ran under pwsh on Linux with the fake player from D-027 (copies of the sample run), with temporary implementations of the open YOU WRITE functions, restored afterwards;
   - `qalab eval triage` on that output reproduced EXPECTED.md: `exact` splits SB14, `frame_tfidf` gives 8 clusters for 8 bugs, `tfidf_only` merges SB01 + SB04;
   - that proves the plumbing, not the tool: there are no benchmark numbers until Sora records `seeded_v1` on the PC.
+
+## D-029 · 2026-10-05 · M6 vision: methods, dataset and evaluation discipline (M6)
+- **Inference and ground truth stay apart:**
+  - `qalab.vision` (analyze, heuristics, VLM, ML, hybrid, findings) never opens `labels.json`, and the leakage test covers `qalab vision analyze`;
+  - dataset building and scoring read labels, so they live in `qalab.eval` (`vision_dataset`, `vision_eval`); `qalab vision dataset` is a thin CLI wrapper around them.
+- **Heuristics** run on a 640 px copy:
+  - `black_ratio` is the share of pixels with luma < 16;
+  - `magenta_ratio` is the YOU WRITE task. Its docstring warns about the uint8 trap: `r - b` wraps around in uint8, so cast to int16 first;
+  - white boxes: near-white connected components with area, fill and aspect rules;
+  - score: 1.0 at or above the threshold, else under 0.5 in proportion to the statistic. Triage keeps labels with score ≥ 0.5, so the threshold decides;
+  - `ui_overflow` is not attempted (a known gap, tested by H2).
+- **No OpenCV (deviation from spec 03):**
+  - connected components come from `scipy.ndimage.label`, already installed with scikit-learn, instead of a 50+ MB package for one function. Its default is 4-connectivity (OpenCV's is 8); a solid box is one component either way;
+  - the ML features use Sobel edge density instead of Canny, for the same reason.
+- **VLM:**
+  - a 768 px PNG, prompt `vision_v1`, the `llm_vision` JSON schema, temperature 0, ≤ 2 retries;
+  - a frame whose answers stay unusable gets no labels, and the error is counted, not raised;
+  - the cache key covers the prompt, the image hash, the model and the prompt version;
+  - the prompt names the screenshot path. That is harmless for a real model, and it lets `FakeProvider` answer from a lookup table in offline tests.
+- **ML baseline (optional, H4):**
+  - 53 features: 3 × 16-bin HSV histograms, edge density, mean and std luma, and the shares of near-white and near-black pixels;
+  - one balanced logistic regression per label, its threshold picked on val; a label with no train positives gets no model;
+  - saved with joblib. That is a pickle, so only load model files you made yourself.
+- **Hybrid** (spec 03):
+  - heuristics first. The VLM runs only when nothing fired AND the frame is within the window of a UI action (`ui_path`) or a non-visual detector event, or it is the 1st of every N remaining frames;
+  - the policy restarts for each run.
+- **Dataset:**
+  - `index.csv` adds `event_gap_s` (so the hybrid can be simulated offline) and `method` (screen capture vs camera render) to spec 03's columns;
+  - seeded 70/15/15 split by run, with at least one val run and one test run once there are 3 runs;
+  - `stats.json` warns when a label has fewer than 10 test frames.
+- **Evaluation discipline:**
+  - the black and magenta thresholds come from fixed grids, picked on val; ties go to the value closest to the spec's starting threshold;
+  - the hybrid's N and window are also picked on val: the cheapest setting that keeps ≥ 90% of the VLM-only macro recall (H3), else the best recall;
+  - every reported number is on test, plus a `real` split when the dataset has one (M7);
+  - the VLM is asked once per frame, and the hybrid is simulated from those answers, which are the same ones a live run would get from the cache;
+  - the ML model trains on train, picks thresholds on val, and reports train vs test macro F1 as an overfitting check.
+- **Metrics:**
+  - multi-label precision, recall and F1 per label, `n/a` when undefined;
+  - macro F1 and macro recall over the labels that have positives in the split;
+  - FP per 100 frames, summed over all labels;
+  - latency p50/p95 over uncached calls;
+  - estimated cost only when `[vision] cost_per_1k_images` is set by hand (never invented).
+- **Outputs:**
+  - `eval/vision_<label>.json` holds everything. Spec 03 says `vision_<date>.json`; the JSON carries `created_at`, and the label names the experiment instead;
+  - `.md` holds the EVAL_RESULTS table;
+  - two charts: `_prf.png` and `_hybrid_tradeoff.png`;
+  - `_errors/` holds thumbnails of 3 false positives and 3 misses of the lead method (the hybrid when it ran, else the heuristics).
+- **Triage integration:**
+  - findings with score ≥ 0.5 become in-memory `visual:<label>` detector events that share their screenshot's seq. `events.jsonl` is never edited;
+  - severities: `black_screen` major, the others minor;
+  - they cluster like detector events;
+  - the best-scoring screenshot is attached first.
+  - In eval, a visual event counts as seed X only when `labels.json` says its screenshot shows X with that label. A false positive on a clean frame never counts as finding the bug.
+- **Pipeline:**
+  - `run_pipeline.ps1` and the Jenkinsfile run `qalab vision analyze` with `qalab.toml`'s method. The default, `heuristic`, is offline and free;
+  - a vision failure is a warning (Jenkins: UNSTABLE), and triage still runs.
+- **Dependencies:**
+  - `pillow`, `scipy` and `joblib` are listed in the core dependencies because qalab imports them. All three were already installed through matplotlib and scikit-learn;
+  - the unused `vision` extra (OpenCV) was removed.
+- **Checked here, not measured:**
+  - with a temporary `magenta_ratio` (restored afterwards), the sample shots match EXPECTED.md: 000004 is `missing_texture`, 000005 is `black_screen`;
+  - `evaluate_vision` ran end to end on a 3-run copy of the sample run with the fake VLM;
+  - the fake-player pipeline wrote `visual_findings.jsonl`, and triage made 10 clusters (8 + 2 visual);
+  - there are no numbers on real sandbox frames until Sora records the benchmark.
