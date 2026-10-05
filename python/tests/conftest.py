@@ -1,6 +1,7 @@
 """Shared pytest setup for qalab.
 
-YOU WRITE tasks: tests marked ``@pytest.mark.youwrite`` cover a function Sora writes himself
+YOU WRITE tasks (all written now, D-030; the marker stays for new ones): tests marked
+``@pytest.mark.youwrite`` cover a function Sora writes himself
 (or code that calls it). While that function is still a stub that raises NotImplementedError,
 those tests count as expected failures (xfail), so CI stays green. Any other failure, such as
 a wrong answer or a crash, still fails the run. When Sora's version passes review,

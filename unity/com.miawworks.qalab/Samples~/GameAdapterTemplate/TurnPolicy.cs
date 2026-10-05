@@ -1,6 +1,5 @@
 // Engine-free (no UnityEngine): tools/cs-check also compiles this file and runs its tests
 // (tools/cs-check/SampleTests/TurnPolicyTests.cs), so it can be checked without Unity.
-using System;
 using MiawWorks.QALab;
 
 namespace MyGame.QALab
@@ -44,8 +43,8 @@ namespace MyGame.QALab
         public const int MaxOrdersPerTurn = 30;
 
         /// <summary>
-        /// YOU WRITE (M7, about 12 lines): choose the bot's next move. Only decide here; never call
-        /// <c>Issue</c> or <c>EndTurn</c> (the adapter does that, then logs it).
+        /// Learning task (M7), written by Claude at Sora's request (D-030): choose the bot's next move.
+        /// Only decide here; never call <c>Issue</c> or <c>EndTurn</c> (the adapter does that, then logs it).
         /// <list type="number">
         /// <item>No game yet (<paramref name="game"/> is null) or <c>!game.CanAct</c>: <see cref="BotDecision.Wait"/>.</item>
         /// <item><paramref name="ordersThisTurn"/> has reached <see cref="MaxOrdersPerTurn"/>, or
@@ -58,7 +57,17 @@ namespace MyGame.QALab
         /// </summary>
         public static BotDecision Decide(IGameCommands game, SeededRandom random, int ordersThisTurn)
         {
-            throw new NotImplementedException("YOU WRITE");
+            if (game == null || !game.CanAct) return BotDecision.Wait();
+            if (ordersThisTurn >= MaxOrdersPerTurn) return BotDecision.EndTurn();
+
+            var units = game.ActiveUnits();
+            if (units == null || units.Count == 0) return BotDecision.EndTurn();
+
+            // Unit first, then order: the same seed must replay the same sequence of picks.
+            string unit = random.Pick(units);
+            var orders = game.LegalOrders(unit);
+            if (orders == null || orders.Count == 0) return BotDecision.EndTurn();
+            return BotDecision.Issue(unit, random.Pick(orders));
         }
     }
 }

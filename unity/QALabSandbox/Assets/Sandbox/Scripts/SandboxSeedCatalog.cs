@@ -54,13 +54,15 @@ namespace QALab.Sandbox
             new MatchRule { StackContains = "SeededDoor.Open" });
 
         /// <summary>
-        /// YOU WRITE (M1, with <c>SeededInventory.GetSlot</c>): the catalog entry for SB02.
-        /// Feature "Inventory", severity S3, title "Inventory HUD requests slots beyond inventory size".
-        /// The match rule is a <c>stack_contains</c> on the frame Unity prints for a Debug.LogError
-        /// call inside <c>SeededInventory.GetSlot</c>. Look at a Debug.Log-style frame in
-        /// docs/specs/00_contracts.md: it uses ':' between class and method, not '.'.
+        /// Learning task (M1, with <c>SeededInventory.GetSlot</c>), written by Claude at Sora's request
+        /// (D-030): the catalog entry for SB02. The match rule is a <c>stack_contains</c> on the frame
+        /// Unity prints for a Debug.LogError call inside <c>SeededInventory.GetSlot</c>. Debug.Log-style
+        /// frames use ':' between class and method, not '.' (docs/specs/00_contracts.md).
         /// </summary>
-        public static SeedCatalogEntry SB02() => throw new NotImplementedException("YOU WRITE");
+        public static SeedCatalogEntry SB02() => Log(
+            "SB02", "Inventory", "S3",
+            "Inventory HUD requests slots beyond inventory size",
+            new MatchRule { StackContains = "SeededInventory:GetSlot" });
 
         public static SeedCatalogEntry SB03() => Log(
             "SB03", "Enemy registry", "S2",

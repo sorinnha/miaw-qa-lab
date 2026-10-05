@@ -1,8 +1,4 @@
-"""``qalab eval triage``: E1 clustering scores and E2/E3 report scores on a small benchmark.
-
-Anything that clusters calls ``normalize_message`` and anything that scores clusters calls
-``pairwise_prf`` (both YOU WRITE), so those tests carry the marker.
-"""
+"""``qalab eval triage``: E1 clustering scores and E2/E3 report scores on a small benchmark."""
 
 import json
 from pathlib import Path
@@ -301,7 +297,6 @@ def test_markdown_and_files_from_a_result(tmp_path: Path) -> None:
 # ---- clustering scores (pairwise_prf, normalize_message) -----------------------------------------
 
 
-@pytest.mark.youwrite
 def test_scores_show_a_split_and_a_wrong_merge() -> None:
     truth = _truth_for_sample()
     sample = load_sample()
@@ -317,7 +312,6 @@ def test_scores_show_a_split_and_a_wrong_merge() -> None:
     assert (score.predicted_clusters, score.true_bugs, score.cluster_count_error) == (3, 3, 0)
 
 
-@pytest.mark.youwrite
 def test_cli_e1_on_a_two_run_benchmark(tmp_path: Path) -> None:
     bench = make_benchmark(tmp_path / "bench", runs=2)
     out = tmp_path / "eval"
@@ -351,7 +345,6 @@ def test_cli_e1_on_a_two_run_benchmark(tmp_path: Path) -> None:
     assert "| 1.000 | 1.000 | 1.000 | 8 / 8 |" in frame
 
 
-@pytest.mark.youwrite
 def test_cli_reports_with_the_fake_provider(tmp_path: Path) -> None:
     bench = make_benchmark(tmp_path / "bench", runs=1)
     out = tmp_path / "eval"
@@ -383,7 +376,6 @@ def test_cli_reports_with_the_fake_provider(tmp_path: Path) -> None:
     assert "RAG on" in text and "map to a seeded bug" in text
 
 
-@pytest.mark.youwrite
 def test_cli_rag_off_still_scores_components_with_a_design_doc(tmp_path: Path) -> None:
     bench = make_benchmark(tmp_path / "bench", runs=1)
     out = tmp_path / "eval"
@@ -427,7 +419,6 @@ def test_frame_embed_is_skipped_without_a_provider_or_when_it_fails(
     assert result.skipped_variants["frame_embed"] == "failed: ollama /api/embed unreachable"
 
 
-@pytest.mark.youwrite
 def test_unlabelled_runs_are_clustered_but_not_scored(tmp_path: Path) -> None:
     bench = make_benchmark(tmp_path / "bench", runs=1, unlabelled=1)
     options = TriageOptions(out=tmp_path / "reports", provider="none")

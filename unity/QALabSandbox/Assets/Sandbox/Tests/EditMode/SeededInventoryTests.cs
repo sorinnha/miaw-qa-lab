@@ -5,8 +5,7 @@ using UnityEngine.TestTools;
 
 namespace QALab.Sandbox.Tests
 {
-    /// <summary>SB02 YOU WRITE: SeededInventory.GetSlot. Remove the category once /review-mine passes.</summary>
-    [Category("YouWrite")]
+    /// <summary>SB02: SeededInventory.GetSlot (a learning task, written by Claude at Sora's request, D-030).</summary>
     public class SeededInventoryTests
     {
         private GameObject _go;

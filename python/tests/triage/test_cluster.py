@@ -1,4 +1,4 @@
-"""Spec 02 §4–5 on samples/sample_run (see EXPECTED.md). Calls normalize → youwrite."""
+"""Spec 02 §4–5 on samples/sample_run (see EXPECTED.md)."""
 
 import pytest
 
@@ -45,7 +45,6 @@ def test_detector_cells_merge_only_same_detector_and_scene(runs: dict[str, Loade
     assert merged[0].merged_from == [max(fell.signature, "aaaaaaaaaaaa")]
 
 
-@pytest.mark.youwrite
 def test_exact_gives_nine_clusters(runs: dict[str, LoadedRun]) -> None:
     clusters = build_clusters(runs, "exact")
     assert len(clusters) == 9
@@ -54,7 +53,6 @@ def test_exact_gives_nine_clusters(runs: dict[str, LoadedRun]) -> None:
     assert not any("MiawWorks.QALab" in f for c in clusters for f in c.top_frames)
 
 
-@pytest.mark.youwrite
 def test_frame_tfidf_merges_sb14_only(runs: dict[str, LoadedRun]) -> None:
     clusters = build_clusters(runs, "frame_tfidf")
     assert len(clusters) == 8
@@ -67,14 +65,12 @@ def test_frame_tfidf_merges_sb14_only(runs: dict[str, LoadedRun]) -> None:
     assert len(sb14.merged_from) == 1
 
 
-@pytest.mark.youwrite
 def test_tfidf_only_wrongly_merges_sb01_and_sb04(runs: dict[str, LoadedRun]) -> None:
     clusters = build_clusters(runs, "tfidf_only")
     assert len(clusters) == 8
     assert [8, 18] in _seqs(clusters) and [30] in _seqs(clusters)
 
 
-@pytest.mark.youwrite
 def test_frame_embed_runs_with_fake_embeddings(runs: dict[str, LoadedRun]) -> None:
     clusters = build_clusters(runs, "frame_embed", provider=FakeProvider())
     assert 8 <= len(clusters) <= 9
@@ -83,7 +79,6 @@ def test_frame_embed_runs_with_fake_embeddings(runs: dict[str, LoadedRun]) -> No
         build_clusters(runs, "frame_embed")
 
 
-@pytest.mark.youwrite
 def test_results_are_deterministic(runs: dict[str, LoadedRun]) -> None:
     first = build_clusters(runs, "frame_tfidf")
     second = build_clusters(runs, "frame_tfidf")

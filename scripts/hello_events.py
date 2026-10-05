@@ -1,4 +1,5 @@
-"""YOU WRITE (M0, about 25 lines): count events per ``kind`` and log lines per ``level``.
+"""Learning task (M0), written by Claude at Sora's request (D-030): count events per ``kind`` and
+log lines per ``level``.
 
 Run it from the repo root:
 
@@ -33,6 +34,7 @@ Hints:
 
 from __future__ import annotations
 
+import json
 import sys
 from collections import Counter
 from pathlib import Path
@@ -46,7 +48,17 @@ def count_events(events_path: Path) -> tuple[Counter[str], Counter[str]]:
     ``per_kind`` counts every event by its ``kind``; ``per_level`` counts only ``log`` events
     by their ``level``. Blank lines are skipped. Read line by line, not the whole file at once.
     """
-    raise NotImplementedError("YOU WRITE")
+    per_kind: Counter[str] = Counter()
+    per_level: Counter[str] = Counter()
+    with events_path.open(encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            event = json.loads(line)
+            per_kind[event["kind"]] += 1
+            if event["kind"] == "log":
+                per_level[event["level"]] += 1
+    return per_kind, per_level
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -55,7 +67,14 @@ def main(argv: list[str] | None = None) -> int:
     ``argv`` is the list of command-line arguments without the script name; when it is None,
     use ``sys.argv[1:]``.
     """
-    raise NotImplementedError("YOU WRITE")
+    args = sys.argv[1:] if argv is None else argv
+    path = Path(args[0]) if args else DEFAULT_EVENTS
+    per_kind, per_level = count_events(path)
+    for name, count in sorted(per_kind.items()):
+        print(f"kind   {name:<11}{count:>3}")
+    for name, count in sorted(per_level.items()):
+        print(f"level  {name:<11}{count:>3}")
+    return 0
 
 
 if __name__ == "__main__":

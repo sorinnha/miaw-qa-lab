@@ -44,7 +44,8 @@ def black_ratio(rgb: np.ndarray) -> float:
 def magenta_ratio(rgb: np.ndarray) -> float:
     """Share of pixels that look like Unity's missing-material magenta (``missing_texture``).
 
-    YOU WRITE (Sora, M6). A pixel counts when, with ``r, g, b`` as ints:
+    Learning task, written by Claude at Sora's request (D-030). A pixel counts when, with
+    ``r, g, b`` as ints:
     ``r > 180 and g < 80 and b > 180 and abs(r - b) < 60``. Return the share of such pixels in the
     whole image as a plain ``float`` between 0 and 1; an empty image (no pixels) returns 0.0.
 
@@ -57,7 +58,12 @@ def magenta_ratio(rgb: np.ndarray) -> float:
     C# comparison: the same as ``pixels.Count(p => p.R > 180 && ...) / (double)pixels.Length``,
     vectorized.
     """
-    raise NotImplementedError("YOU WRITE")
+    if rgb.size == 0:
+        return 0.0
+    channels = rgb.astype(np.int16)  # int16: r - b must be able to go negative
+    r, g, b = channels[..., 0], channels[..., 1], channels[..., 2]
+    magenta = (r > 180) & (g < 80) & (b > 180) & (np.abs(r - b) < 60)
+    return float(np.mean(magenta))
 
 
 @dataclass(frozen=True)

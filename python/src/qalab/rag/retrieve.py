@@ -52,7 +52,8 @@ class Retriever(Protocol):
 def cosine_top_k(query: np.ndarray, matrix: np.ndarray, k: int) -> list[tuple[int, float]]:
     """Return the ``k`` rows of ``matrix`` most similar to ``query``, best first.
 
-    YOU WRITE (Sora). Both ``query`` (shape ``(d,)``) and every row of ``matrix`` (shape
+    Learning task, written by Claude at Sora's request (D-030). Both ``query`` (shape ``(d,)``)
+    and every row of ``matrix`` (shape
     ``(n, d)``) are already L2-normalized, so cosine similarity is just the dot product:
     ``scores = matrix @ query`` gives one score per row. Then pick the ``k`` highest scores
     (``np.argsort`` sorts ascending; think about how to get the largest ones first) and return
@@ -63,7 +64,13 @@ def cosine_top_k(query: np.ndarray, matrix: np.ndarray, k: int) -> list[tuple[in
     C# comparison: this is ``matrix.Select((row, i) => (i, Dot(row, query)))
     .OrderByDescending(p => p.Item2).Take(k)`` with NumPy doing the loops.
     """
-    raise NotImplementedError("YOU WRITE")
+    if matrix.size == 0 or k <= 0:
+        return []
+    scores = matrix @ query  # one dot product per row = cosine, since everything is normalized
+    # Sorting the negated scores ascending puts the largest first; "stable" keeps equal scores in
+    # row order, so ties are reproducible.
+    best = np.argsort(-scores, kind="stable")[:k]
+    return [(int(i), float(scores[i])) for i in best]
 
 
 def build_query(cluster: Cluster) -> str:

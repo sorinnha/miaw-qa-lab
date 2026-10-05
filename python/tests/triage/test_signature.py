@@ -39,7 +39,6 @@ def test_detector_signature_cells(events: dict[int, Event]) -> None:
     assert cell_of(None, 4.0) == (0, 0) and cell_of((-0.1, 0, 7.9), 4.0) == (-1, 1)
 
 
-@pytest.mark.youwrite
 def test_log_signatures(events: dict[int, Event]) -> None:
     sb01, *_ = log_signature(events[8])
     sb04, *_ = log_signature(events[18])

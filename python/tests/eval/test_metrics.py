@@ -1,4 +1,4 @@
-"""Spec 02 (M5) metrics. ``pairwise_prf`` is Sora's (YOU WRITE); its tests carry the marker."""
+"""Spec 02 (M5) metrics, including the ``pairwise_prf`` learning task (D-030)."""
 
 import time
 
@@ -7,7 +7,6 @@ import pytest
 from qalab.eval.metrics import cluster_count_error, pairwise_prf, percentile, rate
 
 
-@pytest.mark.youwrite
 def test_hand_checked_toy_example() -> None:
     # True groups: A A A B B. Predicted: x x y y y.
     # Pairs in predicted clusters: x:{0,1}, y:{2,3},{2,4},{3,4} → 4 (TP+FP)
@@ -20,12 +19,10 @@ def test_hand_checked_toy_example() -> None:
     assert all(type(v) is float for v in (precision, recall, f1))
 
 
-@pytest.mark.youwrite
 def test_perfect_clustering_ignores_label_names() -> None:
     assert pairwise_prf(["SB01", "SB01", "SB04"], [7, 7, 3]) == (1.0, 1.0, 1.0)
 
 
-@pytest.mark.youwrite
 def test_everything_in_one_cluster_has_full_recall_and_low_precision() -> None:
     # 4 items, 2 true groups of 2: true pairs 2, predicted pairs 6, TP 2.
     precision, recall, f1 = pairwise_prf(["a", "a", "b", "b"], ["c"] * 4)
@@ -33,14 +30,12 @@ def test_everything_in_one_cluster_has_full_recall_and_low_precision() -> None:
     assert f1 == pytest.approx(2 * (1 / 3) / (1 / 3 + 1))
 
 
-@pytest.mark.youwrite
 def test_all_singletons_have_no_predicted_pairs() -> None:
     # No predicted pairs → precision 1.0 by definition; every true pair was missed → recall 0.
     precision, recall, f1 = pairwise_prf(["a", "a", "b"], [1, 2, 3])
     assert (precision, recall, f1) == (1.0, 0.0, 0.0)
 
 
-@pytest.mark.youwrite
 def test_edge_cases() -> None:
     assert pairwise_prf([], []) == (1.0, 1.0, 1.0)
     assert pairwise_prf(["a"], ["x"]) == (1.0, 1.0, 1.0)
@@ -49,7 +44,6 @@ def test_edge_cases() -> None:
         pairwise_prf(["a", "b"], ["x"])
 
 
-@pytest.mark.youwrite
 def test_symmetry_swapping_truth_and_prediction_swaps_p_and_r() -> None:
     true = ["a", "a", "a", "b"]
     pred = [1, 1, 2, 2]  # predicted pairs 2, true pairs 3, TP 1
@@ -57,7 +51,6 @@ def test_symmetry_swapping_truth_and_prediction_swaps_p_and_r() -> None:
     assert pairwise_prf(pred, true)[:2] == pytest.approx((1 / 3, 1 / 2))
 
 
-@pytest.mark.youwrite
 def test_twenty_thousand_items_are_counted_not_enumerated() -> None:
     true = [i % 7 for i in range(20_000)]
     pred = [i % 5 for i in range(20_000)]  # 200 million pairs if enumerated
@@ -67,7 +60,6 @@ def test_twenty_thousand_items_are_counted_not_enumerated() -> None:
     assert 0.0 < precision < 1.0 and 0.0 < recall < 1.0
 
 
-@pytest.mark.youwrite
 def test_no_correct_pair_gives_zero_f1_not_a_division_error() -> None:
     # Predicted pair {0, 2} is a wrong merge and true pair {0, 1} is missed: P = R = 0, so F1 = 0.
     assert pairwise_prf(["a", "a", "b"], ["x", "y", "x"]) == (0.0, 0.0, 0.0)

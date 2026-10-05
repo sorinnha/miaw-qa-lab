@@ -7,12 +7,12 @@ using NUnit.Framework;
 namespace MiawWorks.QALab.Tests
 {
     /// <summary>
-    /// YOU WRITE (M7): the game adapter template's decision rule, <c>TurnPolicy.Decide</c>
+    /// The game adapter template's decision rule, <c>TurnPolicy.Decide</c> (an M7 learning task, written
+    /// by Claude at Sora's request, D-030)
     /// (unity/com.miawworks.qalab/Samples~/GameAdapterTemplate/TurnPolicy.cs). These tests live in
     /// cs-check only: the sample is copied into a game, where its own tests belong.
     /// Run: dotnet test tools/cs-check -c Release --filter "FullyQualifiedName~TurnPolicy"
     /// </summary>
-    [Category("YouWrite")]
     public class TurnPolicyTests
     {
         /// <summary>A tactics game in memory: units and their legal orders; it counts what was called.</summary>

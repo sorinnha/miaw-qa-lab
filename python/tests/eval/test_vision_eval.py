@@ -1,7 +1,6 @@
 """``qalab eval vision``: per-label scores, tuning on val, the hybrid trade-off (spec 03, D-029).
 
-Scoring and the hybrid simulation are checked on hand-made examples. Anything that computes frame
-statistics runs ``magenta_ratio`` (YOU WRITE), so those tests carry the marker.
+Scoring and the hybrid simulation are checked on hand-made examples.
 """
 
 import json
@@ -179,7 +178,6 @@ def _seen(dataset: Path) -> dict[str, list[dict[str, object]]]:
     return seen
 
 
-@pytest.mark.youwrite
 def test_full_evaluation_with_the_fake_vlm(tmp_path: Path) -> None:
     dataset = _dataset(tmp_path)
     provider = FakeProvider(vision_labels=_seen(dataset))
@@ -228,7 +226,6 @@ def test_unusable_vlm_answers_are_counted_and_flagged(tmp_path: Path) -> None:
     assert "Warning: 5 test frame(s) got no usable VLM answer" in to_markdown(result)
 
 
-@pytest.mark.youwrite
 def test_the_shipped_thresholds_get_their_own_row_when_they_differ(tmp_path: Path) -> None:
     dataset = _dataset(tmp_path)
     options = VisionEvalOptions(
@@ -238,7 +235,6 @@ def test_the_shipped_thresholds_get_their_own_row_when_they_differ(tmp_path: Pat
     assert rows == ["heuristic", "heuristic (qalab.toml)"]
 
 
-@pytest.mark.youwrite
 def test_cli_without_a_vision_provider_scores_heuristics_only(tmp_path: Path) -> None:
     dataset = _dataset(tmp_path)
     out = tmp_path / "eval"

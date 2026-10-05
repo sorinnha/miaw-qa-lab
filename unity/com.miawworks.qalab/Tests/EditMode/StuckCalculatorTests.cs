@@ -1,6 +1,6 @@
 // Engine-free: runs in Unity's Test Runner and in tools/cs-check.
-// YOU WRITE (M4): these tests describe StuckCalculator and StuckDetector. They fail until both are
-// written; remove [Category("YouWrite")] once /review-mine passes them.
+// These tests describe StuckCalculator and StuckDetector (an M4 learning task, written by Claude at
+// Sora's request, D-030).
 using System.Collections.Generic;
 using MiawWorks.QALab;
 using Newtonsoft.Json.Linq;
@@ -36,7 +36,7 @@ namespace MiawWorks.QALab.Tests
 
         private static DetectorFrame Frame(double t, float[] pos, bool moving) => new DetectorFrame(t, 0, 16f, false, pos, moving, 0);
 
-        [Test, Category("YouWrite")]
+        [Test]
         public void NotStuckBeforeAWholeWindowOfMoving()
         {
             var calc = new StuckCalculator();
@@ -44,7 +44,7 @@ namespace MiawWorks.QALab.Tests
             Assert.IsTrue(calc.Add(4.0, 5f, 5f, true), "4 s without moving while the bot wants to move");
         }
 
-        [Test, Category("YouWrite")]
+        [Test]
         public void WalkingNormallyIsNeverStuck()
         {
             var calc = new StuckCalculator();
@@ -57,7 +57,7 @@ namespace MiawWorks.QALab.Tests
             Assert.IsFalse(stuck);
         }
 
-        [Test, Category("YouWrite")]
+        [Test]
         public void DistanceIsMeasuredOnTheGroundFromTheAnchor()
         {
             var calc = new StuckCalculator();
@@ -72,7 +72,7 @@ namespace MiawWorks.QALab.Tests
             Assert.IsFalse(calc3.Add(4.0, 0.5f, 0f, true), "exactly 0.5 m is not less than 0.5 m");
         }
 
-        [Test, Category("YouWrite")]
+        [Test]
         public void TheAnchorIsTheNewestSampleAtLeastOneWindowOld()
         {
             var calc = new StuckCalculator();
@@ -82,7 +82,7 @@ namespace MiawWorks.QALab.Tests
             Assert.IsTrue(calc.Add(5.0, 10.2f, 0f, true), "anchor (10, 0) is 0.2 m away; the t = 0 sample is not the anchor");
         }
 
-        [Test, Category("YouWrite")]
+        [Test]
         public void JitteringInPlaceIsStuck()
         {
             var calc = new StuckCalculator();
@@ -94,7 +94,7 @@ namespace MiawWorks.QALab.Tests
             Assert.IsTrue(stuck);
         }
 
-        [Test, Category("YouWrite")]
+        [Test]
         public void StoppingOnPurposeClearsTheHistory()
         {
             var calc = new StuckCalculator();
@@ -104,7 +104,7 @@ namespace MiawWorks.QALab.Tests
             Assert.IsTrue(calc.Add(8.0, 1f, 1f, true));
         }
 
-        [Test, Category("YouWrite")]
+        [Test]
         public void ResetStartsANewWindow()
         {
             var calc = new StuckCalculator();
@@ -114,7 +114,7 @@ namespace MiawWorks.QALab.Tests
             Assert.IsFalse(calc.Add(4.5, 0f, 0f, true));
         }
 
-        [Test, Category("YouWrite")]
+        [Test]
         public void MemoryStaysBounded()
         {
             var calc = new StuckCalculator();
@@ -126,7 +126,7 @@ namespace MiawWorks.QALab.Tests
             Assert.Greater(calc.SampleCount, 0);
         }
 
-        [Test, Category("YouWrite")]
+        [Test]
         public void CustomWindowAndDistance()
         {
             var calc = new StuckCalculator(windowS: 2.0, minDistanceM: 1.0f);
@@ -134,7 +134,7 @@ namespace MiawWorks.QALab.Tests
             Assert.IsTrue(calc.Add(2.0, 0.9f, 0f, true));
         }
 
-        [Test, Category("YouWrite")]
+        [Test]
         public void DetectorReportsMajorOncePerWindow()
         {
             var detector = new StuckDetector();
@@ -152,7 +152,7 @@ namespace MiawWorks.QALab.Tests
             Assert.AreEqual(0.5, (double)report.Details["min_distance_m"]);
         }
 
-        [Test, Category("YouWrite")]
+        [Test]
         public void DetectorIgnoresFramesWithoutAPlayerOrWithoutAMoveTarget()
         {
             var detector = new StuckDetector();
