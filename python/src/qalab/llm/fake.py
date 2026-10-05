@@ -24,6 +24,9 @@ _PROMPT_ID = re.compile(r"^\[(?P<id>[EAD]\d+)\]", re.MULTILINE)
 _ACTION_LINE = re.compile(r"^\[(?P<id>A\d+)\] step \d+ t=[\d.]+s (?P<text>.*)$", re.MULTILINE)
 # "door opens slowly" → ["door", "opens", "slowly"]
 _WORD = re.compile(r"\w+")
+# Vision prompt: "Screenshot: shots/000004.png. Scene: ..." → "shots/000004.png"
+_SHOT = re.compile(r"Screenshot: (?P<shot>\S+?)\.(?:\s|$)")
+VISION_SCHEMA_ID = "qalab.llm_vision/1"
 
 EMBED_DIM = 256
 
@@ -34,6 +37,9 @@ class FakeProvider:
     ``invalid_json_times``: how many calls answer with broken JSON first (to test retries).
     ``overrides``: fields forced into every draft (e.g. ``{"severity": "S4"}``) for grounding tests.
     ``script``: raw texts to return verbatim, in order, before falling back to the built draft.
+    ``vision_labels``: for the vision schema, the labels to "see" per screenshot path named in the
+    prompt (``{"shots/000004.png": [{"label": "missing_texture", "score": 0.9}]}``); unknown shots
+    look clean.
     """
 
     name = "fake"
@@ -44,12 +50,14 @@ class FakeProvider:
         invalid_json_times: int = 0,
         overrides: dict[str, Any] | None = None,
         script: list[str] | None = None,
+        vision_labels: dict[str, list[dict[str, Any]]] | None = None,
     ) -> None:
         self.model = model
         self.embed_model = model
         self.invalid_json_times = invalid_json_times
         self.overrides = overrides or {}
         self.script = list(script or [])
+        self.vision_labels = dict(vision_labels or {})
         self.calls: list[dict[str, Any]] = []  # every request, for assertions
         self.embed_calls: list[list[str]] = []
 
@@ -68,6 +76,8 @@ class FakeProvider:
             elif self.invalid_json_times > 0:
                 self.invalid_json_times -= 1
                 raw = '{"title": "broken", '  # truncated on purpose
+            elif schema.get("$id") == VISION_SCHEMA_ID:
+                raw = json.dumps(self.build_verdict(user))
             else:
                 raw = json.dumps(self.build_draft(user))
         data = parse_json_object(raw)  # raises LLMOutputError for the broken answers
@@ -108,6 +118,11 @@ class FakeProvider:
         }
         draft.update(self.overrides)
         return draft
+
+    def build_verdict(self, user: str) -> dict[str, Any]:
+        match = _SHOT.search(user)
+        labels = self.vision_labels.get(match.group("shot"), []) if match else []
+        return {"labels": labels, "explanation": "fake verdict from the lookup table"}
 
     def embed(self, texts: list[str]) -> np.ndarray:
         """Hashed bag-of-words: each word adds 1 to a bucket chosen by its sha1 hash."""

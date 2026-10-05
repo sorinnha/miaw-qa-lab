@@ -63,11 +63,21 @@ class RagConfig:
 
 
 @dataclass
+class VisionConfig:
+    method: str = "heuristic"  # heuristic | vlm | ml | hybrid (qalab vision analyze)
+    hybrid_every_n: int = 5  # spec 03: call the VLM on every Nth frame nothing else flagged
+    hybrid_window_s: float = 2.0  # ... and on frames this close to a UI action or detector event
+    # From the provider's pricing page, filled in by hand; None = no cost reported (never invented).
+    cost_per_1k_images: float | None = None
+
+
+@dataclass
 class Config:
     triage: TriageConfig = field(default_factory=TriageConfig)
     rank: RankConfig = field(default_factory=RankConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
     rag: RagConfig = field(default_factory=RagConfig)
+    vision: VisionConfig = field(default_factory=VisionConfig)
 
 
 def _fill(instance: Any, values: dict[str, Any]) -> None:

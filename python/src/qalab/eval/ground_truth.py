@@ -79,7 +79,9 @@ def build_ground_truth(
 
     Only seeds listed in that run's labels count: a seed that never fired in a run is not ground
     truth for it. An event matching two seeds is ambiguous and left out (the sandbox's catalog
-    tests keep rules disjoint, so this should not happen).
+    tests keep rules disjoint, so this should not happen). A ``visual:<label>`` event (from vision
+    findings) belongs to a visual seed only when ``labels.json`` says its screenshot shows that seed
+    with that label, so a false positive on a clean frame never counts as finding the bug.
     """
     truth = GroundTruth()
     for run_id, events in events_by_run.items():
@@ -89,10 +91,18 @@ def build_ground_truth(
             continue
         truth.runs_with_labels.append(run_id)
         rules = [b for b in labels.seeded_bugs if b.match.visual_label is None]
+        visual = {
+            b.bug_id: b.match.visual_label for b in labels.seeded_bugs if b.match.visual_label
+        }
+        shots = {shot.path: set(shot.bug_ids or []) for shot in labels.screenshots}
         for bug in labels.seeded_bugs:
             truth.bugs.setdefault(bug.bug_id, bug)
         for event in events:
-            hits = [b.bug_id for b in rules if rule_matches(b.match, event)]
+            if _visual_label(event) is not None:
+                shown = shots.get((event.data or {}).get("screenshot"), set())
+                hits = [b for b in sorted(shown) if visual.get(b) == _visual_label(event)]
+            else:
+                hits = [b.bug_id for b in rules if rule_matches(b.match, event)]
             if len(hits) == 1:
                 truth.event_bug[(run_id, event.seq)] = hits[0]
             elif len(hits) > 1:
@@ -100,6 +110,14 @@ def build_ground_truth(
     truth.runs_with_labels.sort()
     truth.runs_without_labels.sort()
     return truth
+
+
+def _visual_label(event: Event) -> str | None:
+    """``missing_texture`` for a ``visual:missing_texture`` detector event, else None."""
+    if event.kind != "detector":
+        return None
+    detector = str((event.data or {}).get("detector", ""))
+    return detector.split(":", 1)[1] if detector.startswith("visual:") else None
 
 
 def feature_components(design_doc: str) -> dict[str, list[str]]:

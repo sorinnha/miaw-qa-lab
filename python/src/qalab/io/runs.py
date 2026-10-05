@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from qalab.models.event import Event
 from qalab.models.run import Run
 from qalab.models.schemas import first_error
+from qalab.vision.findings import read_findings, visual_events
 
 log = logging.getLogger(__name__)
 
@@ -132,12 +133,18 @@ def iter_events(run_dir: Path, report: ValidationReport) -> Iterator[Event]:
 
 
 def load_run(run_dir: Path) -> LoadedRun:
-    """Load one run folder: metadata, validated events sorted by ``seq``, and a report."""
+    """Load one run folder: metadata, validated events sorted by ``seq``, and a report. When
+    ``visual_findings.jsonl`` exists its labels are added as ``visual:<label>`` detector events."""
     run_dir = Path(run_dir)
     report = ValidationReport(run_dir=str(run_dir))
     run = load_run_meta(run_dir)
     report.run_id = run.run_id
     events = sorted(iter_events(run_dir, report), key=lambda e: e.seq)
+    # Spec 03: vision findings join as in-memory visual:<label> detector events that share their
+    # screenshot's seq (stable sort: each comes right after its screenshot event).
+    visual = visual_events(read_findings(run_dir), events)
+    if visual:
+        events = sorted(events + visual, key=lambda e: e.seq)
     if report.invalid_ratio > INVALID_WARN_RATIO:
         log.warning(
             "%s: %d of %d event lines are invalid",
