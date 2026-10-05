@@ -221,7 +221,7 @@ def eval_triage(
     config: ConfigOpt = None,
 ) -> None:
     """Clustering P/R/F1 per variant (E1) and, with --reports, report quality (E2, E3)."""
-    from qalab.eval.triage_eval import run_triage_eval, to_markdown, write_result
+    from qalab.eval.triage_eval import run_triage_eval, safe_label, to_markdown, write_result
 
     chosen = (
         []
@@ -234,10 +234,9 @@ def eval_triage(
             f"[red]error:[/red] unknown variant(s) {', '.join(unknown)} (use {', '.join(VARIANTS)})"
         )
         raise typer.Exit(EXIT_ERROR)
-    safe_label = "".join(c if c.isalnum() or c in "_.-" else "_" for c in label)
     try:
         options = _options(
-            out / f"reports_{safe_label}",
+            out / f"reports_{safe_label(label)}",
             provider,
             model,
             report_variant,
@@ -253,5 +252,6 @@ def eval_triage(
     except USER_ERRORS as exc:
         console.print(f"[red]error:[/red] {exc}")
         raise typer.Exit(EXIT_ERROR) from exc
-    console.print(to_markdown(result))
+    # soft_wrap: long table rows stay on one line, so the printed Markdown can be pasted as is.
+    console.print(to_markdown(result), soft_wrap=True, markup=False, highlight=False)
     console.print("wrote " + ", ".join(str(p) for p in written))

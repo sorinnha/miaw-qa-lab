@@ -58,19 +58,24 @@ if ($Benchmark) { $playerArgs += "-qalabBenchmark" }
 Write-Host "run_playtest: seed $Seed, $Duration s, adapter $Adapter, scene $Scene"
 $process = Start-Process -FilePath $Player -ArgumentList $playerArgs -PassThru
 $null = $process.Handle   # keep a handle open, or ExitCode can come back empty after the exit
+
+# QA Lab logs "[QALab] recording run <run_id> to <run folder> for <n> s, ..." when it starts.
+function Find-RunDir {
+    if (-not (Test-Path $log)) { return $null }
+    $match = Select-String -Path $log -Pattern '\[QALab\] recording run (\S+) to (.+) for [0-9.]+ s' | Select-Object -First 1
+    if ($match) { return $match.Matches[0].Groups[2].Value.Trim() }
+    return $null
+}
+
 if (-not $process.WaitForExit($TimeoutS * 1000)) {
     Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
     Write-Host "run_playtest: timed out after $TimeoutS s; the player was stopped (log: $log)" -ForegroundColor Red
+    $partial = Find-RunDir
+    if ($partial -and (Test-Path $partial)) { Write-Output $partial }   # incomplete: callers may set it aside
     exit 4
 }
 $code = $process.ExitCode
-
-# QA Lab logs "[QALab] recording run <run_id> to <run folder> for <n> s, ..." when it starts.
-$runDir = $null
-if (Test-Path $log) {
-    $match = Select-String -Path $log -Pattern '\[QALab\] recording run (\S+) to (.+) for [0-9.]+ s' | Select-Object -First 1
-    if ($match) { $runDir = $match.Matches[0].Groups[2].Value.Trim() }
-}
+$runDir = Find-RunDir
 if (-not $runDir -or -not (Test-Path $runDir)) {
     Write-Host "run_playtest: no run folder (player exit $code); see $log" -ForegroundColor Red
     exit 3

@@ -21,10 +21,11 @@ from qalab import __version__
 from qalab.eval.ground_truth import GroundTruth, build_ground_truth, feature_components, load_labels
 from qalab.eval.metrics import cluster_count_error, pairwise_prf, percentile, rate
 from qalab.io.runs import LoadedRun
-from qalab.llm.base import LLMProvider
+from qalab.llm.base import LLMError, LLMProvider
 from qalab.llm.factory import make_provider
 from qalab.models.bug import BugReport
-from qalab.rag.retrieve import build_query
+from qalab.models.labels import SeededBug
+from qalab.rag.retrieve import RetrievedChunk, Retriever, build_query
 from qalab.triage.cluster import Cluster, Variant
 from qalab.triage.pipeline import (
     TriageOptions,
@@ -40,6 +41,8 @@ from qalab.triage.prompts import load_prompt
 log = logging.getLogger(__name__)
 
 MANIFEST_FILE = "manifest.json"
+# A label becomes part of file names: "e2 small model" → "e2_small_model".
+_UNSAFE_IN_NAMES = re.compile(r"[^A-Za-z0-9_.-]+")
 # Substrings of the review reasons that report_llm.ground_draft writes for grounding failures.
 GROUNDING_REASONS = (
     "unknown evidence ids",
@@ -154,6 +157,9 @@ def evaluate_clustering(
 
 # ---- E2 / E3: reports ----------------------------------------------------------------------------
 
+# What the template writes when it can't know a field: the field is present but says nothing.
+PLACEHOLDERS = {"", "unknown", "n/a", "none", "tbd"}
+
 
 @dataclass
 class ReportScore:
@@ -163,7 +169,8 @@ class ReportScore:
     rag: bool
     reports: int
     labelled_reports: int  # reports whose cluster is mostly one seeded bug
-    llm_reports: int
+    attempted: int  # reports the model was asked for: LLM drafts plus template fallbacks
+    fallback_rate: float | None  # share of attempted reports that fell back to the template
     field_completeness: float | None
     grounding_rate: float | None
     repro_step_match: float | None
@@ -178,26 +185,77 @@ class ReportScore:
     seconds: float = 0.0
 
 
+@dataclass
+class LabelledReport:
+    """A report whose cluster is mostly one seeded bug, with that cluster and the bug's entry."""
+
+    report: BugReport
+    cluster: Cluster
+    bug: SeededBug
+
+
+class RecordingRetriever:
+    """Passes each search to the real retriever and keeps the result, so hit@k scores the docs
+    the reports were given, without searching a second time."""
+
+    def __init__(self, inner: Retriever) -> None:
+        self.inner = inner
+        self.results: dict[str, list[RetrievedChunk]] = {}
+
+    def retrieve(self, query: str) -> list[RetrievedChunk]:
+        chunks = self.inner.retrieve(query)
+        self.results[query] = chunks
+        return chunks
+
+
 def majority_bug(cluster: Cluster, truth: GroundTruth) -> str | None:
     """The seeded bug that more than half of the cluster's labelled members belong to, else None."""
-    bugs = Counter(
-        b for m in cluster.members if (b := truth.bug_of(m.event.run_id, m.event.seq)) is not None
-    )
+    bugs: Counter[str] = Counter()
+    for member in cluster.members:
+        bug = truth.bug_of(member.event.run_id, member.event.seq)
+        if bug is not None:
+            bugs[bug] += 1
     if not bugs:
         return None
     bug, n = bugs.most_common(1)[0]
     return bug if n * 2 > sum(bugs.values()) else None
 
 
+def labelled_reports(
+    reports: Sequence[BugReport], clusters: Sequence[Cluster], truth: GroundTruth
+) -> list[LabelledReport]:
+    """The reports that can be checked against the catalog (their cluster is mostly one bug)."""
+    by_signature = {c.signature: c for c in clusters}
+    labelled: list[LabelledReport] = []
+    for report in reports:
+        cluster = by_signature.get(report.signature)
+        bug = majority_bug(cluster, truth) if cluster is not None else None
+        if cluster is not None and bug is not None:
+            labelled.append(LabelledReport(report, cluster, truth.bugs[bug]))
+    return labelled
+
+
+def is_filled(value: object) -> bool:
+    """False for blank text and for the template's placeholders such as "unknown"."""
+    return str(value).strip().lower() not in PLACEHOLDERS
+
+
 def field_completeness(report: BugReport) -> float:
-    """Share of the narrative fields that are filled in (non-blank), plus ≥ 1 reproduction step."""
-    filled = sum(1 for name in NARRATIVE_FIELDS if str(getattr(report, name)).strip())
+    """Share of the narrative fields with real content, plus ≥ 1 reproduction step."""
+    filled = sum(1 for name in NARRATIVE_FIELDS if is_filled(getattr(report, name)))
     filled += 1 if report.steps_to_reproduce else 0
     return filled / (len(NARRATIVE_FIELDS) + 1)
 
 
+def was_attempted(report: BugReport) -> bool:
+    """The model was asked for this report: an LLM draft, or a template after the drafts failed."""
+    return report.generator.provider is not None
+
+
 def is_grounded(report: BugReport) -> bool:
-    """No grounding failure in the review reasons (unknown evidence, action or doc ids)."""
+    """An LLM draft (not a template fallback) with no grounding failure in its review reasons."""
+    if report.generator.method != "llm":
+        return False
     reasons = " ".join(report.review_reasons or []).lower()
     return not any(r in reasons for r in GROUNDING_REASONS)
 
@@ -228,79 +286,106 @@ def component_matches(report_component: str, names: Sequence[str]) -> bool:
     return any(n.lower() in text for n in names)
 
 
+def severity_gap(item: LabelledReport) -> int:
+    """Levels between the report's severity and the catalog's (S2 vs S3 → 1)."""
+    return abs(int(item.report.severity[1]) - int(item.bug.expected_severity[1]))
+
+
+def repro_step_match(
+    labelled: Sequence[LabelledReport], runs: Mapping[str, LoadedRun]
+) -> float | None:
+    """Among clusters with bot actions before their first occurrence, the share of reports with a
+    bot step that cites real actions."""
+    action_keys = {(e.run_id, e.seq) for r in runs.values() for e in r.events if e.kind == "action"}
+    eligible = [item.report for item in labelled if actions_before_first(item.cluster, runs)]
+    return rate(sum(1 for r in eligible if has_bot_step(r, action_keys)), len(eligible))
+
+
+def component_correct(
+    labelled: Sequence[LabelledReport], components: Mapping[str, Sequence[str]]
+) -> float | None:
+    """Share of reports naming one of their feature's components (features without a
+    ``Component:`` line in the design doc are left out)."""
+    checked = [
+        (item.report.component, components[item.bug.feature])
+        for item in labelled
+        if components.get(item.bug.feature)
+    ]
+    return rate(sum(1 for text, names in checked if component_matches(text, names)), len(checked))
+
+
+def retrieval_hit_rate(
+    labelled: Sequence[LabelledReport], retrieved_headings: Mapping[str, list[str]]
+) -> float | None:
+    """Spec 02 §10: share of seeded bugs whose feature heading is among the top-k chunk headings
+    retrieved for one of their clusters (a bug split into two clusters still counts once)."""
+    found: dict[str, bool] = {}
+    for item in labelled:
+        hit = item.bug.feature in retrieved_headings.get(item.cluster.signature, [])
+        found[item.bug.bug_id] = found.get(item.bug.bug_id, False) or hit
+    return rate(sum(found.values()), len(found))
+
+
+def _mean(values: Sequence[float]) -> float | None:
+    return round(sum(values) / len(values), 4) if values else None
+
+
+def _r4(value: float | None) -> float | None:
+    return round(value, 4) if value is not None else None
+
+
 def score_reports(
     label: str,
     reports: Sequence[BugReport],
     clusters: Sequence[Cluster],
-    runs: Mapping[str, LoadedRun],
-    truth: GroundTruth,
+    bench: Benchmark,
     components: Mapping[str, Sequence[str]],
     retrieved_headings: Mapping[str, list[str]] | None,
     k: int,
     provider: LLMProvider | None,
-    rag: bool,
 ) -> ReportScore:
-    """Report quality over the reports of clusters that are mostly one seeded bug (E2, E3)."""
-    by_signature = {c.signature: c for c in clusters}
-    action_keys = {(e.run_id, e.seq) for r in runs.values() for e in r.events if e.kind == "action"}
-    labelled: list[tuple[BugReport, Cluster, str]] = []
-    for report in reports:
-        cluster = by_signature.get(report.signature)
-        bug = majority_bug(cluster, truth) if cluster else None
-        if cluster is not None and bug is not None:
-            labelled.append((report, cluster, bug))
+    """Report quality (E2, E3; definitions in DECISIONS D-028).
 
-    llm = [r for r in reports if r.generator.method == "llm"]
-    measured = [r for r in llm if not r.generator.cached and r.generator.latency_ms is not None]
-    tokens = [(r.generator.tokens_in or 0) + (r.generator.tokens_out or 0) for r in llm]
-    with_actions = [(r, c) for r, c, _ in labelled if actions_before_first(c, runs)]
-    with_components = [
-        (r, components[truth.bugs[b].feature])
-        for r, _, b in labelled
-        if components.get(truth.bugs[b].feature)
+    Content metrics (completeness, repro steps, severity, component, hit@k) use the labelled
+    reports. Cost metrics (fallback, grounding, latency, tokens) use every report the model was
+    asked for, so a model whose drafts fail is not flattered by leaving its failures out.
+    """
+    labelled = labelled_reports(reports, clusters, bench.truth)
+    attempted = [r for r in reports if was_attempted(r)]
+    timed = [
+        r.generator.latency_ms
+        for r in attempted
+        if not r.generator.cached and r.generator.latency_ms is not None
     ]
-    severity_gap = [
-        abs(int(r.severity[1]) - int(truth.bugs[b].expected_severity[1])) for r, _, b in labelled
+    tokens = [
+        float((r.generator.tokens_in or 0) + (r.generator.tokens_out or 0)) for r in attempted
     ]
-    hits = None
-    if retrieved_headings is not None:
-        checked = [(c.signature, truth.bugs[b].feature) for _, c, b in labelled]
-        hits = rate(
-            sum(1 for sig, feat in checked if feat in retrieved_headings.get(sig, [])), len(checked)
-        )
-
-    def mean(values: Sequence[float]) -> float | None:
-        return round(sum(values) / len(values), 4) if values else None
-
-    def r4(value: float | None) -> float | None:
-        return round(value, 4) if value is not None else None
-
+    gaps = [severity_gap(item) for item in labelled]
+    fallbacks = sum(1 for r in attempted if r.generator.method != "llm")
     return ReportScore(
         label=label,
         provider=provider.name if provider else None,
         model=provider.model if provider else None,
-        rag=rag,
+        rag=retrieved_headings is not None,
         reports=len(reports),
         labelled_reports=len(labelled),
-        llm_reports=len(llm),
-        field_completeness=mean([field_completeness(r) for r, _, _ in labelled]),
-        grounding_rate=r4(rate(sum(1 for r in llm if is_grounded(r)), len(llm))),
-        repro_step_match=r4(
-            rate(sum(1 for r, _ in with_actions if has_bot_step(r, action_keys)), len(with_actions))
+        attempted=len(attempted),
+        fallback_rate=_r4(rate(fallbacks, len(attempted))),
+        field_completeness=_mean([field_completeness(item.report) for item in labelled]),
+        grounding_rate=_r4(rate(sum(1 for r in attempted if is_grounded(r)), len(attempted))),
+        repro_step_match=_r4(repro_step_match(labelled, bench.runs)),
+        severity_agreement=_r4(rate(sum(1 for g in gaps if g == 0), len(gaps))),
+        severity_within_one=_r4(rate(sum(1 for g in gaps if g <= 1), len(gaps))),
+        component_correct=_r4(component_correct(labelled, components)),
+        retrieval_hit_at_k=(
+            _r4(retrieval_hit_rate(labelled, retrieved_headings))
+            if retrieved_headings is not None
+            else None
         ),
-        severity_agreement=r4(rate(sum(1 for g in severity_gap if g == 0), len(severity_gap))),
-        severity_within_one=r4(rate(sum(1 for g in severity_gap if g <= 1), len(severity_gap))),
-        component_correct=r4(
-            rate(
-                sum(1 for r, names in with_components if component_matches(r.component, names)),
-                len(with_components),
-            )
-        ),
-        retrieval_hit_at_k=r4(hits),
         k=k,
-        latency_p50_ms=r4(percentile([r.generator.latency_ms or 0.0 for r in measured], 50)),
-        latency_p95_ms=r4(percentile([r.generator.latency_ms or 0.0 for r in measured], 95)),
-        tokens_per_report=mean([float(t) for t in tokens]),
+        latency_p50_ms=_r4(percentile(timed, 50)),
+        latency_p95_ms=_r4(percentile(timed, 95)),
+        tokens_per_report=_mean(tokens),
     )
 
 
@@ -318,28 +403,20 @@ def evaluate_reports(
     )
     clusters = triage_clusters(bench.runs, options, provider)
     retriever = make_retriever_for(options, provider)
-    reports = make_reports(clusters, bench.runs, options, provider, retriever)
+    recorder = RecordingRetriever(retriever) if retriever is not None else None
+    reports = make_reports(clusters, bench.runs, options, provider, recorder)
     meta = build_meta(bench.runs, clusters, reports, options, provider, {})
     write_outputs(options.out, reports, clusters, bench.runs, meta)
 
     headings: dict[str, list[str]] | None = None
-    if retriever is not None:
+    if recorder is not None:
         headings = {
-            c.signature: [d.heading for d in retriever.retrieve(build_query(c))]
+            c.signature: [chunk.heading for chunk in recorder.results.get(build_query(c), [])]
             for c in clusters[: options.max_reports]
         }
     components = feature_components(design_doc.read_text(encoding="utf-8")) if design_doc else {}
     score = score_reports(
-        label,
-        reports,
-        clusters,
-        bench.runs,
-        bench.truth,
-        components,
-        headings,
-        options.config.rag.top_k,
-        provider,
-        rag=retriever is not None,
+        label, reports, clusters, bench, components, headings, options.config.rag.top_k, provider
     )
     score.seconds = round(time.perf_counter() - started, 2)
     return score
@@ -355,7 +432,8 @@ class EvalResult:
     qalab_version: str
     runs: int
     runs_without_labels: list[str]
-    seeded_bugs_present: list[str]
+    seeded_bugs_present: list[str]  # seeds labels.json says fired (visual ones included)
+    bugs_with_events: list[str]  # seeds at least one event matched: what triage could find
     ambiguous_events: int
     manifest: dict[str, Any] | None
     clustering: list[ClusteringScore] = field(default_factory=list)
@@ -382,25 +460,33 @@ def run_triage_eval(
         runs=len(bench.runs),
         runs_without_labels=bench.truth.runs_without_labels,
         seeded_bugs_present=sorted(bench.truth.bugs),
+        bugs_with_events=sorted(set(bench.truth.event_bug.values())),
         ambiguous_events=len(bench.truth.ambiguous),
         manifest=bench.manifest,
     )
     embed_provider: LLMProvider | None = None
     for variant in variants:
-        if variant == "frame_embed":
-            if options.provider == "none":
-                result.skipped_variants[variant] = (
-                    "needs an embedding provider (--provider none has none)"
+        if variant == "frame_embed" and options.provider == "none":
+            result.skipped_variants[variant] = (
+                "needs an embedding provider (--provider none has none)"
+            )
+            continue
+        try:
+            if variant == "frame_embed":
+                embed_provider = embed_provider or make_provider(
+                    options.provider,
+                    options.model,
+                    options.embed_model,
+                    use_cache=options.use_cache,
                 )
-                continue
-            embed_provider = embed_provider or make_provider(
-                options.provider, options.model, options.embed_model, use_cache=options.use_cache
+            result.clustering.append(
+                evaluate_clustering(
+                    bench, variant, options, embed_provider if variant == "frame_embed" else None
+                )
             )
-        result.clustering.append(
-            evaluate_clustering(
-                bench, variant, options, embed_provider if variant == "frame_embed" else None
-            )
-        )
+        except LLMError as exc:
+            # A provider that is down costs this variant only; the others are still written.
+            result.skipped_variants[variant] = f"failed: {exc}"
     if evaluate_report_quality:
         result.reports = evaluate_reports(bench, options, label, design_doc)
     return result
@@ -421,8 +507,10 @@ def _fmt(value: float | int | None, digits: int = 3) -> str:
 def to_markdown(result: EvalResult) -> str:
     """The tables of docs/EVAL_RESULTS.md, filled from this result (paste them as they are)."""
     present = ", ".join(result.seeded_bugs_present) or "none"
+    with_events = ", ".join(result.bugs_with_events) or "none"
     lines = [
-        f"Benchmark `{result.benchmark}`: {result.runs} runs, seeded bugs present: {present}. "
+        f"Benchmark `{result.benchmark}`: {result.runs} runs. Seeds triggered (labels.json): "
+        f"{present}. Seeds with matching events: {with_events}. "
         f"Created {result.created_at}, qalab {result.qalab_version}.",
         "",
     ]
@@ -449,6 +537,7 @@ def to_markdown(result: EvalResult) -> str:
         rag = "on" if r.rag else "off"
         cells = [
             r.label,
+            _fmt(r.fallback_rate),
             _fmt(r.field_completeness),
             _fmt(r.grounding_rate),
             _fmt(r.repro_step_match),
@@ -460,6 +549,7 @@ def to_markdown(result: EvalResult) -> str:
         ]
         header = [
             "Setting",
+            "Fallback rate",
             "Field completeness",
             "Grounding rate",
             "Repro-step match",
@@ -471,8 +561,8 @@ def to_markdown(result: EvalResult) -> str:
         ]
         lines += [
             f"Reports `{r.label}`: provider {r.provider or 'none'}, model {r.model or '-'}, "
-            f"RAG {rag}; {r.labelled_reports} of {r.reports} reports map to a seeded bug, "
-            f"{r.llm_reports} written by the LLM.",
+            f"RAG {rag}; {r.labelled_reports} of {r.reports} reports map to a seeded bug; "
+            f"the model was asked for {r.attempted}.",
             "",
             "| " + " | ".join(header) + " |",
             "|" + "---|" * len(header),
@@ -534,10 +624,15 @@ def write_charts(result: EvalResult, out: Path, stem: str) -> list[Path]:
     return written
 
 
+def safe_label(label: str) -> str:
+    """The label as used in output names (``triage_<label>.json``, ``reports_<label>/``)."""
+    return _UNSAFE_IN_NAMES.sub("_", label)
+
+
 def write_result(result: EvalResult, out: Path, label: str) -> list[Path]:
     """``triage_<label>.json`` (everything), ``.md`` (the tables) and the charts, in ``out``."""
     out.mkdir(parents=True, exist_ok=True)
-    stem = "triage_" + re.sub(r"[^A-Za-z0-9_.-]+", "_", label)
+    stem = "triage_" + safe_label(label)
     json_path = out / f"{stem}.json"
     json_path.write_text(json.dumps(result.to_dict(), indent=2) + "\n", encoding="utf-8")
     md_path = out / f"{stem}.md"

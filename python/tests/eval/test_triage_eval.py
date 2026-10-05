@@ -11,8 +11,9 @@ import pytest
 from typer.testing import CliRunner
 
 from qalab.cli import app
-from qalab.eval.ground_truth import GroundTruth
+from qalab.eval.ground_truth import GroundTruth, feature_components
 from qalab.eval.triage_eval import (
+    Benchmark,
     EvalResult,
     ReportScore,
     component_matches,
@@ -21,12 +22,19 @@ from qalab.eval.triage_eval import (
     is_grounded,
     load_benchmark,
     majority_bug,
+    run_triage_eval,
+    safe_label,
     score_clusters,
+    score_reports,
     to_markdown,
     write_result,
 )
+from qalab.llm.base import LLMError
+from qalab.llm.fake import FakeProvider
 from qalab.models.bug import BugReport
+from qalab.triage.context import build_context
 from qalab.triage.pipeline import TriageOptions
+from qalab.triage.report_llm import generate_report
 
 from ..triage.fixtures import (
     SB01_DOORS,
@@ -84,10 +92,15 @@ def _report(**overrides) -> BugReport:
 def test_field_completeness_counts_blank_fields_and_steps() -> None:
     assert field_completeness(_report()) == 1.0
     assert field_completeness(_report(expected="  ", steps_to_reproduce=[])) == pytest.approx(5 / 7)
+    # The template's "unknown" fills the field but says nothing: it counts as empty.
+    template_like = _report(expected="unknown", suspected_cause="Unknown ")
+    assert field_completeness(template_like) == pytest.approx(5 / 7)
 
 
 def test_grounding_reads_the_review_reasons() -> None:
     assert is_grounded(_report())
+    fallback = {"method": "template", "provider": "fake", "attempts": 3}
+    assert not is_grounded(_report(generator=fallback)), "a failed draft is not a grounded one"
     assert is_grounded(_report(needs_review=True, review_reasons=["low confidence (0.40)"]))
     assert not is_grounded(
         _report(needs_review=True, review_reasons=["dropped unknown evidence ids: E9"])
@@ -98,6 +111,98 @@ def test_grounding_reads_the_review_reasons() -> None:
             review_reasons=["step 2 cited unknown action ids (A7); marked inferred"],
         )
     )
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"evidence_ids": ["E9"]},
+        {"steps_to_reproduce": [{"text": "x", "source": "bot_log", "action_ids": ["A99"]}]},
+        {"doc_ids": ["D7"]},
+    ],
+)
+def test_grounding_reasons_match_what_the_report_writer_says(overrides: dict) -> None:
+    # GROUNDING_REASONS matches report_llm's wording; if that wording changes, this test fails
+    # instead of the grounding rate silently becoming 100%.
+    sample = load_sample()
+    cluster = make_cluster(sample, SB01_DOORS)
+    context = build_context(cluster, {sample.run.run_id: sample})
+    assert is_grounded(generate_report(cluster, context, "QAL-0001", FakeProvider()))
+    bad = generate_report(cluster, context, "QAL-0001", FakeProvider(overrides=overrides))
+    assert bad.generator.method == "llm" and not is_grounded(bad), bad.review_reasons
+
+
+def test_report_scores_on_a_hand_checked_example() -> None:
+    sample = load_sample()
+    rid = sample.run.run_id
+    truth = _truth_for_sample()
+    bench = Benchmark(Path("bench"), {rid: sample}, truth)
+    doors = make_cluster(sample, SB01_DOORS)  # SB01, feature Doors, expected S2
+    combat = make_cluster(sample, SB14_COMBAT)  # SB14, feature Combat math, expected S3
+    noise = make_cluster(sample, [34])  # an info log: no seeded bug
+    good = _report(
+        signature=doors.signature,
+        severity="S2",
+        component="SeededDoor (Door_02)",
+        steps_to_reproduce=[
+            {"text": "walk", "source": "bot_log", "action_refs": [{"run_id": rid, "seq": 7}]}
+        ],
+        generator={
+            "method": "llm", "provider": "fake", "latency_ms": 100.0,
+            "tokens_in": 100, "tokens_out": 50, "cached": False,
+        },
+    )  # fmt: skip
+    fallback = _report(
+        signature=combat.signature,
+        severity="S1",
+        component="Combat",
+        expected="unknown",
+        suspected_cause="unknown",
+        generator={
+            "method": "template", "provider": "fake", "attempts": 3, "latency_ms": 900.0,
+            "tokens_in": 900, "tokens_out": 0, "cached": False,
+        },
+    )  # fmt: skip
+    cached = _report(
+        signature=noise.signature,
+        generator={
+            "method": "llm", "provider": "fake", "latency_ms": 5.0,
+            "tokens_in": 20, "tokens_out": 10, "cached": True,
+        },
+    )  # fmt: skip
+    score = score_reports(
+        "toy",
+        [good, fallback, cached],
+        [doors, combat, noise],
+        bench,
+        feature_components(DESIGN_DOC.read_text(encoding="utf-8")),
+        {doors.signature: ["Doors", "Spawner"], combat.signature: ["Audio"]},
+        k=3,
+        provider=None,
+    )
+    assert (score.reports, score.labelled_reports, score.attempted) == (3, 2, 3)
+    assert score.fallback_rate == pytest.approx(1 / 3, abs=1e-4)
+    assert score.field_completeness == pytest.approx((1.0 + 5 / 7) / 2, abs=1e-4)
+    assert score.grounding_rate == pytest.approx(2 / 3, abs=1e-4), "the fallback counts against"
+    assert score.repro_step_match == 0.5, "both clusters follow bot actions; only one cites them"
+    assert (score.severity_agreement, score.severity_within_one) == (0.5, 0.5), "gaps 0 and 2"
+    assert score.component_correct == 0.5, "'Combat' names none of the Combat math components"
+    assert score.retrieval_hit_at_k == 0.5, "SB01's feature retrieved, SB14's not"
+    assert (score.latency_p50_ms, score.latency_p95_ms) == (500.0, 860.0), "cached call left out"
+    assert score.tokens_per_report == pytest.approx((150 + 900 + 30) / 3)
+    assert score.rag is True
+
+
+def test_hit_rate_counts_a_split_bug_once() -> None:
+    sample = load_sample()
+    truth = _truth_for_sample()
+    halves = [make_cluster(sample, [30]), make_cluster(sample, [31])]  # SB14 split in two
+    reports = [_report(signature=c.signature) for c in halves]
+    retrieved = {halves[0].signature: ["Combat math"], halves[1].signature: ["Audio"]}
+    bench = Benchmark(Path("bench"), {sample.run.run_id: sample}, truth)
+    score = score_reports("split", reports, halves, bench, {}, retrieved, 3, None)
+    assert score.retrieval_hit_at_k == 1.0, "one bug, found through one of its clusters"
+    assert score.component_correct is None, "no design doc given: nothing to check against"
 
 
 def test_bot_steps_must_cite_real_actions() -> None:
@@ -152,7 +257,8 @@ def test_markdown_and_files_from_a_result(tmp_path: Path) -> None:
         qalab_version="0.1.0",
         runs=2,
         runs_without_labels=[],
-        seeded_bugs_present=["SB01"],
+        seeded_bugs_present=["SB01", "SB09"],
+        bugs_with_events=["SB01"],
         ambiguous_events=0,
         manifest=None,
         skipped_variants={"frame_embed": "needs an embedding provider"},
@@ -163,7 +269,8 @@ def test_markdown_and_files_from_a_result(tmp_path: Path) -> None:
             rag=True,
             reports=3,
             labelled_reports=2,
-            llm_reports=3,
+            attempted=3,
+            fallback_rate=0.0,
             field_completeness=1.0,
             grounding_rate=1.0,
             repro_step_match=None,
@@ -179,7 +286,9 @@ def test_markdown_and_files_from_a_result(tmp_path: Path) -> None:
     )
     text = to_markdown(result)
     assert "| frame_embed | skipped: needs an embedding provider |" in text
-    assert "| fake | 1.000 | 1.000 | n/a | 0.500 (1.000) | 0.500 | 1.000 | n/a / n/a | 12 |" in text
+    assert "Seeds triggered (labels.json): SB01, SB09. Seeds with matching events: SB01." in text
+    row = "| fake | 0.000 | 1.000 | 1.000 | n/a | 0.500 (1.000) | 0.500 | 1.000 | n/a / n/a | 12 |"
+    assert row in text
     written = write_result(result, tmp_path, "fake model")
     names = sorted(p.name for p in written)
     assert names == [
@@ -294,5 +403,36 @@ def test_cli_rejects_unknown_variants(tmp_path: Path) -> None:
     assert result.exit_code == 2 and "unknown variant" in result.output
 
 
-def test_options_type_is_reused() -> None:
-    assert TriageOptions(out=Path("x")).variant == "frame_tfidf"
+def test_labels_become_safe_file_names() -> None:
+    assert safe_label("e2 small  model/v1") == "e2_small_model_v1"
+
+
+def test_frame_embed_is_skipped_without_a_provider_or_when_it_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bench = make_benchmark(tmp_path / "bench", runs=1)
+    options = TriageOptions(out=tmp_path / "reports", provider="none")
+    result = run_triage_eval(bench, ["frame_embed"], options, False, "x", None)
+    assert (
+        result.clustering == []
+        and "needs an embedding provider" in result.skipped_variants["frame_embed"]
+    )
+
+    def down(*args: object, **kwargs: object) -> None:
+        raise LLMError("ollama /api/embed unreachable")
+
+    monkeypatch.setattr("qalab.eval.triage_eval.make_provider", down)
+    options = TriageOptions(out=tmp_path / "reports", provider="ollama")
+    result = run_triage_eval(bench, ["frame_embed"], options, False, "x", None)
+    assert result.skipped_variants["frame_embed"] == "failed: ollama /api/embed unreachable"
+
+
+@pytest.mark.youwrite
+def test_unlabelled_runs_are_clustered_but_not_scored(tmp_path: Path) -> None:
+    bench = make_benchmark(tmp_path / "bench", runs=1, unlabelled=1)
+    options = TriageOptions(out=tmp_path / "reports", provider="none")
+    result = run_triage_eval(bench, ["frame_tfidf"], options, False, "x", None)
+    score = result.clustering[0]
+    assert len(result.runs_without_labels) == 1
+    assert score.labelled_events < score.labelled_events + score.unlabelled_events
+    assert (score.precision, score.recall, score.f1) == (1.0, 1.0, 1.0), "the copy changes nothing"

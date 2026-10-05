@@ -1,8 +1,7 @@
 """Matching events to seeded bugs (spec 00 match rules). Eval may read labels.json; triage never."""
 
+import re
 from pathlib import Path
-
-import pytest
 
 from qalab.eval.ground_truth import (
     build_ground_truth,
@@ -14,7 +13,7 @@ from qalab.io.runs import load_run
 from qalab.models.event import Event
 from qalab.models.labels import MatchRule
 
-from .bench import DESIGN_DOC, SAMPLE_RUN, copy_run
+from .bench import DESIGN_DOC, REPO, SAMPLE_RUN, copy_run
 
 
 def _event(**fields) -> Event:
@@ -109,6 +108,16 @@ def test_feature_components_from_the_design_doc() -> None:
     assert components["Performance"] == [], "no Component line"
 
 
-@pytest.mark.parametrize("heading", ["Doors", "Level geometry", "Ballistics range"])
-def test_every_catalog_feature_is_a_heading(heading: str) -> None:
-    assert heading in feature_components(DESIGN_DOC.read_text(encoding="utf-8"))
+# '"SB06", "Level geometry", "S2",' → ("SB06", "Level geometry")
+_CATALOG_ENTRY = re.compile(r'"(SB\d\d)", "([^"]+)", "S[1-4]"')
+CATALOG = (
+    REPO / "unity" / "QALabSandbox" / "Assets" / "Sandbox" / "Scripts" / "SandboxSeedCatalog.cs"
+)
+
+
+def test_every_catalog_feature_is_a_heading() -> None:
+    # A typo in a catalog feature would silently zero hit@k and "component correct" for that bug.
+    entries = dict(_CATALOG_ENTRY.findall(CATALOG.read_text(encoding="utf-8")))
+    assert len(entries) >= 15, "SB02's entry is a learning task; every other seed is listed"
+    headings = feature_components(DESIGN_DOC.read_text(encoding="utf-8"))
+    assert {bug: f for bug, f in entries.items() if f not in headings} == {}
