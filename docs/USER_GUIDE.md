@@ -13,6 +13,7 @@ new game is in [GAME_INTEGRATION.md](GAME_INTEGRATION.md); the design is in [ARC
 | ProjectScanner (missing scripts, broken references, materials) | Built (M7) |
 | Game adapter contracts and template | Built (M7) |
 | Seeded bot, detectors, screenshots, results.xml, one-command pipeline | Built (M4). Not yet run in Unity: first run is on the PC checklist. The stuck detector is a learning task, skipped until written |
+| Benchmark and `qalab eval triage` (clustering and report scores against seeded ground truth) | Built (M5). Needs a recorded benchmark; `pairwise_prf` is a learning task, so scoring stops with `NotImplementedError` until it is written |
 | Vision (missing textures, black screens, broken UI) | Planned (M6) |
 
 Two learning tasks still gate the end-to-end triage run. Until `normalize_message` exists, every
@@ -213,6 +214,24 @@ and detection against ground truth (M5). Visual seeds (SB09–SB12) count only w
 them, and each screenshot lists its visual labels (M6). F1 in Play Mode opens a menu to trigger any seed
 by hand or walk to it. Seed ids never appear in log text, and triage never opens `labels.json`; a test
 enforces this.
+
+**Score the tool on the sandbox** (M5):
+
+```powershell
+scripts\benchmark.ps1 -Seeds (1..20) -Duration 120          # one explorer run + one 30 s menu crawl per seed
+qalab eval triage benchmarks\seeded_v1 --provider none      # E1: clustering P/R/F1 per variant
+qalab eval triage benchmarks\seeded_v1 --variants none --reports --docs docs\sandbox_design.md --label rag-on
+```
+
+`benchmarks\seeded_v1\manifest.json` records the seeds, durations, commit, machine and every run's exit
+code. Each `qalab eval triage` writes to `eval\`:
+- `triage_<label>.json`: every number;
+- `triage_<label>.md`: the tables for `docs/EVAL_RESULTS.md`;
+- charts;
+- `reports_<label>\`: the reports that were scored.
+
+`--design-doc docs\sandbox_design.md` scores the component field when RAG is off (no `--docs`). The
+metric definitions are in DECISIONS D-028.
 
 ## 9. CI
 

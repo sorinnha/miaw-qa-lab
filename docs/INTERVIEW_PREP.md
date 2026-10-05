@@ -40,12 +40,13 @@ These are things you can open and explain. Decisions are in `docs/DECISIONS.md` 
 | Detectors + results | `Runtime/Detectors/DetectorHub.cs`, `RateLimiter.cs`, `FallDetector.cs`, `PerfSpikeDetector.cs`, `ExceptionBurstCounter.cs`, `StuckCalculator.cs` (yours), `TunnelingDetector.cs`, `Runtime/Results/JUnitWriter.cs` | Rules in plain C# fed a `DetectorFrame`; rate limit per 4 m cell (same cells as triage); a throwing detector is switched off, a stub is skipped; exit 2 beats 1 | D-025 |
 | Screenshots + labels | `Runtime/Capture/Shots.cs` (planner), `ScreenshotService.cs`, `Labels/VisualLabelProbe.cs`, sandbox `SeededBugs/*` visual seeds | End-of-frame capture, one shot per frame, path reserved before the file exists; visual ground truth only when a shot shows it | D-025, D-026 |
 | Pipeline scripts | `scripts/build_sandbox.ps1`, `run_playtest.ps1`, `run_pipeline.ps1`, `Editor/BuildRunner.cs` | Run folder found from the player's own log (safe in parallel); exit codes passed through; commit stamped into builds | D-027 |
+| Triage evaluation | `python/src/qalab/eval/ground_truth.py`, `metrics.py` (`pairwise_prf` is yours), `triage_eval.py`, `scripts/benchmark.ps1` | Ground truth from catalog rules per run; pairwise P/R/F1 by counting pairs, not looping; report metrics defined so a script can compute them; one manual column where only a human can judge | D-028 |
 | C# outside Unity | `tools/cs-check/` | netstandard2.1 + C# 9 like Unity, NUnit on .NET 8 in CI; what it does and doesn't prove | D-006, D-018 |
 | CI | `.github/workflows/python-ci.yml`, `scripts/ci_smoke.py`, `ci/Jenkinsfile` | Windows + Ubuntu, smoke triage with the fake provider; Jenkinsfile is an example | D-015, D-016 |
 
 **Not built or not run yet (don't claim it):**
 - the M4 code has not run in Unity: no real bot run, no detection numbers, no screenshot spike result yet;
-- evaluation numbers (M5);
+- evaluation numbers (M5: the tool is built, but no benchmark has been recorded);
 - vision (M6);
 - the real-game run (M7).
 
@@ -90,6 +91,7 @@ These are things you can open and explain. Decisions are in `docs/DECISIONS.md` 
 18. *Local vs hosted model?* Privacy of unreleased builds (some free tiers use your data), cost, latency, quality. Show E2.
 19. *How would you scale to a million events a day?* Stream, aggregate by signature first, call the LLM only for new or changed clusters (cache keyed by signature), queue the work, store in a database.
 20. *How do you evaluate report quality without humans?* Grounding rate, field completeness, repro-step match, severity agreement, plus a small human-rated sample.
+    *Follow-up: why pairwise F1 for clustering, not accuracy?* Cluster ids are arbitrary, so "label i is correct" means nothing. Pairs ask "should these two be together?", which penalizes both a wrong merge (precision) and a split bug (recall). Count pairs per group with `n(n−1)/2`; looping over all pairs is O(n²).
 
 ### Vision
 

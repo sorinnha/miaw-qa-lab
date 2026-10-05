@@ -15,9 +15,8 @@ Run commands in PowerShell from the repo root with the virtual environment activ
   - M2–M3: triage, LLM layer with fake/Ollama/Gemini, RAG, reports;
   - M7 code: ProjectScanner, bot contracts, game adapter template, `ci/Jenkinsfile`, USER_GUIDE, GAME_INTEGRATION, final README outline.
 - **On the M4 branch (`m4-bot-pipeline`, draft PR):** bot runner, NavMesh explorer (coverage-biased), UI crawler, detector hub and the fall / perf / exception-burst / tunneling detectors, screenshots with visual labels, results.xml and exit codes, BuildRunner, the QA Lab window, seeds SB06–SB12, SB15, SB16, `build_sandbox.ps1` / `run_playtest.ps1` / `run_pipeline.ps1`. The stuck detector is your YOU WRITE task; until then it is skipped at runtime.
-- **Not built (needs a cloud session first):**
-  - M5: `qalab eval triage`, `benchmark.ps1`;
-  - M6: vision.
+- **On the M5 branch (`m5-eval`, draft PR stacked on M4):** `qalab eval triage` (E1 clustering P/R/F1, E2/E3 report quality, D-028) and `scripts\benchmark.ps1`. `pairwise_prf` is your YOU WRITE task.
+- **Not built (needs a cloud session first):** M6 vision.
 - **Never run in Unity yet:** everything under `unity/` except the engine-free files, which `tools/cs-check` compiles and tests. The first Unity session will likely surface compile errors. Paste them to Claude.
 - **Decisions to know:** D-021 (Gemini is the configured provider, sandbox data only), D-023 (clean run end, disjoint seed rules), D-024 (M7 code before M4, versions stay 0.1.0 until the first tag), D-025–D-027 (M4 runtime, sandbox seeds, scripts).
 
@@ -31,7 +30,7 @@ Run commands in PowerShell from the repo root with the virtual environment activ
 | M2 | `python/src/qalab/triage/normalize.py` | `normalize_message` | `pytest python/tests/triage/test_normalize.py -rxX` |
 | M3 | `python/src/qalab/rag/retrieve.py` | `cosine_top_k` | `pytest python/tests/rag/test_retrieve.py -rxX` |
 | M4 | `unity/com.miawworks.qalab/Runtime/Detectors/StuckCalculator.cs` and `StuckDetector.cs` | `StuckCalculator.Add`, `Reset`, `SampleCount`; `StuckDetector.Tick` | `dotnet test tools\cs-check -c Release --filter "FullyQualifiedName~StuckCalculatorTests"` (11 tests), then in Unity `scripts\unity_tests.ps1 -Platform EditMode -IncludeYouWrite` |
-| M5 | `python/src/qalab/eval/metrics.py` (to be created) | `pairwise_prf` | after the M5 cloud session |
+| M5 | `python/src/qalab/eval/metrics.py` | `pairwise_prf` | `pytest python/tests/eval -m youwrite -rxX` |
 | M6 | `python/src/qalab/vision/heuristics.py` (to be created) | `magenta_ratio` | after the M6 cloud session |
 | M7 | `unity/com.miawworks.qalab/Samples~/GameAdapterTemplate/TurnPolicy.cs`, then your game | `TurnPolicy.Decide`, then `IGameCommands` for the real game | `dotnet test tools\cs-check -c Release --filter "FullyQualifiedName~TurnPolicy"`; `docs/GAME_INTEGRATION.md` §4 |
 
@@ -129,11 +128,17 @@ Built in the cloud (D-025–D-027); none of it has run in Unity yet. Steps in or
 
 ## M5: Triage evaluation → v0.3.0
 
-- [ ] Cloud session first (M5).
-- [ ] Write the E1–E3 hypotheses in `docs/EVAL_RESULTS.md` **before** running anything.
-- [ ] `scripts\benchmark.ps1 -Seeds 1..20 -Duration 120`.
-- [ ] YOU WRITE `pairwise_prf`.
-- [ ] `qalab eval triage benchmarks\seeded_v1`. Fill EVAL_RESULTS (tables, 2 charts, conclusions) and README §6 from its output only.
+Built in the cloud (D-028); it has only run on copies of the sample run. Needs M4 working first (a
+built sandbox player and your M2/M3 YOU WRITE functions). Steps in order:
+
+- [ ] YOU WRITE `pairwise_prf` (table above) until `pytest python/tests/eval -m youwrite -rxX` shows only `X`, then `/review-mine`, `/teach`, LEARNING.md.
+- [ ] Write the E2 and E3 hypotheses in `docs/EVAL_RESULTS.md` **before** running anything (E1's is there; adjust it if you disagree). Commit them first, so the git history shows they came before the numbers.
+- [ ] `scripts\benchmark.ps1 -Seeds (1..20) -Duration 120` (about an hour: 20 × (120 s + 30 s menu crawl + loading)). It ends with `benchmark: 40/40 playtests recorded`. If some failed, `manifest.json` lists their exit codes. Re-run only those seeds with `-Seeds 3,7 -Out benchmarks\seeded_v1`.
+- [ ] Sanity check: `qalab eval triage benchmarks\seeded_v1 --variants exact --provider none --label check`. The first line lists the seeded bugs present. Expect most log and detector seeds (SB01–SB08, SB13–SB16; SB07 only once your stuck detector works; SB09–SB12 are visual and only count in M6). Bugs the bot never reached are absent, which is a finding for the README limitations, not an error. `ambiguous_events` in the JSON must be 0.
+- [ ] E1, E2 and E3: the exact commands are in `docs/EVAL_RESULTS.md`. Paste each printed table and copy the charts to `docs/img/`.
+- [ ] E3 manual column: read 10 reports per setting and count the correct "expected" fields.
+- [ ] Write Conclusions and Limitations in EVAL_RESULTS, then README §6, using only those numbers. Every number must have its command.
+- [ ] Commit `docs/` only. `benchmarks/` and `eval/` stay out of git (too big; the manifest and the commands make them reproducible).
 - [ ] Release v0.3.0 (ask first).
 
 ## M6: Vision → v0.4.0

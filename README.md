@@ -7,7 +7,8 @@ thousands of log lines into a short list of unique, ranked bugs, with reports th
 
 > **Status:** in development, nothing released yet. Built: run recording (M1), triage with AI reports
 > and RAG (M2–M3), the seeded bot, detectors, screenshots and one-command pipeline (M4, not yet run in
-> Unity), the project scanner and game adapter contracts (M7). Next: measured results (M5–M6). See
+> Unity), triage evaluation (M5, not yet run on a recorded benchmark), the project scanner and game
+> adapter contracts (M7). Next: vision (M6) and measured results. See
 > [Limitations](#8-limitations) and [docs/PLAN.md](docs/PLAN.md).
 
 ## 1. Problem
@@ -56,12 +57,18 @@ evidence.
   - every choice comes from a seeded RNG, so a seed gives the same random sequence. Physics and timing
     still vary, so the action log, where every action becomes a "step to reproduce", is the repro record.
 - **Watches for problems while it plays.** Detectors report `fell_out_of_world` (and respawn the
-  player), `perf_spike`, `exception_burst`, `tunneling` and `stuck` (a YOU WRITE task: it shows as skipped
-  in results.xml until written), rate-limited per 4 m cell, each with a screenshot. A blocker or critical finding makes the player exit with code 1, so CI fails.
+  player), `perf_spike`, `exception_burst`, `tunneling` and `stuck` (a YOU WRITE task: it shows as
+  skipped in results.xml until written), rate-limited per 4 m cell, each with a screenshot. A blocker
+  or critical finding makes the player exit with code 1, so CI fails.
 - **One command** (`scripts\run_pipeline.ps1 -Seed 42 -Duration 120 -Open`): builds the sandbox
   player if needed, runs a bot playtest and a menu crawl, triages both and opens `report.html`.
 - **Measures itself.** A sandbox project has 16 seeded bugs with known causes, so clustering and
-  detection can be scored against ground truth (M5–M6).
+  detection can be scored against ground truth:
+  - `scripts\benchmark.ps1` records one bot playtest per seed (20 by default) with labels;
+  - `qalab eval triage` scores clustering (pairwise precision, recall, F1 per variant) and reports
+    (field completeness, grounding, repro steps, severity, component, retrieval hit@3, latency,
+    tokens), and writes the tables and charts for `docs/EVAL_RESULTS.md` (D-028);
+  - vision is scored the same way in M6.
 
 Guides: [USER_GUIDE.md](docs/USER_GUIDE.md) (QC testers) · [GAME_INTEGRATION.md](docs/GAME_INTEGRATION.md)
 (adding it to a game) · [ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -95,13 +102,15 @@ flowchart LR
     context["context: events · bot actions<br/>logs · RAG docs · code"]
     llm["LLM draft (JSON schema, temp 0, cache)<br/>→ grounding checks → template fallback"]
     vision["vision analyze"]:::planned
-    evalx["eval (triage · vision)"]:::planned
+    evalt["eval triage<br/>(pairwise P/R/F1 · report metrics)"]
+    evalv["eval vision"]:::planned
     validate --> cluster --> context --> llm
   end
 
   run --> validate
   run -.-> vision -.-> cluster
-  run -.->|labels.json only| evalx
+  run -->|labels.json only| evalt
+  run -.->|labels.json only| evalv
   llm --> out[("report.html · bugs.json<br/>report.md · bugs_jira.csv")]
 
   ci["GitHub Actions: ruff · pytest · cs-check · smoke<br/>Jenkinsfile: example nightly<br/>run_pipeline.ps1: build → playtest → triage"] -.-> py
@@ -109,7 +118,7 @@ flowchart LR
   classDef planned stroke-dasharray: 5 5,opacity:0.7;
 ```
 
-Dashed boxes are planned (M5–M6). The Unity and Python sides share only the JSON Schemas in `schemas/`.
+Dashed boxes are planned (M6). The Unity and Python sides share only the JSON Schemas in `schemas/`.
 Both test against the same examples, so either side can change internally without breaking the other.
 
 ## 5. Quick start
@@ -158,8 +167,10 @@ multiplier, clustering thresholds, model names) live in `qalab.toml`; the rank w
 ## 6. Results
 
 <!-- Placeholder: filled in M5/M6 from docs/EVAL_RESULTS.md. Every number comes from `qalab eval`. -->
-*Not measured yet.* Clustering precision, recall and F1 per variant (E1), local vs hosted model (E2),
-RAG on/off (E3), and visual detection (H1–H4) will be reported here from
+*Not measured yet.* The triage evaluation is built (`scripts\benchmark.ps1`, `qalab eval triage`;
+metric definitions in D-028), but no benchmark has been recorded: that needs the sandbox running on
+the PC. Clustering precision, recall and F1 per variant (E1), local vs hosted model (E2), RAG on/off
+(E3), and visual detection (H1–H4) will be reported here from
 [docs/EVAL_RESULTS.md](docs/EVAL_RESULTS.md). Each number will come with the command that reproduces it.
 
 ## 7. Design decisions
@@ -198,8 +209,9 @@ The full list, with alternatives and consequences, is in [docs/DECISIONS.md](doc
 
 ## 8. Limitations
 
-- **No measured results yet.** Triage evaluation (M5) and vision (M6) aren't built, and the bot has
-  never played, so there are no precision, recall or detection numbers.
+- **No measured results yet.** The triage evaluation (M5) is built but has only run on copies of the
+  hand-made sample run; vision (M6) isn't built, and the bot has never played. So there are no
+  precision, recall or detection numbers.
 - **The Unity code hasn't run in Unity yet.**
   - It was written in cloud sessions without Unity. The engine-free part is compiled and tested in
     .NET, and the rest was only compiled against stand-in UnityEngine types.

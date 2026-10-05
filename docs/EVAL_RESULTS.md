@@ -13,13 +13,18 @@ Every number here must be reproducible with the command in its section. Write th
 
 ## Triage (M5)
 
+Metric definitions: DECISIONS D-028. Every command writes `eval\triage_<label>.json` (all numbers),
+`eval\triage_<label>.md` (these tables, ready to paste) and charts. Paste the tables as printed; don't
+retype numbers. Record the benchmark first: `scripts\benchmark.ps1 -Seeds (1..20) -Duration 120`.
+
 ### Hypotheses (write before running)
 - E1: `frame_tfidf` beats `exact` on pairwise F1 (it fixes the SB14 split) without merging SB01/SB04. `tfidf_only` has lower precision.
 - E2: [ ]
 - E3: [ ]
 
 ### E1: clustering variants
-Reproduce: `qalab eval triage benchmarks\seeded_v1 --variants exact,frame_tfidf,frame_embed,tfidf_only`
+Reproduce: `qalab eval triage benchmarks\seeded_v1 --variants exact,frame_tfidf,frame_embed,tfidf_only --provider ollama --label e1`
+(`frame_embed` needs an embedding model; with `--provider none` it is skipped.)
 
 | Variant | Pairwise P | Pairwise R | F1 | Clusters / true bugs | Notes |
 |---|---|---|---|---|---|
@@ -28,18 +33,35 @@ Reproduce: `qalab eval triage benchmarks\seeded_v1 --variants exact,frame_tfidf,
 | frame_embed | | | | | |
 | tfidf_only | | | | | |
 
-### E2: models (report quality)
+Chart: `eval\triage_e1_e1_prf.png` → copy to `docs/img/triage_e1_prf.png`.
 
-| Model | Field completeness | Grounding rate | Repro-step match | Severity agreement | Latency p50 / p95 | Tokens per report |
-|---|---|---|---|---|---|---|
-| | | | | | | |
+### E2: models (report quality)
+Reproduce, once per model (same benchmark, same prompt, RAG on):
+```
+qalab eval triage benchmarks\seeded_v1 --variants none --reports --docs docs\sandbox_design.md --provider ollama --model <small model> --label e2-small
+qalab eval triage benchmarks\seeded_v1 --variants none --reports --docs docs\sandbox_design.md --provider gemini --label e2-gemini
+```
+
+| Setting | Field completeness | Grounding rate | Repro-step match | Severity agreement (±1) | Component correct | Retrieval hit@3 | Latency p50 / p95 ms | Tokens per report |
+|---|---|---|---|---|---|---|---|---|
+| | | | | | | | | |
+
+Chart: `eval\triage_e2-gemini_reports.png` → `docs/img/triage_reports.png`. Latency comes only from uncached calls: add `--no-cache` for a fair timing run.
 
 ### E3: RAG on vs off
+Reproduce (same model; `--design-doc` scores "component correct" without giving the doc to the model):
+```
+qalab eval triage benchmarks\seeded_v1 --variants none --reports --provider gemini --design-doc docs\sandbox_design.md --label e3-rag-off
+qalab eval triage benchmarks\seeded_v1 --variants none --reports --provider gemini --docs docs\sandbox_design.md --label e3-rag-on
+```
 
-| Setting | Retrieval hit@3 | "expected" filled correctly | Component correct | Notes |
-|---|---|---|---|---|
-| RAG off | n/a | | | |
-| RAG on | | | | |
+| Setting | Field completeness | Grounding rate | Repro-step match | Severity agreement (±1) | Component correct | Retrieval hit@3 | Latency p50 / p95 ms | Tokens per report |
+|---|---|---|---|---|---|---|---|---|
+| e3-rag-off | | | | | | n/a | | |
+| e3-rag-on | | | | | | | | |
+
+Manual check (not automated, D-028): read 10 reports from each of `eval\reports_e3-rag-off\report.md`
+and `eval\reports_e3-rag-on\report.md`. Count how many have an "expected" that matches the design doc: rag-off __/10, rag-on __/10.
 
 ## Vision (M6)
 
