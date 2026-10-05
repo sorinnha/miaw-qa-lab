@@ -14,12 +14,12 @@ Run commands in PowerShell from the repo root with the virtual environment activ
   - M1: Unity package recording, sandbox log seeds, scripts;
   - M2–M3: triage, LLM layer with fake/Ollama/Gemini, RAG, reports;
   - M7 code: ProjectScanner, bot contracts, game adapter template, `ci/Jenkinsfile`, USER_GUIDE, GAME_INTEGRATION, final README outline.
+- **On the M4 branch (`m4-bot-pipeline`, draft PR):** bot runner, NavMesh explorer (coverage-biased), UI crawler, detector hub and the fall / perf / exception-burst / tunneling detectors, screenshots with visual labels, results.xml and exit codes, BuildRunner, the QA Lab window, seeds SB06–SB12, SB15, SB16, `build_sandbox.ps1` / `run_playtest.ps1` / `run_pipeline.ps1`. The stuck detector is your YOU WRITE task; until then it is skipped at runtime.
 - **Not built (needs a cloud session first):**
-  - M4: bot runner, NavMesh explorer and UI crawler, detectors, screenshots, JUnit, `build_sandbox.ps1` / `run_playtest.ps1` / `run_pipeline.ps1`, seeds SB06–SB12, SB15, SB16;
   - M5: `qalab eval triage`, `benchmark.ps1`;
   - M6: vision.
 - **Never run in Unity yet:** everything under `unity/` except the engine-free files, which `tools/cs-check` compiles and tests. The first Unity session will likely surface compile errors. Paste them to Claude.
-- **Decisions to know:** D-021 (Gemini is the configured provider, sandbox data only), D-023 (clean run end, disjoint seed rules), D-024 (M7 code before M4, versions stay 0.1.0 until the first tag).
+- **Decisions to know:** D-021 (Gemini is the configured provider, sandbox data only), D-023 (clean run end, disjoint seed rules), D-024 (M7 code before M4, versions stay 0.1.0 until the first tag), D-025–D-027 (M4 runtime, sandbox seeds, scripts).
 
 ### Open learning tasks (YOU WRITE)
 
@@ -30,7 +30,7 @@ Run commands in PowerShell from the repo root with the virtual environment activ
 | M1 | `unity/QALabSandbox/Assets/Sandbox/Scripts/SandboxSeedCatalog.cs` | `SB02()` | `dotnet test tools\cs-check -c Release --filter TestCategory=YouWrite` |
 | M2 | `python/src/qalab/triage/normalize.py` | `normalize_message` | `pytest python/tests/triage/test_normalize.py -rxX` |
 | M3 | `python/src/qalab/rag/retrieve.py` | `cosine_top_k` | `pytest python/tests/rag/test_retrieve.py -rxX` |
-| M4 | `Runtime/Detectors/StuckCalculator.cs` (to be created) | `StuckCalculator` + `StuckDetector` | after the M4 cloud session |
+| M4 | `unity/com.miawworks.qalab/Runtime/Detectors/StuckCalculator.cs` and `StuckDetector.cs` | `StuckCalculator.Add`, `Reset`, `SampleCount`; `StuckDetector.Tick` | `dotnet test tools\cs-check -c Release --filter "FullyQualifiedName~StuckCalculatorTests"` (11 tests), then in Unity `scripts\unity_tests.ps1 -Platform EditMode -IncludeYouWrite` |
 | M5 | `python/src/qalab/eval/metrics.py` (to be created) | `pairwise_prf` | after the M5 cloud session |
 | M6 | `python/src/qalab/vision/heuristics.py` (to be created) | `magenta_ratio` | after the M6 cloud session |
 | M7 | `unity/com.miawworks.qalab/Samples~/GameAdapterTemplate/TurnPolicy.cs`, then your game | `TurnPolicy.Decide`, then `IGameCommands` for the real game | `dotnet test tools\cs-check -c Release --filter "FullyQualifiedName~TurnPolicy"`; `docs/GAME_INTEGRATION.md` §4 |
@@ -98,11 +98,33 @@ Run commands in PowerShell from the repo root with the virtual environment activ
 
 ## M4: Bot, detectors, screenshots, pipeline → v0.2.0
 
-- [ ] Cloud session first: `docs/PROMPTS.md` → C1 with "Milestone: M4".
-- [ ] Screenshot spike: try both capture methods in a windowed development player and record the results in DECISIONS.md.
-- [ ] YOU WRITE `StuckCalculator` + `StuckDetector` (with an EditMode test).
-- [ ] `scripts\build_sandbox.ps1`, then `scripts\run_playtest.ps1 -Seed 42 -Duration 120`.
-- [ ] **Acceptance:** `scripts\run_pipeline.ps1 -Seed 42 -Duration 120 -Open`, from nothing to `report.html` with detector bugs and screenshots, and the PlayMode tests pass.
+Built in the cloud (D-025–D-027); none of it has run in Unity yet. Steps in order:
+
+- [ ] Check out `m4-bot-pipeline` (or `main` once the PR is merged). Open `unity\QALabSandbox` and let it compile. Paste any Console errors to Claude (new APIs: NavMesh, ScreenCapture, ExecuteEvents, Physics.Linecast, `NamedBuildTarget`).
+- [ ] **Tools → QA Lab → Rebuild Sandbox Scenes.** The Console must not show `Humanoid agent radius is ...`. Check:
+  - Window → AI → Navigation → Agents: Humanoid radius **0.3**;
+  - Scene view with the NavMesh shown: a thin blue strip passes through the north-west doorway gap (x ≈ 5.8, z = 30);
+  - T_17 (x 34–36, z 0–2, inside the south-east corridor) is drawn and is blue on the NavMesh.
+- [ ] **Screenshot spike** (spec 01, M4 step 1). Record the result as a new decision in DECISIONS.md:
+  - Play Mode with the settings asset: press **F12**, check `runs\<id>\shots\` has a PNG with the HUD (`screen_capture`);
+  - after `build_sandbox.ps1`: a `run_playtest.ps1` run's shots include the HUD;
+  - once with `-batchmode` added to the player arguments (edit `run_playtest.ps1` locally, don't commit): shots are `camera_render`, without the HUD.
+- [ ] **F1 menu, one seed at a time** (Play Mode, settings asset on, adapter `manual`). After each, stop and look at `events.jsonl` / `labels.json`:
+  - SB06 "Stand on tile T_17": the player falls and respawns at the start; a `fell_out_of_world` event, critical, near (35, 1);
+  - SB07 "Go to the narrow gap", then walk north (W): you can't pass. A `stuck` event only after your YOU WRITE task, and only when the bot is driving;
+  - SB08 "GC burst now": a `perf_spike` event. If not, raise GcZone's `megabytes` (Inspector) until it does and note the value in D-026;
+  - SB09 "Look at Crate_07": the crate is magenta;
+  - SB10 "Black out the camera now": 2 s of black with the HUD still drawn;
+  - SB11 "+10000 points": the score text runs out of its dark box;
+  - SB12/SB16 "Go to the ballistics range": the ammo icon is a white box, projectiles fly through the thin wall, and `tunneling` events appear;
+  - SB15: open `Sandbox_Menu`, Play, Settings → Apply: an InvalidOperationException in the Console.
+- [ ] Check the bot by hand: settings asset adapter `navmesh_explorer`, press Play: the player walks by itself, `action` events (`move_to`, `interact`) appear.
+- [ ] `scripts\unity_tests.ps1 -Platform EditMode` and `-Platform PlayMode`, both `failed=0`. New: `BotAndDetectorTests`, `BuiltInAdapterTests`, `SeededLevelTests` (the projectile tests check the SB16 premise on your PC's physics), `HudScoreTests`.
+- [ ] YOU WRITE `StuckCalculator` + `StuckDetector` (table above) until the 11 cs-check tests pass, then `/review-mine` (it drops `[Category("YouWrite")]`), `/teach`, LEARNING.md.
+- [ ] Close the editor. `scripts\build_sandbox.ps1` prints `built ...\Builds\Sandbox\QALabSandbox.exe`.
+- [ ] `scripts\run_playtest.ps1 -Seed 42 -Duration 120` opens a 1280×720 window and prints `exit N, ... actions, ... detector events, ... screenshots` and the run folder. Expect ≥ 30 actions. `qalab validate runs\<id>` prints `ok`. `results.xml` lists the detectors; `labels.json` lists screenshots with labels.
+- [ ] **Acceptance:** `scripts\run_pipeline.ps1 -Seed 42 -Duration 120 -Open` goes from nothing to `report.html` with detector bugs and their screenshots. Triage needs your M2 and M3 YOU WRITE functions (`normalize_message`, `cosine_top_k`). The bot is random: if seed 42 misses SB06 or SB07, note which seeds find them; M5's benchmark measures the rates.
+- [ ] Commit what Unity generated: both scenes, `NavMesh-Sandbox_Level01.asset`, the new materials, `ProjectSettings/NavMeshAreas.asset`, and every new `.meta` file (package and sandbox).
 - [ ] Release v0.2.0 (ask first).
 
 ## M5: Triage evaluation → v0.3.0
@@ -131,7 +153,7 @@ Run commands in PowerShell from the repo root with the virtual environment activ
 - [ ] Check the missing-script rule by hand: on a throwaway prefab, add a small script component, delete the script, scan, and expect `missing_script`. Then delete the prefab.
 - [ ] Install the package in Crimson Tactics by git URL (`docs/GAME_INTEGRATION.md` §1–2). Record a manual run and run `qalab validate` on it.
 - [ ] YOU WRITE `TurnPolicy.Decide` in the template until its cs-check tests pass, then `/review-mine` (it drops the `YouWrite` category).
-- [ ] Import the **Game adapter template** sample into the game and implement `IGameCommands`, pairing with Claude (§4). It plays only once M4's bot runner exists.
+- [ ] Import the **Game adapter template** sample into the game and implement `IGameCommands`, pairing with Claude (§4). Run it with `-qalabAdapter my_game` (the M4 bot runner calls it).
 - [ ] Triage 3 runs with `--provider none` (or `ollama`), **never Gemini**, plus `--repo <game>\Assets`.
 - [ ] `scripts\scan_project.ps1 -ProjectPath <game> -Out out\game_scan.json`.
 - [ ] Write `docs/REAL_GAME.md` honestly: what was found, false positives, scanner results, measured numbers only.

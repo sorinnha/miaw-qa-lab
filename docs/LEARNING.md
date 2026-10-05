@@ -12,7 +12,7 @@ See what's still open: `pytest python -m youwrite -rxX` (x = open, X = passing b
 | M1 | unity/QALabSandbox/Assets/Sandbox/Scripts/SeededBugs/SeededInventory.cs | SeededInventory | | |
 | M2 | python/src/qalab/triage/normalize.py | normalize_message | | |
 | M3 | python/src/qalab/rag/retrieve.py | cosine_top_k | | |
-| M4 | unity/com.miawworks.qalab/Runtime/Detectors/StuckCalculator.cs | StuckCalculator | | |
+| M4 | unity/com.miawworks.qalab/Runtime/Detectors/StuckCalculator.cs + StuckDetector.cs | StuckCalculator, StuckDetector.Tick | | |
 | M5 | python/src/qalab/eval/metrics.py | pairwise_prf | | |
 | M6 | python/src/qalab/vision/heuristics.py | magenta_ratio | | |
 | M7 | unity/com.miawworks.qalab/Samples~/GameAdapterTemplate/TurnPolicy.cs + your game | TurnPolicy.Decide, IGameCommands | | |

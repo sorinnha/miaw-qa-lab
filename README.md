@@ -6,9 +6,9 @@ AI-assisted game QA for Unity. A C# package records what happens during a playte
 thousands of log lines into a short list of unique, ranked bugs, with reports that cite their evidence.
 
 > **Status:** in development, nothing released yet. Built: run recording (M1), triage with AI reports
-> and RAG (M2–M3), the project scanner and game adapter contracts (M7). Next: the seeded bot,
-> detectors and screenshots (M4), then measured results (M5–M6). See [Limitations](#8-limitations) and
-> [docs/PLAN.md](docs/PLAN.md).
+> and RAG (M2–M3), the seeded bot, detectors, screenshots and one-command pipeline (M4, not yet run in
+> Unity), the project scanner and game adapter contracts (M7). Next: measured results (M5–M6). See
+> [Limitations](#8-limitations) and [docs/PLAN.md](docs/PLAN.md).
 
 ## 1. Problem
 
@@ -28,9 +28,11 @@ evidence.
 
 - **Records playtests in Unity** (`unity/com.miawworks.qalab`). Add `-qalab` to a build, or tick
   auto-start in the editor, and every run writes a folder:
-  - `run.json` (build, scenes, seed, clean end or crash);
-  - `events.jsonl` (logs with stack traces, metrics every second, markers);
-  - `labels.json` (seeded-bug ground truth) in benchmark mode.
+  - `run.json` (build and commit, scenes, seed, clean end or crash, exit code);
+  - `events.jsonl` (logs with stack traces, bot actions, detector findings, screenshots, metrics every
+    second, markers);
+  - `shots/` (screenshots, long side ≤ 1280 px) and `results.xml` (JUnit, for Jenkins and TeamCity);
+  - `labels.json` (seeded-bug and screenshot ground truth) in benchmark mode.
 
   Logging is thread-safe: log callbacks from any thread only enqueue, and the main thread writes
   every 0.5 s.
@@ -47,10 +49,17 @@ evidence.
   - missing scripts, broken references, empty material slots and error shaders in Build Settings
     scenes and prefabs;
   - writes `scan.json`; exit 1 on errors.
-- **Plays games through their own commands** (from M4). Bot adapters (`IBotAdapter`) draw every random
-  choice from a seeded RNG, so a seed gives the same random sequence. Game state and timing still vary
-  between runs, so the action log, where every action becomes a "step to reproduce", is the repro
-  record. A game adapter template ships as a package sample.
+- **Plays the game with a seeded bot** (`-qalabAdapter`):
+  - `navmesh_explorer` walks to reachable points on the baked NavMesh, preferring places it hasn't
+    been, and interacts with what's in range; `ui_crawler` clicks random menu controls; game adapters
+    drive a game's own commands (a template ships as a package sample);
+  - every choice comes from a seeded RNG, so a seed gives the same random sequence. Physics and timing
+    still vary, so the action log, where every action becomes a "step to reproduce", is the repro record.
+- **Watches for problems while it plays.** Detectors report `fell_out_of_world` (and respawn the
+  player), `perf_spike`, `exception_burst`, `tunneling` and `stuck`, rate-limited per 4 m cell, each
+  with a screenshot. A blocker or critical finding makes the player exit with code 1, so CI fails.
+- **One command** (`scripts\run_pipeline.ps1 -Seed 42 -Duration 120 -Open`): builds the sandbox
+  player if needed, runs a bot playtest and a menu crawl, triages both and opens `report.html`.
 - **Measures itself.** A sandbox project has 16 seeded bugs with known causes, so clustering and
   detection can be scored against ground truth (M5–M6).
 
@@ -66,15 +75,15 @@ flowchart LR
     log["LogCapture · MetricsSampler<br/>(any thread → queue → main thread)"]
     writer["EventWriter<br/>(seq, sort, 0.5 s drain, clean close)"]
     labels["LabelRecorder<br/>(benchmark only)"]
-    bot["BotRunner + IBotAdapter<br/>NavMesh · UI crawler · game adapter"]:::planned
-    det["DetectorHub · ScreenshotService"]:::planned
+    bot["BotRunner + IBotAdapter<br/>NavMesh · UI crawler · game adapter"]
+    det["DetectorHub · ScreenshotService<br/>results.xml · exit code"]
     scan["ProjectScanner (editor)"]
     log --> writer
     bot --> writer
     det --> writer
   end
 
-  run[("runs/run_id/<br/>run.json · events.jsonl<br/>labels.json · shots/")]
+  run[("runs/run_id/<br/>run.json · events.jsonl · shots/<br/>results.xml · labels.json")]
   writer --> run
   labels --> run
   scan --> scanjson[("scan.json")]
@@ -95,12 +104,12 @@ flowchart LR
   run -.->|labels.json only| evalx
   llm --> out[("report.html · bugs.json<br/>report.md · bugs_jira.csv")]
 
-  ci["GitHub Actions: ruff · pytest · cs-check · smoke<br/>Jenkinsfile: example nightly"] -.-> py
+  ci["GitHub Actions: ruff · pytest · cs-check · smoke<br/>Jenkinsfile: example nightly<br/>run_pipeline.ps1: build → playtest → triage"] -.-> py
 
   classDef planned stroke-dasharray: 5 5,opacity:0.7;
 ```
 
-Dashed boxes are planned (M4–M6). The Unity and Python sides share only the JSON Schemas in `schemas/`.
+Dashed boxes are planned (M5–M6). The Unity and Python sides share only the JSON Schemas in `schemas/`.
 Both test against the same examples, so either side can change internally without breaking the other.
 
 ## 5. Quick start
@@ -132,6 +141,13 @@ qalab triage run samples\sample_run --provider gemini --docs docs\sandbox_design
 > `triage run` needs `normalize_message`, and `--docs` with an embedding provider (fake, Ollama, Gemini)
 > also needs `cosine_top_k` (`--provider none` uses TF-IDF instead). Until they're written, the run stops
 > with `NotImplementedError: YOU WRITE`. `qalab validate` and the test suite (`pytest python -q`) already work.
+
+**A bot playtest of the sandbox** (Windows, Unity; first-time setup in `docs/progress/PC_CHECKLIST.md`):
+
+```powershell
+scripts\run_pipeline.ps1 -Seed 42 -Duration 120 -Open   # build if needed → bot playtest + menu crawl → triage → report.html
+scripts\run_playtest.ps1 -Seed 7 -Duration 60           # one playtest; prints the run folder
+```
 
 Exit code 3 means a P1 bug was found, so CI can fail on it. Tunables (priority thresholds, crash
 multiplier, clustering thresholds, model names) live in `qalab.toml`; the rank weights are fixed in
@@ -170,19 +186,27 @@ The full list, with alternatives and consequences, is in [docs/DECISIONS.md](doc
   `Interlocked`. The run ends with `run_end` as the last event and no seq gaps, and `ended_at` marks a
   clean end.
 - **Engine-free C# is tested outside Unity** (D-006, D-018): `tools/cs-check` compiles it like Unity
-  does (netstandard2.1, C# 9) and runs its tests on .NET 8 in CI.
+  does (netstandard2.1, C# 9) and runs its tests on .NET 8 in CI. Detector rules, the rate limiter,
+  screenshot planning and results.xml are plain C# for this reason (D-025).
+- **A broken tool must not break the game** (D-025): a detector that throws is switched off for the
+  run (a not-yet-written one is skipped, anything else is an internal error, exit code 2); a failing
+  bot adapter stops the bot but the run keeps recording.
+- **The bot explores, not wanders** (D-025, D-026): random reachable targets, biased towards the
+  least-visited 4 m cells, so side rooms and corners get visited, where level bugs hide.
 - **Gemini is the configured provider, and providers stay pluggable** (D-002, D-021): the key comes from
   the environment only. A SQLite cache keyed by prompt hash makes reruns free.
 
 ## 8. Limitations
 
-- **No measured results yet.** The seeded bot, detectors, screenshots (M4), triage evaluation (M5) and
-  vision (M6) aren't built, so there are no precision, recall or detection numbers.
+- **No measured results yet.** Triage evaluation (M5) and vision (M6) aren't built, and the bot has
+  never played, so there are no precision, recall or detection numbers.
 - **The Unity code hasn't run in Unity yet.**
   - It was written in cloud sessions without Unity. The engine-free part is compiled and tested in
     .NET, and the rest was only compiled against stand-in UnityEngine types.
-  - The first real Unity compile, the tests and the 60-second acceptance run are on the PC checklist
-    (`docs/progress/PC_CHECKLIST.md`).
+  - The first real Unity compile, the tests, the scene rebuild and the bot playtests are on the PC
+    checklist (`docs/progress/PC_CHECKLIST.md`).
+- **The bot is random.** A given seed may not reach every seeded bug; detection rates per bug come from
+  the 20-seed benchmark (M5), not from one run.
 - **Learning tasks gate the pipeline.** Several functions are written by hand as learning tasks;
   until they exist, their tests are expected failures and the end-to-end triage run stops early.
 - **Grouping is signature-based.** It splits a bug whose message varies in ways normalization misses,
@@ -233,8 +257,8 @@ computer engineering student) with Claude Code as a pair programmer:
   reviewer agent with fresh context checked each diff against the specs, and its findings were fixed
   before Sora reviewed the pull request.
 - **Sora's part:** owning the design and reviewing every change. Sora also writes the learning tasks by
-  hand: the message normalizer, cosine retrieval, the SB02 seeded bug, and (planned) the stuck
-  detector, clustering metrics, magenta heuristic and the game adapter's decision rule. Unity, the sandbox and the real-game
+  hand: the message normalizer, cosine retrieval, the SB02 seeded bug, the stuck detector, and
+  (planned) clustering metrics, the magenta heuristic and the game adapter's decision rule. Unity, the sandbox and the real-game
   runs happen on Sora's PC.
 - **The record:** `docs/DECISIONS.md` keeps the reasoning, `docs/LEARNING.md` what was learned.
 

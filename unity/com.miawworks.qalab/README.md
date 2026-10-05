@@ -1,12 +1,15 @@
 # QA Lab (Unity package)
 
 Writes a QA Lab run folder during a playtest (contract: `docs/specs/00_contracts.md` in the
-repository). Enable it with `-qalab` on the player's command line, or with the `QALabSettings`
-asset ("Auto-start in Play Mode") in the editor.
+repository), optionally with a seeded bot playing and detectors watching. Enable it with `-qalab` on
+the player's command line, or with the QA Lab window (Tools > QA Lab > Window, "Play with QA Lab") in
+the editor.
 
 ```
-runs/<run_id>/run.json        metadata (rewritten with ended_at on a clean end)
-runs/<run_id>/events.jsonl    one event per line: logs, metrics, markers
+runs/<run_id>/run.json        metadata (rewritten with ended_at, exit code on a clean end)
+runs/<run_id>/events.jsonl    one event per line: logs, bot actions, detectors, screenshots, metrics, markers
+runs/<run_id>/shots/          screenshots (periodic, per detector event, F12), long side ≤ 1280 px
+runs/<run_id>/results.xml     JUnit summary for CI
 runs/<run_id>/labels.json     benchmark runs only (-qalabBenchmark)
 ```
 
@@ -17,7 +20,17 @@ runs/<run_id>/labels.json     benchmark runs only (-qalabBenchmark)
 - Other games: `"com.miawworks.qalab": "https://github.com/sorinnha/miaw-qa-lab.git?path=/unity/com.miawworks.qalab"`,
   pinned with `#<tag>` once releases exist (or `#<commit>`). Walkthrough: `docs/GAME_INTEGRATION.md`.
 
-Register the player once so events carry a position: `QALab.RegisterPlayer(transform, mover)`.
+Register the player once so events carry a position and the bot can steer it:
+`QALab.RegisterPlayer(transform, mover)`.
+
+## Detectors
+
+`fell_out_of_world` (critical; respawns the player; kill plane = `QALab.KillPlaneY` or the lowest
+renderer − 5 m), `stuck` (major), `perf_spike` (minor, > 50 ms), `exception_burst` (major, > 20 in 1 s)
+and `tunneling` (major; add `TunnelingDetector` to fast projectiles). Each detector reports a 4 m cell
+at most once per 10 s, with a screenshot. Report your own with `QALab.ReportDetector(name, severity,
+details)`. With `-qalabQuitOnEnd` the player exits 0 (clean), 1 (a blocker/critical finding) or 2 (QA
+Lab failed).
 
 ## Project scanner
 
@@ -29,10 +42,14 @@ code 0 means clean, 1 means errors, 2 means the scan failed.
 
 ## Bot adapters
 
-An adapter (`IBotAdapter`) is the bot's strategy. Register one by name with `BotAdapterRegistry`
-and select it with `-qalabAdapter <name>`. It gets a `BotContext` with the run's `SeededRandom` and
-`LogAction` for repro steps. Import the **Game adapter template** sample (Package Manager > QA Lab >
-Samples) to write one for your game. The bot runner that calls adapters comes in a later version (M4).
+An adapter (`IBotAdapter`) is the bot's strategy. Built in: `navmesh_explorer` (needs a baked NavMesh
+and a registered player) and `ui_crawler` (uGUI). Register your own by name with `BotAdapterRegistry`
+and select it with `-qalabAdapter <name>`. The bot runner calls `Step` every 0.25 s with a
+`BotContext`: the run's `SeededRandom`, the player and mover, and `LogAction` for repro steps. Import
+the **Game adapter template** sample (Package Manager > QA Lab > Samples) to write one for your game.
+
+Build a development player for playtests with
+`-executeMethod MiawWorks.QALab.Editor.BuildRunner.BuildSandboxPlayer -qalabBuildOut <path.exe>`.
 
 ## Flags
 
