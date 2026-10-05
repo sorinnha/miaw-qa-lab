@@ -51,6 +51,7 @@ namespace MiawWorks.QALab
                     && Physics.Linecast(_previous, position, out var hit, layers, QueryTriggerInteraction.Ignore)
                     && !hit.collider.transform.IsChildOf(transform))
                 {
+                    // Reported at the wall, not at the player: the 4 m cell (and triage's clusters) follow the bug.
                     QALab.ReportDetector(DetectorNames.Tunneling, DetectorSeverity.Major, new JObject
                     {
                         ["object"] = name,
@@ -59,8 +60,8 @@ namespace MiawWorks.QALab
                         ["step_m"] = Math.Round(move.magnitude, 2),
                         ["fixed_dt_s"] = Math.Round(Time.fixedDeltaTime, 4),
                         ["collision_mode"] = _body.collisionDetectionMode.ToString(),
-                        ["hit_pos"] = new JArray(Round(hit.point.x), Round(hit.point.y), Round(hit.point.z)),
-                    });
+                        ["player_pos"] = QALab.Player != null ? PosArray(QALab.Player.position) : null,
+                    }, hit.point);
                 }
             }
             _previous = position;
@@ -70,7 +71,8 @@ namespace MiawWorks.QALab
 
         private void OnCollisionEnter(Collision collision) => _collided = true;
 
-        private static float Round(float v) => (float)Math.Round(v, 2);
+        private static JArray PosArray(Vector3 p) =>
+            new JArray((float)Math.Round(p.x, 2), (float)Math.Round(p.y, 2), (float)Math.Round(p.z, 2));
     }
 }
 #endif

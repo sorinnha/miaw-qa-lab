@@ -57,10 +57,25 @@ namespace MiawWorks.QALab
         /// Report a problem from game code, the same way the built-in detectors do: rate-limited (same
         /// detector, same 4 m cell, once per 10 s), with a screenshot, counted in results.xml. Severity is
         /// one of <see cref="DetectorSeverity"/>; blocker and critical make the run exit with code 1.
-        /// Returns the event, or null when QA Lab isn't running or the report was rate-limited.
+        /// <paramref name="position"/>: where the problem is, if not at the player (it picks the 4 m cell).
+        /// Main thread only. A bad name or severity is logged as a <c>[QALab]</c> warning, never thrown into
+        /// game code. Returns the event, or null when QA Lab isn't running, the report was rate-limited or
+        /// its arguments were bad.
         /// </summary>
-        public static QAEvent ReportDetector(string detector, string severity, JObject details = null) =>
-            _host != null ? _host.ReportDetector(detector, severity, details) : null;
+        public static QAEvent ReportDetector(string detector, string severity, JObject details = null, Vector3? position = null)
+        {
+            if (_host == null) return null;
+            try
+            {
+                var pos = position.HasValue ? new[] { position.Value.x, position.Value.y, position.Value.z } : null;
+                return _host.ReportDetector(detector, severity, details, pos);
+            }
+            catch (ArgumentException exc)
+            {
+                Debug.LogWarning("[QALab] ReportDetector ignored: " + exc.Message);
+                return null;
+            }
+        }
 
         /// <summary>Take a screenshot at the end of this frame (reason <c>manual</c>); returns its path or null.</summary>
         public static string RequestScreenshot() => _host != null ? _host.RequestScreenshot() : null;

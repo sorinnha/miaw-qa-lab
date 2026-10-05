@@ -63,9 +63,13 @@ foreach ($p in $playtests) {
     $runs += $runDir
 }
 
-# 3. Vision (M6): only when this qalab has the command.
+# 3. Vision (M6): only when this qalab has the command. Windows PowerShell 5.1 turns a native
+# command's redirected stderr into a terminating error under "Stop", so probe with "Continue".
+$ErrorActionPreference = "Continue"
 & $qalab vision analyze --help *> $null
-if ($LASTEXITCODE -eq 0) {
+$hasVision = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = "Stop"
+if ($hasVision) {
     $visionArgs = @("vision", "analyze") + $runs
     if ($Provider) { $visionArgs += @("--provider", $Provider) }
     & $qalab @visionArgs

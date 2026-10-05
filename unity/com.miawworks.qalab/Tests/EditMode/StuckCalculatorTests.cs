@@ -14,7 +14,7 @@ namespace MiawWorks.QALab.Tests
         {
             public readonly List<(string Detector, string Severity, JObject Details)> Reports = new List<(string, string, JObject)>();
 
-            public QAEvent Report(string detector, string severity, JObject details = null)
+            public QAEvent Report(string detector, string severity, JObject details = null, float[] pos = null)
             {
                 Reports.Add((detector, severity, details));
                 return new QAEvent();
@@ -67,6 +67,9 @@ namespace MiawWorks.QALab.Tests
             var calc2 = new StuckCalculator();
             calc2.Add(0.0, 0f, 0f, true);
             Assert.IsFalse(calc2.Add(4.0, 0.3f, 0.45f, true), "√(0.09 + 0.2025) ≈ 0.54 m: it moved");
+            var calc3 = new StuckCalculator();
+            calc3.Add(0.0, 0f, 0f, true);
+            Assert.IsFalse(calc3.Add(4.0, 0.5f, 0f, true), "exactly 0.5 m is not less than 0.5 m");
         }
 
         [Test, Category("YouWrite")]

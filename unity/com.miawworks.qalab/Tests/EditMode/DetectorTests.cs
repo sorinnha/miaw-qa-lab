@@ -46,7 +46,7 @@ namespace MiawWorks.QALab.Tests
         {
             public readonly List<(string Detector, string Severity, JObject Details)> Reports = new List<(string, string, JObject)>();
 
-            public QAEvent Report(string detector, string severity, JObject details = null)
+            public QAEvent Report(string detector, string severity, JObject details = null, float[] pos = null)
             {
                 Reports.Add((detector, severity, details));
                 return new QAEvent();
@@ -145,6 +145,20 @@ namespace MiawWorks.QALab.Tests
             Assert.AreEqual(1, rig.ShotsRequested);
             Assert.AreEqual(1, rig.Hub.Count("perf_spike"));
             Assert.IsFalse(rig.Hub.FatalFired, "minor is not fatal");
+        }
+
+        [Test]
+        public void AReportCanBePlacedWhereTheProblemIs()
+        {
+            var rig = new Rig();
+            rig.State.Position = new[] { 31f, 1f, 31f };   // the player, 6 m from the wall
+            var wall = new[] { 37.5f, 2.5f, 35f };
+            rig.Hub.Report("tunneling", "major", null, wall);
+            Assert.IsNotNull(rig.Hub.Report("tunneling", "major", null, rig.State.Position), "the player's cell is a different cell");
+            Assert.IsNull(rig.Hub.Report("tunneling", "major", null, new[] { 37.9f, 0f, 35.5f }), "same cell as the wall: limited");
+            var lines = rig.Events();
+            CollectionAssert.AreEqual(new[] { 37.5, 2.5, 35.0 }, lines[0]["pos"].ToObject<double[]>());
+            Assert.Throws<ArgumentException>(() => rig.Hub.Report("tunneling", "major", null, new[] { 1f, 2f }));
         }
 
         [Test]

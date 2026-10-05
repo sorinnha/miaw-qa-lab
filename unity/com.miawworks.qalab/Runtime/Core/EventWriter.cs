@@ -70,10 +70,12 @@ namespace MiawWorks.QALab
         // ---- producers (any thread) ---------------------------------------------------------------
 
         /// <summary>
-        /// Stamp and enqueue an event of any kind. <c>data</c> may be null for log events. Once the writer
-        /// is closing this returns null and takes no seq.
+        /// Stamp and enqueue an event of any kind. <c>data</c> may be null for log events. <paramref name="pos"/>
+        /// replaces the main-thread cache's player position (e.g. where a projectile went through a wall).
+        /// Once the writer is closing this returns null and takes no seq.
         /// </summary>
-        public QAEvent Enqueue(string kind, JObject data = null, string level = null, string message = null, string stack = null)
+        public QAEvent Enqueue(string kind, JObject data = null, string level = null, string message = null, string stack = null,
+            float[] pos = null)
         {
             // The in-flight bracket is what Close waits on. Both sides use full fences (Interlocked) before
             // reading the other side's flag, so either Close sees this producer in flight and waits for its
@@ -85,7 +87,7 @@ namespace MiawWorks.QALab
                 {
                     return null;
                 }
-                return Push(kind, data, level, message, stack);
+                return Push(kind, data, level, message, stack, pos);
             }
             finally
             {
@@ -93,7 +95,7 @@ namespace MiawWorks.QALab
             }
         }
 
-        private QAEvent Push(string kind, JObject data, string level, string message, string stack)
+        private QAEvent Push(string kind, JObject data, string level, string message, string stack, float[] pos = null)
         {
             var e = new QAEvent
             {
@@ -104,7 +106,7 @@ namespace MiawWorks.QALab
                 Frame = _state.Frame,
                 Kind = kind,
                 Scene = _state.Scene,
-                Pos = _state.Position,
+                Pos = pos ?? _state.Position,
                 Level = level,
                 Message = message,
                 Stack = string.IsNullOrEmpty(stack) ? null : stack,

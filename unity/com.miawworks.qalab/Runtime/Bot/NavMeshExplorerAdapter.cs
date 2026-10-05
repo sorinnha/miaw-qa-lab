@@ -21,7 +21,9 @@ namespace MiawWorks.QALab
     /// level bugs hide. Choosing a target counts as a visit to its cell, so a pocket the player can't
     /// actually reach doesn't attract the bot for the whole run.</item>
     /// <item>Follows the path corners with <c>MoveTowards</c>, advancing within 0.5 m of a corner.</item>
-    /// <item>Gives up after path length / speed × 2 + 3 s and picks a new target.</item>
+    /// <item>Gives up after path length / speed × 2 + 3 s, or after 5 s without 0.5 m of progress (longer
+    /// than the stuck detector's 4 s window, so a stuck spot is still reported), logs <c>give_up</c> and
+    /// marks the target's cell as heavily visited so it isn't picked again soon.</item>
     /// <item>With p = 0.2 per step it tries to interact; a success is logged as <c>interact</c>.</item>
     /// </list>
     /// All choices come from <see cref="BotContext.Random"/>, so a seed replays the same decisions.
@@ -36,6 +38,9 @@ namespace MiawWorks.QALab
         private const int CandidatesPerTarget = 6;
         private const int TargetAttemptsPerStep = 12;
         private const int ChosenTargetVisitWeight = 8;   // ≈ 2 s spent there
+        private const int GiveUpVisitWeight = 40;        // ≈ 10 s: an unreachable spot stops attracting the bot
+        public const float StallSeconds = 5f;
+        public const float StallProgressM = 0.5f;
 
         private readonly float _speedMps;
         private readonly NavMeshPath _path = new NavMeshPath();
@@ -44,6 +49,9 @@ namespace MiawWorks.QALab
         private int _corner;
         private float _giveUpAt;
         private float _lastStepAt;
+        private Vector3 _target;
+        private Vector3 _progressFrom;
+        private float _progressAt;
         private Bounds _bounds;
         private bool _hasBounds;
         private int _boundsScene = -1;
@@ -91,7 +99,23 @@ namespace MiawWorks.QALab
                 ctx.LogAction("interact", null, null, new JObject { ["object"] = objectName });
             }
 
-            if (_corner >= _corners.Length || now >= _giveUpAt)
+            var following = _corner < _corners.Length;
+            if (following && Flat(position - _progressFrom).magnitude >= StallProgressM)
+            {
+                _progressFrom = position;
+                _progressAt = now;
+            }
+            if (following && (now >= _giveUpAt || now - _progressAt >= StallSeconds))
+            {
+                ctx.LogAction("give_up", _target, null, new JObject
+                {
+                    ["reason"] = now >= _giveUpAt ? "timeout" : "no_progress",
+                    ["seconds"] = Math.Round(now - _progressAt, 1),
+                });
+                AddVisits(_target, GiveUpVisitWeight);
+                _corners = Array.Empty<Vector3>();
+            }
+            if (_corner >= _corners.Length)
             {
                 if (!PickTarget(ctx, position, now))
                 {
@@ -146,6 +170,9 @@ namespace MiawWorks.QALab
 
             _corners = bestCorners;
             _corner = 1;   // corner 0 is where the player stands
+            _target = bestTarget;
+            _progressFrom = from;
+            _progressAt = now;
             var length = 0f;
             for (var i = 1; i < _corners.Length; i++) length += Vector3.Distance(_corners[i - 1], _corners[i]);
             _giveUpAt = now + length / _speedMps * 2f + 3f;

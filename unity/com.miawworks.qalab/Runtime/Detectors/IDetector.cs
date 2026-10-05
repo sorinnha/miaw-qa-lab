@@ -23,9 +23,11 @@ namespace MiawWorks.QALab
     {
         /// <summary>
         /// Write a <c>detector</c> event. Returns it, or null when the report was rate-limited or the run
-        /// has ended (then nothing was written and no screenshot was taken).
+        /// has ended (then nothing was written and no screenshot was taken). <paramref name="pos"/> is where
+        /// the problem is (x, y, z) when that isn't the player's position; it decides the rate-limit cell
+        /// and the event's <c>pos</c>.
         /// </summary>
-        QAEvent Report(string detector, string severity, JObject details = null);
+        QAEvent Report(string detector, string severity, JObject details = null, float[] pos = null);
     }
 
     /// <summary>

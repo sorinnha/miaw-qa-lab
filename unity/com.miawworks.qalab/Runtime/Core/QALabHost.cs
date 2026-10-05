@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
@@ -38,6 +39,7 @@ namespace MiawWorks.QALab
         private float _killPlaneY = float.NegativeInfinity;
         private bool _killPlaneMeasured;
         private bool _capturedLastFrame;
+        private bool _warnedNoCamera;
         private long _lastExceptions;
         private float _sinceDrain;
         private bool _recording;
@@ -82,7 +84,8 @@ namespace MiawWorks.QALab
                     _metrics.ExcludeCurrentFrame();
                 },
                 onError: InternalError);
-            _hub = new DetectorHub(_writer, _clock, _cache, new RateLimiter(), _shots.RequestDetectorShot, Warn);
+            _hub = new DetectorHub(_writer, _clock, _cache, new RateLimiter(),
+                () => ScreenshotService.CanCapture ? _shots.RequestDetectorShot() : null, Warn);
             _perf = new PerfSpikeDetector();
             _perf.Suppress();   // the first frames of a run are loading frames
             _hub.Add(new StuckDetector());
@@ -98,15 +101,16 @@ namespace MiawWorks.QALab
 #if UNITY_EDITOR
             UnityEditor.EditorPrefs.SetString("QALab.LastRunDir", runDir);
 #endif
-            Debug.Log($"[QALab] recording run {runId} to {runDir} for {options.DurationS:0.#} s, adapter '{options.Adapter}'");
+            // Invariant culture: scripts/run_playtest.ps1 parses this line ("for 120 s", never "for 120,5 s").
+            Debug.Log($"[QALab] recording run {runId} to {runDir} for {options.DurationS.ToString("0.#", CultureInfo.InvariantCulture)} s, adapter '{options.Adapter}'");
         }
 
         /// <summary>Report through the hub (game detectors use <see cref="QALab.ReportDetector"/>).</summary>
-        internal QAEvent ReportDetector(string detector, string severity, JObject details) =>
-            _recording ? _hub.Report(detector, severity, details) : null;
+        internal QAEvent ReportDetector(string detector, string severity, JObject details, float[] pos) =>
+            _recording ? _hub.Report(detector, severity, details, pos) : null;
 
         /// <summary>Plan a manual screenshot for the end of this frame; returns its path.</summary>
-        internal string RequestScreenshot() => _recording ? _shots.RequestManualShot() : null;
+        internal string RequestScreenshot() => _recording && ScreenshotService.CanCapture ? _shots.RequestManualShot() : null;
 
         private void CreateBot(QALabOptions options)
         {
@@ -179,42 +183,53 @@ namespace MiawWorks.QALab
 
             if (ManualShotKey.WasPressed()) _shots.RequestManualShot();
             var shot = _shots.TakeDue(_clock.Seconds);
-            if (shot != null) StartCoroutine(_screenshots.CaptureAtEndOfFrame(shot));
+            if (shot == null) return;
+            if (!ScreenshotService.CanCapture)
+            {
+                if (!_warnedNoCamera) Warn("batch mode without a MainCamera-tagged camera: no screenshots this run");
+                _warnedNoCamera = true;
+            }
+            else if (Application.isBatchMode)
+            {
+                _screenshots.Capture(shot);   // no end-of-frame rendering in batch mode; a camera renders any time
+            }
+            else
+            {
+                StartCoroutine(_screenshots.CaptureAtEndOfFrame(shot));
+            }
         }
 
-        /// <summary>Close the run: run_end marker, final drain, run.json with ended_at, results.xml, labels.json.</summary>
+        /// <summary>
+        /// Close the run: stop the bot, write labels.json and results.xml, then the run_end marker and
+        /// run.json with the final exit code. Each file is written on its own, so one failure doesn't
+        /// lose the others; a failure is a QA Lab internal error (exit code 2), and because run_end and
+        /// run.json come last they always carry the code the process exits with.
+        /// </summary>
         internal void EndRun(string exitReason)
         {
             if (!_recording) return;
             _recording = false;
-            var exitCode = ExitCodes.Clean;
-            try
+            Try("bot", () => _bot?.Stop(exitReason));
+            if (_bot?.Error != null && !_internalErrors.Contains(_bot.Error)) InternalError(_bot.Error);
+            Try("labels.json", () =>
             {
-                _bot?.Stop(exitReason);
-                exitCode = ExitCodes.For(_hub.FatalFired, _hub.Failed.Count > 0 || _internalErrors.Count > 0);
-                _logs.Stop();   // no new log callbacks; Close waits for any still in flight
-                _writer.Close("run_end", new JObject { ["exit_reason"] = exitReason, ["exit_code"] = exitCode });
-                _run.WriteEnd(exitReason, exitCode);
-                JUnitWriter.WriteTo(Path.Combine(RunDir, "results.xml"), Results(exitCode));
                 var unknown = LabelRecorder.End(Path.Combine(RunDir, "labels.json"), _runId);
                 if (unknown.Count > 0)
                 {
                     // Count only: seed ids must never appear in log text (player.log sits in the run folder).
                     Debug.LogWarning($"[QALab] {unknown.Count} triggered seed(s) have no catalog entry and are missing from labels.json");
                 }
-                Debug.Log($"[QALab] run {_runId} ended ({exitReason}, exit code {exitCode}): {RunDir}");
-            }
-            catch (Exception exc)
-            {
-                exitCode = ExitCodes.InternalError;
-                Debug.LogError("[QALab] could not close the run: " + exc.Message);
-            }
-            finally
-            {
-                SceneManager.sceneLoaded -= OnSceneLoaded;
-                SceneManager.activeSceneChanged -= OnActiveSceneChanged;
-                Application.quitting -= OnQuitting;
-            }
+            });
+            Try("results.xml", () => JUnitWriter.WriteTo(Path.Combine(RunDir, "results.xml"), Results(ExitCode())));
+            var exitCode = ExitCode();
+            Try("log capture", () => _logs.Stop());   // no new log callbacks; Close waits for any still in flight
+            Try("events.jsonl", () => _writer.Close("run_end", new JObject { ["exit_reason"] = exitReason, ["exit_code"] = exitCode }));
+            Try("run.json", () => _run.WriteEnd(exitReason, exitCode));
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+            SceneManager.activeSceneChanged -= OnActiveSceneChanged;
+            Application.quitting -= OnQuitting;
+            exitCode = ExitCode();   // a failed run.json write still makes the process report it
+            Debug.Log($"[QALab] run {_runId} ended ({exitReason}, exit code {exitCode}): {RunDir}");
             if (_options.QuitOnEnd && exitReason == ExitReasons.DurationElapsed)
             {
 #if UNITY_EDITOR
@@ -222,6 +237,20 @@ namespace MiawWorks.QALab
 #else
                 Application.Quit(exitCode);
 #endif
+            }
+        }
+
+        private int ExitCode() => ExitCodes.For(_hub.FatalFired, _hub.Failed.Count > 0 || _internalErrors.Count > 0);
+
+        private void Try(string what, Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception exc)
+            {
+                InternalError($"closing the run ({what}): {exc.GetType().Name}: {exc.Message}");
             }
         }
 

@@ -104,11 +104,12 @@ namespace MiawWorks.QALab
         }
 
         /// <inheritdoc />
-        public QAEvent Report(string detector, string severity, JObject details = null)
+        public QAEvent Report(string detector, string severity, JObject details = null, float[] pos = null)
         {
             if (!DetectorNames.IsValid(detector)) throw new ArgumentException($"bad detector name '{detector}'", nameof(detector));
             if (!DetectorSeverity.IsKnown(severity)) throw new ArgumentException($"bad severity '{severity}'", nameof(severity));
-            if (!_limiter.Allow(detector, _state.Position, _clock.Seconds))
+            if (pos != null && pos.Length != 3) throw new ArgumentException("pos is x, y, z", nameof(pos));
+            if (!_limiter.Allow(detector, pos ?? _state.Position, _clock.Seconds))
             {
                 return null;
             }
@@ -116,7 +117,7 @@ namespace MiawWorks.QALab
             if (details != null) data["details"] = details;
             var shot = _requestScreenshot?.Invoke();
             if (shot != null) data["screenshot"] = shot;
-            var written = _writer.Enqueue(EventKinds.Detector, data);
+            var written = _writer.Enqueue(EventKinds.Detector, data, pos: pos);
             if (written == null)
             {
                 return null;   // the run has ended
