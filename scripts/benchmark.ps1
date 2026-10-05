@@ -54,8 +54,15 @@ foreach ($seed in $Seeds) {
 
 $sha = $null
 try { $sha = (git -C $repo rev-parse HEAD 2>$null).Trim() } catch { $sha = $null }
-$computer = Get-CimInstance Win32_ComputerSystem -ErrorAction SilentlyContinue
-$cpu = Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | Select-Object -First 1
+# Machine facts are nice to have: a missing cmdlet (pwsh outside Windows) or CIM error must not lose the manifest.
+$cpu = $null
+$ramGb = $null
+try {
+    $cpu = (Get-CimInstance Win32_Processor | Select-Object -First 1).Name.Trim()
+    $ramGb = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 1)
+} catch {
+    Write-Host "benchmark: no CPU/RAM info for the manifest ($($_.Exception.Message))" -ForegroundColor Yellow
+}
 $manifest = [ordered]@{
     name = Split-Path $Out -Leaf
     created_at = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
@@ -65,8 +72,8 @@ $manifest = [ordered]@{
     git_sha = $sha
     machine = [ordered]@{
         os = [Environment]::OSVersion.VersionString
-        cpu = if ($cpu) { $cpu.Name.Trim() } else { $null }
-        ram_gb = if ($computer) { [math]::Round($computer.TotalPhysicalMemory / 1GB, 1) } else { $null }
+        cpu = $cpu
+        ram_gb = $ramGb
     }
     runs = $runs
 }

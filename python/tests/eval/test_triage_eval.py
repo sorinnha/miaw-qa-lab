@@ -4,6 +4,7 @@ Anything that clusters calls ``normalize_message`` and anything that scores clus
 ``pairwise_prf`` (both YOU WRITE), so those tests carry the marker.
 """
 
+import json
 from pathlib import Path
 
 import pytest
@@ -271,6 +272,21 @@ def test_cli_reports_with_the_fake_provider(tmp_path: Path) -> None:
     assert (out / "reports_fake-rag" / "bugs.json").is_file(), "the reports themselves are kept"
     text = (out / "triage_fake-rag.md").read_text(encoding="utf-8")
     assert "RAG on" in text and "map to a seeded bug" in text
+
+
+@pytest.mark.youwrite
+def test_cli_rag_off_still_scores_components_with_a_design_doc(tmp_path: Path) -> None:
+    bench = make_benchmark(tmp_path / "bench", runs=1)
+    out = tmp_path / "eval"
+    args = ["eval", "triage", str(bench), "--variants", "none", "--reports", "--provider", "fake"]
+    args += ["--design-doc", str(DESIGN_DOC), "--out", str(out), "--label", "off", "--no-cache"]
+    result = runner.invoke(app, args)
+    if isinstance(result.exception, NotImplementedError):
+        raise result.exception
+    assert result.exit_code == 0, result.output
+    scores = json.loads((out / "triage_off.json").read_text(encoding="utf-8"))["reports"]
+    assert scores["rag"] is False and scores["retrieval_hit_at_k"] is None, "no RAG, no hit@k"
+    assert scores["component_correct"] is not None, "the design doc scores, it isn't retrieved"
 
 
 def test_cli_rejects_unknown_variants(tmp_path: Path) -> None:

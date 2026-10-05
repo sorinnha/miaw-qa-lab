@@ -90,13 +90,12 @@ class ClusteringScore:
     true_bugs: int  # distinct seeded bugs among the labelled events
     cluster_count_error: int  # predicted − true: > 0 split bugs, < 0 merged bugs
     labelled_events: int  # candidate events that match exactly one seeded bug
-    unlabelled_events: (
-        int  # candidate events matching no seed (noise, or a bug the sandbox didn't seed)
-    )
-    split_bugs: dict[str, int] = field(
-        default_factory=dict
-    )  # bug → clusters it was split into (> 1)
-    mixed_clusters: list[dict[str, Any]] = field(default_factory=list)  # clusters holding > 1 bug
+    # Candidate events matching no seed (noise, or a bug the sandbox didn't seed).
+    unlabelled_events: int
+    # Bug → number of clusters it was split into (only bugs split into more than one).
+    split_bugs: dict[str, int] = field(default_factory=dict)
+    # Clusters holding more than one bug, with the event count of each bug.
+    mixed_clusters: list[dict[str, Any]] = field(default_factory=list)
     seconds: float = 0.0
 
 

@@ -201,6 +201,14 @@ def eval_triage(
         str, typer.Option("--label", help="Name of this setting in the output files.")
     ] = "default",
     docs: Annotated[list[Path] | None, typer.Option("--docs", help="Design docs (RAG on).")] = None,
+    design_doc: Annotated[
+        Path | None,
+        typer.Option(
+            "--design-doc",
+            help="Design doc for scoring 'component correct' only, never sent to the model "
+            "(default: the first --docs file). Lets RAG-off runs be scored too.",
+        ),
+    ] = None,
     repo: Annotated[
         Path | None, typer.Option("--repo", help="Game source for code context.")
     ] = None,
@@ -239,7 +247,7 @@ def eval_triage(
             no_cache,
             config,
         )
-        design_doc = docs[0] if docs else None
+        design_doc = design_doc or (docs[0] if docs else None)
         result = run_triage_eval(benchmark_dir, chosen, options, reports, label, design_doc)  # type: ignore[arg-type]
         written = write_result(result, out, label)
     except USER_ERRORS as exc:
