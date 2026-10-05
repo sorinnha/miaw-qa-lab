@@ -1,4 +1,4 @@
-"""Spec 02 §2 table. YOU WRITE: xfail while ``normalize_message`` is a stub."""
+"""Spec 02 §2 table for ``normalize_message`` (an M2 learning task, D-030)."""
 
 import pytest
 
@@ -34,20 +34,17 @@ ROWS = [
 ]
 
 
-@pytest.mark.youwrite
 @pytest.mark.parametrize(("raw", "expected"), ROWS, ids=[r[0][:30] or "empty" for r in ROWS])
 def test_normalize_table(raw: str, expected: str) -> None:
     assert normalize_message(raw) == expected
 
 
-@pytest.mark.youwrite
 @pytest.mark.parametrize("raw", [r[0] for r in ROWS])
 def test_normalize_is_idempotent(raw: str) -> None:
     once = normalize_message(raw)
     assert normalize_message(once) == once
 
 
-@pytest.mark.youwrite
 @pytest.mark.parametrize(
     "raw", ["", " ", "'unterminated", "0x", "_", "123", "\n\t", "é ü 日本語 42", "a" * 5000]
 )

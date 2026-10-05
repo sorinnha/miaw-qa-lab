@@ -79,10 +79,9 @@ def test_make_retriever_picks_tfidf_without_provider(chunks: list[Chunk], tmp_pa
     assert isinstance(make_retriever(DocIndex(chunks=chunks), FakeProvider()), TfidfRetriever)
 
 
-# ---- YOU WRITE: cosine_top_k and everything that calls it ---------------------------------
+# ---- cosine_top_k and everything that calls it ------------------------------------------
 
 
-@pytest.mark.youwrite
 def test_cosine_top_k_orders_and_limits() -> None:
     matrix = np.array([[1.0, 0.0], [0.0, 1.0], [0.6, 0.8], [-1.0, 0.0]], dtype=np.float32)
     query = np.array([1.0, 0.0], dtype=np.float32)
@@ -94,7 +93,6 @@ def test_cosine_top_k_orders_and_limits() -> None:
     assert cosine_top_k(query, np.zeros((0, 2), dtype=np.float32), k=3) == []
 
 
-@pytest.mark.youwrite
 def test_embedding_retriever_on_fake_index(loaded: LoadedRun, tmp_path: Path) -> None:
     provider = FakeProvider()
     index = build_index([DESIGN_DOC], provider, index_dir=tmp_path)

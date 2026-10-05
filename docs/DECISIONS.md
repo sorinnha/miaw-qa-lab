@@ -309,3 +309,20 @@ One entry per real choice: what we decided, why, what else we considered, and wh
   - `evaluate_vision` ran end to end on a 3-run copy of the sample run with the fake VLM;
   - the fake-player pipeline wrote `visual_findings.jsonl`, and triage made 10 clusters (8 + 2 visual);
   - there are no numbers on real sandbox frames until Sora records the benchmark.
+
+## D-030 · 2026-10-05 · The eight learning tasks are written by Claude, at Sora's request
+- **Why:** Sora asked for a repo that works on download, with everything on `main`, after M4–M6 were built. The eight YOU WRITE stubs were the only Python/C# gaps: `normalize_message` and `cosine_top_k` stopped every triage run, `pairwise_prf` every eval, `magenta_ratio` every heuristic vision run. CLAUDE.md says to write a solution only when Sora asks twice; this was the second, explicit request (confirmed by choosing "write all of them").
+- **What:** `hello_events.py`, SB02 (`SeededInventory.GetSlot` + `SandboxSeedCatalog.SB02`), `normalize_message`, `cosine_top_k`, `StuckCalculator` + `StuckDetector.Tick`, `pairwise_prf`, `magenta_ratio`, `TurnPolicy.Decide`. Each follows its own docstring; their tests lost the `youwrite` marker and `YouWrite` category and now run as normal tests.
+- **Checked here:**
+  - `pytest python -q`: 320 passed, no xfails;
+  - `dotnet test tools/cs-check -c Release` (no filter): 196 passed;
+  - smoke compiles of all Unity projects against the stubs: 0 errors;
+  - `python scripts/hello_events.py` prints the docstring's table exactly;
+  - `scripts/ci_smoke.py` now runs the full triage smoke;
+  - with the fake player, `run_pipeline.ps1` → vision → triage gives 10 reports, exit 3; `benchmark.ps1` → `qalab eval triage` reproduces EXPECTED.md; `qalab vision dataset` → `qalab eval vision` scores the heuristic and ML rows.
+- **Not checked here:** `SeededInventoryTests` (it uses Unity's `LogAssert`) and everything else that needs Unity: the PC checklist.
+- **Consequences:**
+  - honesty: README §11 and INTERVIEW_PREP say Claude wrote them and Sora studied them, never "I wrote";
+  - LEARNING.md tracks studying and re-writing each one from memory, which is what makes them explainable;
+  - the `youwrite` pytest marker, `-IncludeYouWrite` in `unity_tests.ps1` and the CI filter `TestCategory!=YouWrite` stay as harmless infrastructure for new tasks;
+  - earlier decisions that describe these functions as stubs (D-006, D-015, D-025, D-028, D-029) describe how things stood then.

@@ -5,6 +5,7 @@ Plain functions over plain values, so each one can be checked by hand on a toy e
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Hashable, Sequence
 
 import numpy as np
@@ -15,7 +16,8 @@ def pairwise_prf(
 ) -> tuple[float, float, float]:
     """Pairwise precision, recall and F1 of a clustering against the true grouping.
 
-    YOU WRITE (Sora, M5). Item ``i`` belongs to true group ``true_labels[i]`` and to predicted
+    Learning task, written by Claude at Sora's request (D-030). Item ``i`` belongs to true group
+    ``true_labels[i]`` and to predicted
     cluster ``pred_labels[i]``. Look at every unordered pair of items ``{i, j}``:
 
     - **TP**: same predicted cluster and same true group (a correct merge);
@@ -37,7 +39,22 @@ def pairwise_prf(
 
     C# comparison: ``GroupBy(x => x).Sum(g => g.Count() * (g.Count() - 1) / 2)`` three times.
     """
-    raise NotImplementedError("YOU WRITE")
+    if len(true_labels) != len(pred_labels):
+        raise ValueError(
+            f"true_labels has {len(true_labels)} items but pred_labels has {len(pred_labels)}"
+        )
+
+    def pairs(groups: Counter[Hashable]) -> int:
+        """Unordered pairs inside groups: a group of n items holds n·(n−1)/2 of them."""
+        return sum(n * (n - 1) // 2 for n in groups.values())
+
+    true_positives = pairs(Counter(zip(true_labels, pred_labels, strict=True)))  # same in both
+    predicted_pairs = pairs(Counter(pred_labels))  # TP + FP
+    true_pairs = pairs(Counter(true_labels))  # TP + FN
+    precision = true_positives / predicted_pairs if predicted_pairs else 1.0
+    recall = true_positives / true_pairs if true_pairs else 1.0
+    f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
+    return float(precision), float(recall), float(f1)
 
 
 def cluster_count_error(predicted: int, true: int) -> int:

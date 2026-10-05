@@ -1,4 +1,4 @@
-"""CLI smoke and leakage tests. The end-to-end ones call normalize_message → youwrite."""
+"""CLI smoke and leakage tests."""
 
 import builtins
 import json
@@ -24,7 +24,7 @@ runner = CliRunner()
 
 
 def _invoke(args: list[str]) -> Result:
-    """Run the CLI; a YOU WRITE stub's NotImplementedError is re-raised so the test xfails."""
+    """Run the CLI; a NotImplementedError inside it is re-raised so its traceback shows."""
     result = runner.invoke(app, args)
     if isinstance(result.exception, NotImplementedError):
         raise result.exception
@@ -52,7 +52,6 @@ def test_report_html_without_bugs_json(tmp_path: Path) -> None:
     assert runner.invoke(app, ["report", "html", str(tmp_path)]).exit_code == 2
 
 
-@pytest.mark.youwrite
 def test_triage_run_smoke(tmp_path: Path) -> None:
     out = tmp_path / "report"
     result = _invoke(
@@ -80,7 +79,6 @@ def test_triage_run_smoke(tmp_path: Path) -> None:
     assert clusters.exit_code == 0 and "variant exact" in clusters.output
 
 
-@pytest.mark.youwrite
 def test_triage_never_opens_labels(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Leakage guard: labels.json must stay closed during qalab triage run."""
 
@@ -155,7 +153,6 @@ def test_validate_reports_corrupted_labels(tmp_path: Path) -> None:
     assert result.exit_code == 2 and "labels.json" in result.output
 
 
-@pytest.mark.youwrite
 def test_config_values_reach_the_pipeline(tmp_path: Path) -> None:
     toml = tmp_path / "qalab.toml"
     toml.write_text("[triage]\nmax_reports = 2\n", encoding="utf-8")

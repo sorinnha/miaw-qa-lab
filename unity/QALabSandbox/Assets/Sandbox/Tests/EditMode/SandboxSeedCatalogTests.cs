@@ -209,7 +209,7 @@ namespace QALab.Sandbox.Tests
                 {
                     if (Matches(entry.Match, e.Message, e.Stack)) matched.Add(entry.BugId);
                 }
-                // A seed without a catalog entry (SB02 until its YOU WRITE entry exists) matches nothing.
+                // A seed without a catalog entry matches nothing (every seed has one now).
                 var expected = new List<string>();
                 foreach (var entry in SandboxSeedCatalog.All()) if (entry.BugId == e.Id) expected.Add(e.Id);
                 CollectionAssert.AreEqual(expected, matched, e.Id + ": " + e.Message);
@@ -225,7 +225,7 @@ namespace QALab.Sandbox.Tests
             }
         }
 
-        [Test, Category("YouWrite")]
+        [Test]
         public void Sb02EntryMatchesTheSampleLabels()
         {
             Json.AssertSame(SampleEntry("SB02").ToString(), ToJson(SandboxSeedCatalog.SB02()));

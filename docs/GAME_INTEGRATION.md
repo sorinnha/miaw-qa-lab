@@ -76,7 +76,7 @@ Detector settings a game may need:
   through the same rate limit, screenshot and results.xml as the built-in detectors. Blocker and
   critical make the run exit with code 1.
 
-## 4. Write the game adapter (YOU WRITE, M7)
+## 4. Write the game adapter (M7)
 
 An adapter is the bot's strategy. A game adapter plays through the game's **own commands** (select a
 unit, read its legal moves, issue one, end the turn) instead of fake clicks. That keeps it robust to UI
@@ -85,11 +85,12 @@ changes, and its action log reads like a tester's notes.
 1. **Package Manager → QA Lab → Samples → Game adapter template → Import.** The files land in
    `Assets/Samples/QA Lab/<version>/Game adapter template/`. Move them next to your game scripts if you
    like. They have no `.asmdef`, so they compile into your game's assembly and can see its code.
-2. Write the decision rule, `TurnPolicy.Decide` (YOU WRITE). It's engine-free, so its tests run
-   without Unity: `dotnet test tools\cs-check -c Release --filter "FullyQualifiedName~TurnPolicy"`
-   (`tools/cs-check/SampleTests/TurnPolicyTests.cs`). Write it in the repo's copy
-   (`unity/com.miawworks.qalab/Samples~/GameAdapterTemplate/TurnPolicy.cs`) until the tests pass, then
-   import the sample.
+2. Check the decision rule, `TurnPolicy.Decide` (a random legal order for a random active unit, end
+   the turn after 30 orders). It's engine-free, so its tests run without Unity:
+   `dotnet test tools\cs-check -c Release --filter "FullyQualifiedName~TurnPolicy"`
+   (`tools/cs-check/SampleTests/TurnPolicyTests.cs`). Change it in the repo's copy
+   (`unity/com.miawworks.qalab/Samples~/GameAdapterTemplate/TurnPolicy.cs`) if your game needs a
+   smarter rule, keep the tests passing, then import the sample.
 3. Implement `IGameCommands` on the script that owns turns (for example your `TurnManager`):
    - `CanAct`: the player's turn and no animation or dialog in progress;
    - `ActiveUnits()` and `LegalOrders(unit)`: read them from your game rules;

@@ -12,14 +12,12 @@ new game is in [GAME_INTEGRATION.md](GAME_INTEGRATION.md); the design is in [ARC
 | AI-written reports with Gemini or Ollama, RAG over design docs and code | Built (M3) |
 | ProjectScanner (missing scripts, broken references, materials) | Built (M7) |
 | Game adapter contracts and template | Built (M7) |
-| Seeded bot, detectors, screenshots, results.xml, one-command pipeline | Built (M4). Not yet run in Unity: first run is on the PC checklist. The stuck detector is a learning task, skipped until written |
-| Benchmark and `qalab eval triage` (clustering and report scores against seeded ground truth) | Built (M5). Needs a recorded benchmark; `pairwise_prf` is a learning task, so scoring stops with `NotImplementedError` until it is written |
-| Vision: `qalab vision analyze` (missing textures, black screens, white placeholder boxes, UI overflow), visual bugs in reports, `qalab eval vision` | Built (M6). Needs real screenshots to tune; `magenta_ratio` is a learning task, so `--method heuristic` and `hybrid` stop with `NotImplementedError` until it is written (`--method vlm` works) |
+| Seeded bot, detectors, screenshots, results.xml, one-command pipeline | Built (M4). Not yet run in Unity: first run is on the PC checklist. |
+| Benchmark and `qalab eval triage` (clustering and report scores against seeded ground truth) | Built (M5). Needs a recorded benchmark |
+| Vision: `qalab vision analyze` (missing textures, black screens, white placeholder boxes, UI overflow), visual bugs in reports, `qalab eval vision` | Built (M6). Needs real screenshots to tune |
 
-Two learning tasks still gate the end-to-end triage run. Until `normalize_message` exists, every
-`qalab triage run` stops with `NotImplementedError: YOU WRITE`. Until `cosine_top_k` exists, so does a
-run with `--docs` and an embedding provider (fake, Ollama, Gemini); `--provider none` retrieves with
-TF-IDF instead.
+Everything Python-side runs today, offline included (`--provider none`). The Unity side needs the
+first-run steps in `docs/progress/PC_CHECKLIST.md`.
 
 ## 1. Set up once
 
@@ -271,13 +269,12 @@ metric definitions are in DECISIONS D-028.
 
 | Symptom | Cause and fix |
 |---|---|
-| `NotImplementedError: YOU WRITE` | A learning task is still a stub (`pytest python -m youwrite -rxX` lists them). |
 | `GEMINI_API_KEY is not set` (exit 2) | Put the key in `.env` at the repo root, or use `--provider none`. |
 | `qalab validate` reports bad lines | The run was written by an older package version, or the file was edited by hand: the message names the field. |
 | No run folder after Play | Auto-start is off; or the editor runs tests (auto-start is skipped there). |
 | `run_playtest.ps1` exit 3 | The player wrote no run folder: read the `player-*.log` it names (QA Lab didn't start, or the player crashed on load). |
 | The bot stands still | No baked NavMesh in the scene, or the game never called `QALab.RegisterPlayer`. The Console says which adapter started. |
-| `detector 'stuck' is not implemented yet` | The stuck detector is a learning task (PLAN.md M4); the rest of the run is fine. |
+| `detector '<name>' is not implemented yet` | A game detector that throws `NotImplementedException` is switched off for the run (shown as skipped in results.xml); the rest of the run is fine. |
 | No `fell_out_of_world` although the player fell | The game respawned the player first: set `QALab.KillPlaneY` above the game's own respawn height. |
 | A bug you expected is missing | Its level is below `-qalabMinLevel`, or it was grouped with another cluster: check `qalab triage clusters`. |
 | Two different bugs in one report | Try `--cluster exact`; if they share message and top frames, they are one signature by design. |

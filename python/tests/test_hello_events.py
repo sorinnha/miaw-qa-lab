@@ -1,4 +1,4 @@
-"""M0 YOU WRITE: scripts/hello_events.py counts per kind and per log level. xfail while a stub."""
+"""M0 learning task: scripts/hello_events.py counts per kind and per log level."""
 
 import importlib.util
 import json
@@ -39,7 +39,6 @@ def test_script_exists_and_has_the_entry_points() -> None:
     assert module.DEFAULT_EVENTS == SAMPLE_EVENTS
 
 
-@pytest.mark.youwrite
 def test_counts_match_the_sample_run() -> None:
     per_kind, per_level = _load_script().count_events(SAMPLE_EVENTS)
     expected_kind, expected_level = _expected()
@@ -49,7 +48,6 @@ def test_counts_match_the_sample_run() -> None:
     assert per_kind["log"] == 12 and per_level["warning"] == 3
 
 
-@pytest.mark.youwrite
 def test_blank_lines_are_skipped(tmp_path: Path) -> None:
     path = tmp_path / "events.jsonl"
     path.write_text('{"kind":"metric"}\n\n{"kind":"log","level":"error"}\n', encoding="utf-8")
@@ -71,13 +69,11 @@ level  warning      3
 """
 
 
-@pytest.mark.youwrite
 def test_main_prints_the_documented_tables(capsys: pytest.CaptureFixture[str]) -> None:
     assert _load_script().main([str(SAMPLE_EVENTS)]) == 0
     assert capsys.readouterr().out == EXPECTED_OUTPUT
 
 
-@pytest.mark.youwrite
 def test_main_defaults_to_the_sample_run(capsys: pytest.CaptureFixture[str]) -> None:
     assert _load_script().main([]) == 0
     assert capsys.readouterr().out == EXPECTED_OUTPUT

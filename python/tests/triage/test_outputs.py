@@ -1,4 +1,4 @@
-"""Spec 02 §11 outputs, built from fixture clusters so they don't depend on YOU WRITE code."""
+"""Spec 02 §11 outputs, built from fixture clusters so they don't depend on clustering."""
 
 import csv
 import json
@@ -54,7 +54,7 @@ def written(tmp_path: Path) -> tuple[Path, list[BugReport], list[Cluster]]:
         out=tmp_path / "out", provider="fake", docs=[DESIGN_DOC], max_reports=25
     )
     provider = FakeProvider()
-    # TF-IDF retrieval on purpose: the embedding path needs the YOU WRITE cosine_top_k.
+    # TF-IDF retrieval on purpose: it needs no embedding model.
     retriever = make_retriever(chunk_only_index([DESIGN_DOC]), None)
     reports = make_reports(clusters, runs, options, provider, retriever)
     meta = build_meta(runs, clusters, reports, options, provider, {"total": 1.0})

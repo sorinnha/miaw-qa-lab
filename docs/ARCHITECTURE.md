@@ -12,7 +12,7 @@ principles. Reasons for specific choices are in `docs/DECISIONS.md`.
 | Labels + seeded sandbox | C# | Ground truth from engine state (benchmark mode), SB01–SB16 | 01 | Built (M1, M4) |
 | Bot contracts | C# | `IBotAdapter`, `BotContext`, `BotAdapterRegistry`, `SeededRandom` | 01 | Built (M7 polish) |
 | Bot runner + built-in adapters | C# | Seeded exploration (NavMesh, UI crawler); action log | 01 | Built (M4), not yet run in Unity |
-| Detectors | C# | Falls, stuck (YOU WRITE), perf spikes, exception bursts, tunneling; results.xml, exit codes | 01 | Built (M4), not yet run in Unity |
+| Detectors | C# | Falls, stuck, perf spikes, exception bursts, tunneling; results.xml, exit codes | 01 | Built (M4), not yet run in Unity |
 | Screenshots + visual labels | C# | Frames for vision; labels from engine state | 01 | Built (M4), not yet run in Unity |
 | Project scanner | C# (Editor) | Missing scripts, broken references, null materials, error shaders | 01 | Built (M7) |
 | Triage | Python | Deduplicate, rank and explain bugs with evidence | 02 | Built (M2–M3) |
@@ -68,13 +68,13 @@ Runtime/
   Labels/   LabelRecorder · LabelBook · SeedCatalogEntry · VisualLabels · IVisualSeed · VisualLabelProbe
   Bot/      IBotAdapter · BotContext · BotAdapterRegistry · NamedRegistry · SeededRandom · BotActionData · IBotMover
             BotRunner (tracking mover) · NavMeshExplorerAdapter · UICrawlerAdapter · BuiltInAdapters
-  Detectors/ IDetector + DetectorFrame · DetectorHub · RateLimiter · StuckCalculator/StuckDetector (YOU WRITE)
+  Detectors/ IDetector + DetectorFrame · DetectorHub · RateLimiter · StuckCalculator/StuckDetector
             FallDetector · PerfSpikeDetector · ExceptionBurstCounter/Detector · KillPlane · TunnelingDetector (component)
   Capture/  Shots + ShotPlanner (engine-free) · ScreenshotService · ManualShotKey (F12)
   Results/  JUnitWriter (results.xml) · ExitCodes
 Editor/     QALabWindow · QALabMenu · BuildRunner · RunSummary · EditorCommandLine
             Scanner/ProjectScanner (Unity side) · Scanner/ScanReport (engine-free)
-Samples~/GameAdapterTemplate/   IGameCommands · TurnPolicy (YOU WRITE, tested in cs-check) · MyGameAdapter · MyGameQALabBootstrap
+Samples~/GameAdapterTemplate/   IGameCommands · TurnPolicy (tested in cs-check) · MyGameAdapter · MyGameQALabBootstrap
 Tests/EditMode (engine-free ones also run in tools/cs-check) · Tests/PlayMode
 ```
 

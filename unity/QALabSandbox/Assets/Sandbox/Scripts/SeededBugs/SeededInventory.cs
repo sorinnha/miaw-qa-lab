@@ -15,8 +15,8 @@ namespace QALab.Sandbox
         private readonly string[] _slots = { "Medkit", "Ammo", null, "Key", null };
 
         /// <summary>
-        /// YOU WRITE (M1, about 10 lines): return the item name in slot <paramref name="index"/>, or null
-        /// for an empty slot.
+        /// Learning task (M1), written by Claude at Sora's request (D-030): return the item name in slot
+        /// <paramref name="index"/>, or null for an empty slot.
         /// <list type="bullet">
         /// <item>Valid indices are 0 to <see cref="Size"/> − 1.</item>
         /// <item>For any other index: call <c>LabelRecorder.Trigger("SB02")</c> first, then log with
@@ -25,11 +25,16 @@ namespace QALab.Sandbox
         /// <item>Why Debug.LogError and not an exception? The HUD has to keep working after a bad index,
         /// and the sample run (the triage fixture) records SB02 as an error log, not an exception.</item>
         /// </list>
-        /// Tests: <c>Tests/EditMode/SeededInventoryTests.cs</c> (category YouWrite).
+        /// Tests: <c>Tests/EditMode/SeededInventoryTests.cs</c>.
         /// </summary>
         public string GetSlot(int index)
         {
-            throw new System.NotImplementedException("YOU WRITE");
+            if (index >= 0 && index < Size) return _slots[index];
+
+            // Label first: if logging ever threw, the ground truth would still say the seed fired.
+            LabelRecorder.Trigger("SB02");
+            Debug.LogError($"Inventory slot {index} out of range (size {Size})");
+            return null;
         }
     }
 }

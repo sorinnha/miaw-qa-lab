@@ -67,13 +67,14 @@ stay at version 0.1.0.
   - `qalab vision dataset` (split by run), `qalab vision train-ml`;
   - `qalab eval vision`: per-label P/R/F1, FP/100 frames, VLM calls, latency and cost, tuned on val and scored on test (D-029);
   - a non-fatal vision step in `run_pipeline.ps1` and the Jenkinsfile.
+- **Learning tasks written (D-030):** `normalize_message`, `cosine_top_k`, `pairwise_prf`, `magenta_ratio`, `hello_events`, SB02, the stuck detector and `TurnPolicy.Decide`, so triage, eval and vision run end to end from a fresh clone.
 - **Engine-free C# checked outside Unity:** `tools/cs-check` builds it as netstandard2.1 / C# 9 and runs its NUnit tests on .NET 8.
 - **Scripts and CI:**
   - `find_unity.ps1`, `unity_tests.ps1`, `link_sandbox_package.py`;
   - `build_sandbox.ps1`, `run_playtest.ps1` and `run_pipeline.ps1` (build → bot playtest + menu crawl → triage → report, M4);
   - GitHub Actions running ruff, pytest on Windows and Ubuntu, a smoke triage with the fake provider, and cs-check;
   - an example `ci/Jenkinsfile`.
-- **Docs:** `USER_GUIDE.md`, `GAME_INTEGRATION.md`, `ARCHITECTURE.md`, decisions D-001–D-029, and a single PC checklist (`docs/progress/PC_CHECKLIST.md`).
+- **Docs:** `USER_GUIDE.md`, `GAME_INTEGRATION.md`, `ARCHITECTURE.md`, decisions D-001–D-030, and a single PC checklist (`docs/progress/PC_CHECKLIST.md`).
 
 ### Changed
 
@@ -81,7 +82,7 @@ stay at version 0.1.0.
 
 ### Not built yet
 
-- M4 on the PC: the first Unity run of the bot, detectors and screenshots, the screenshot spike, the stuck detector (learning task).
-- M5 on the PC: recording the 20-seed benchmark, the E1–E3 numbers, `pairwise_prf` (learning task).
-- M6 on the PC: the vision dataset from the benchmark, H1–H4 numbers, `magenta_ratio` (learning task).
+- M4 on the PC: the first Unity run of the bot, detectors and screenshots, and the screenshot spike.
+- M5 on the PC: recording the 20-seed benchmark and the E1–E3 numbers.
+- M6 on the PC: the vision dataset from the benchmark and the H1–H4 numbers.
 - M7 on the PC: real-game integration, demo video, measured README results.

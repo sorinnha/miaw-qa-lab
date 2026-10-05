@@ -208,9 +208,8 @@ class DraftModels(FakeModels):
         return SimpleNamespace(embeddings=[SimpleNamespace(values=list(r)) for r in rows])
 
 
-@pytest.mark.youwrite
 def test_triage_run_with_gemini_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """`qalab triage run --provider gemini` with the SDK client mocked (needs YOU WRITE code)."""
+    """`qalab triage run --provider gemini` with the SDK client mocked."""
     from typer.testing import CliRunner
 
     from qalab.cli import app

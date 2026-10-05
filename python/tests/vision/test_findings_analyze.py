@@ -1,8 +1,4 @@
-"""visual_findings.jsonl, ``qalab vision analyze`` and the triage integration (spec 03).
-
-The VLM-only paths need no learning task; the heuristic and hybrid paths run ``magenta_ratio`` and
-triage runs ``normalize_message`` (both YOU WRITE), so those tests carry the marker.
-"""
+"""visual_findings.jsonl, ``qalab vision analyze`` and the triage integration (spec 03)."""
 
 import builtins
 import json
@@ -235,7 +231,6 @@ def test_vision_analyze_never_opens_labels(tmp_path: Path, monkeypatch: pytest.M
     assert (run_dir / FINDINGS_FILE).is_file()
 
 
-@pytest.mark.youwrite
 def test_heuristic_and_hybrid_analysis(tmp_path: Path) -> None:
     run = load_run(copy_run(tmp_path, "20261005T103000Z-s42"))
     heuristic = analyze_run(run, AnalyzeOptions(method="heuristic"))
@@ -254,7 +249,6 @@ def test_heuristic_and_hybrid_analysis(tmp_path: Path) -> None:
     assert hybrid.labels["missing_texture"] == 1 and hybrid.labels["black_screen"] == 1
 
 
-@pytest.mark.youwrite
 def test_visual_bugs_reach_the_report(tmp_path: Path) -> None:
     run_dir = copy_run(tmp_path, "20261005T103000Z-s42")
     analyzed = runner.invoke(app, ["vision", "analyze", str(run_dir), "--method", "heuristic"])

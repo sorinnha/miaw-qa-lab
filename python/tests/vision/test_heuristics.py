@@ -1,7 +1,4 @@
-"""Spec 03 heuristics on synthetic frames and on the sample run's screenshots.
-
-Anything that runs ``magenta_ratio`` (Sora's, YOU WRITE) carries the marker, including ``analyze``.
-"""
+"""Spec 03 heuristics on synthetic frames and on the sample run's screenshots."""
 
 import numpy as np
 import pytest
@@ -69,10 +66,9 @@ def test_score_is_monotonic_with_the_threshold_as_the_cut() -> None:
     assert to_score(0.1, 0.9) < to_score(0.2, 0.9) < 0.5
 
 
-# ---- magenta and the full analysis (YOU WRITE: magenta_ratio) --------------------------------
+# ---- magenta and the full analysis ------------------------------------------------------------
 
 
-@pytest.mark.youwrite
 def test_magenta_ratio_matches_the_spec_rule() -> None:
     assert magenta_ratio(frame((255, 0, 255))) == 1.0
     assert magenta_ratio(frame((90, 140, 90))) == 0.0
@@ -82,7 +78,6 @@ def test_magenta_ratio_matches_the_spec_rule() -> None:
     assert magenta_ratio(np.zeros((0, 0, 3), dtype=np.uint8)) == 0.0
 
 
-@pytest.mark.youwrite
 def test_magenta_edges_and_the_uint8_trap() -> None:
     assert magenta_ratio(frame((181, 79, 181))) == 1.0, "just inside every bound"
     assert magenta_ratio(frame((180, 0, 200))) == 0.0, "R must be > 180 (180 is not)"
@@ -95,7 +90,6 @@ def test_magenta_edges_and_the_uint8_trap() -> None:
     assert magenta_ratio(frame((200, 0, 250))) == 1.0
 
 
-@pytest.mark.youwrite
 def test_analyze_synthetic_frames() -> None:
     labels = lambda img: sorted(f.label for f in heuristics.analyze(img))  # noqa: E731
     assert labels(gradient()) == [], "a clean frame"
@@ -113,7 +107,6 @@ def test_analyze_synthetic_frames() -> None:
     ] == ["missing_texture"]
 
 
-@pytest.mark.youwrite
 @pytest.mark.parametrize(
     ("shot", "expected"),
     [

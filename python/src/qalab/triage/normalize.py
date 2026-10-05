@@ -27,7 +27,8 @@ WHITESPACE = re.compile(r"\s+")
 def normalize_message(message: str) -> str:
     """Replace volatile parts of a log message with placeholders (spec 02 §2, in table order).
 
-    YOU WRITE (Sora). Apply the module-level patterns in this order, each with ``pattern.sub``:
+    Learning task, written by Claude at Sora's request (D-030). Applies the module-level patterns in
+    this order, each with ``pattern.sub``:
     1. ``GUID`` → ``<guid>``   2. ``HEX_ADDRESS`` → ``<hex>``   3. ``QUOTED`` → ``<str>``
     4. ``HEX_ID_AFTER_UNDERSCORE`` → ``<id>``   5. ``NUMBER`` → ``<n>``
     6. ``WHITESPACE`` → one space, then ``strip()``.
@@ -36,4 +37,14 @@ def normalize_message(message: str) -> str:
 
     C# comparison: ``Regex.Replace(message, pattern, "<n>")`` chained six times.
     """
-    raise NotImplementedError("YOU WRITE")
+    # Order matters: a GUID or 0x address contains digits, so NUMBER must run after them, and a
+    # quoted name like 'Grass_01' must become <str> before NUMBER could turn it into 'Grass_<n>'.
+    for pattern, placeholder in (
+        (GUID, "<guid>"),
+        (HEX_ADDRESS, "<hex>"),
+        (QUOTED, "<str>"),
+        (HEX_ID_AFTER_UNDERSCORE, "<id>"),
+        (NUMBER, "<n>"),
+    ):
+        message = pattern.sub(placeholder, message)
+    return WHITESPACE.sub(" ", message).strip()
