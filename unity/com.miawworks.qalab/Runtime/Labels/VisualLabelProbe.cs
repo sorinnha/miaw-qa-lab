@@ -8,9 +8,9 @@ namespace MiawWorks.QALab
     /// Asks the registered <see cref="IVisualSeed"/>s what is visible before each screenshot (benchmark mode
     /// only) and offers the visibility tests the spec describes, so every seed answers the same way:
     /// a renderer counts when it is inside the camera frustum, its projected bounds cover at least 1% of
-    /// the screen and nothing blocks the line of sight to its centre; a UI element counts when it is
-    /// active and its rectangle is on screen. These are heuristics: a renderer half hidden behind a wall
-    /// whose centre is visible still counts. Main thread only.
+    /// the screen and nothing but the player blocks the line of sight to its centre; a UI element counts
+    /// when it is active and its rectangle is on screen. These are heuristics: a renderer half hidden
+    /// behind a wall whose centre is visible still counts. Main thread only.
     /// </summary>
     public static class VisualLabelProbe
     {
@@ -68,13 +68,25 @@ namespace MiawWorks.QALab
             if (!GeometryUtility.TestPlanesAABB(Planes, bounds)) return false;
             if (ScreenCoverage(camera, bounds) < minCoverage) return false;
 #if QALAB_PHYSICS
+            // Anything between the camera and the renderer's centre hides it, except the renderer itself
+            // and the registered player: a follow camera looks over the player's shoulder, so the
+            // player's own collider sits on the line to everything straight ahead.
             var eye = camera.transform.position;
-            if (Physics.Linecast(eye, bounds.center, out var hit, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            var toCenter = bounds.center - eye;
+            var distance = toCenter.magnitude;
+            if (distance > 0.01f)
             {
-                var hitTransform = hit.collider.transform;
-                if (hitTransform != renderer.transform && !hitTransform.IsChildOf(renderer.transform)
-                    && !renderer.transform.IsChildOf(hitTransform))
+                var player = QALab.Player;
+                var hits = Physics.RaycastAll(eye, toCenter / distance, distance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+                foreach (var hit in hits)
                 {
+                    var hitTransform = hit.collider.transform;
+                    if (hitTransform == renderer.transform || hitTransform.IsChildOf(renderer.transform)
+                        || renderer.transform.IsChildOf(hitTransform))
+                    {
+                        continue;
+                    }
+                    if (player != null && (hitTransform == player || hitTransform.IsChildOf(player))) continue;
                     return false;   // something else is in the way
                 }
             }

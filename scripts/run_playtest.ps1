@@ -23,7 +23,7 @@ param(
     [string]$Scene = "Sandbox_Level01",
     [switch]$Benchmark,
     [string]$Out = (Join-Path (Split-Path $PSScriptRoot -Parent) "runs"),
-    [string]$Seeds = "all",
+    [string[]]$Seeds = @("all"),
     [double]$ShotEvery = 5,
     [string]$Player = (Join-Path (Split-Path $PSScriptRoot -Parent) "Builds\Sandbox\QALabSandbox.exe"),
     [int]$TimeoutS = 0
@@ -47,7 +47,7 @@ $playerArgs = @(
     "-qalabDuration", $Duration.ToString($inv),
     "-qalabAdapter", $Adapter,
     "-qalabShotEvery", $ShotEvery.ToString($inv),
-    "-qalabSeeds", $Seeds,
+    "-qalabSeeds", ($Seeds -join ","),   # -Seeds SB01,SB06 arrives as a list
     "-qalabQuitOnEnd",
     "-screen-fullscreen", "0", "-screen-width", "1280", "-screen-height", "720",
     "-logFile", "`"$log`""

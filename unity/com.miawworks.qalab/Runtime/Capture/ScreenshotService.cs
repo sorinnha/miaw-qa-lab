@@ -19,6 +19,9 @@ namespace MiawWorks.QALab
     /// <c>screenshot</c> event is written. In benchmark runs the visual seeds are asked what is on screen
     /// in the same frame, and the answer goes to labels.json. Encoding a PNG takes milliseconds, so the
     /// host leaves the next frame out of the frame-time stats (the observer effect).
+    /// In batch mode there is no screen and no end-of-frame rendering, so the host captures right away
+    /// (<see cref="Capture"/>), and without a camera there is nothing to capture: no shot is planned
+    /// (<see cref="CanCapture"/>), which is not an error.
     /// </summary>
     internal sealed class ScreenshotService
     {
@@ -41,6 +44,12 @@ namespace MiawWorks.QALab
             _onError = onError;
             Directory.CreateDirectory(Path.Combine(runDir, Shots.Folder));
         }
+
+        /// <summary>
+        /// False in batch mode without a <c>MainCamera</c>-tagged camera: <c>camera_render</c> has nothing
+        /// to render. The host plans no shot then, so detector events never point to a missing file.
+        /// </summary>
+        public static bool CanCapture => !Application.isBatchMode || Camera.main != null;
 
         /// <summary>A coroutine: waits for the end of this frame, then captures <paramref name="shot"/>.</summary>
         public IEnumerator CaptureAtEndOfFrame(PlannedShot shot)

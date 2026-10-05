@@ -1,3 +1,6 @@
+// The built-in bots exist only when the project has the AI module and uGUI (the package's version
+// defines), so these tests compile under the same conditions.
+#if QALAB_AI && QALAB_UGUI
 using MiawWorks.QALab;
 using NUnit.Framework;
 using UnityEngine;
@@ -45,3 +48,4 @@ namespace MiawWorks.QALab.Tests
         }
     }
 }
+#endif

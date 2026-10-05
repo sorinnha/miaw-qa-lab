@@ -71,7 +71,7 @@ def test_detector_cluster_facts_and_screenshots(runs: dict[str, LoadedRun]) -> N
     context = build_context(make_cluster(loaded, SB06_FELL), runs)
     assert context.facts["detector"] == "fell_out_of_world"
     assert context.facts["detector_severity"] == "critical"
-    assert context.detector_details["tile"] == "T_17"
+    assert context.detector_details["kill_plane_y"] == -5.5
     assert context.screenshots == ["shots/000003.png"]
     assert context.events[0].message.startswith("fell_out_of_world (critical)")
     assert "detector_details" in context.to_prompt_vars()["cluster_json"]

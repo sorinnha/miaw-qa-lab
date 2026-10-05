@@ -109,6 +109,15 @@ namespace MiawWorks.QALab.Tests
         }
 
         [Test]
+        public void CharactersXmlForbidsAreReplacedNotThrown()
+        {
+            var results = new RunResults { RunId = "r" };
+            results.InternalErrors.Add("bad \u0001 byte and an emoji \U0001F600");
+            var error = Case(XDocument.Parse(JUnitWriter.ToXml(results)), "no_internal_errors").Element("error");
+            Assert.AreEqual("bad ? byte and an emoji \U0001F600", error.Value);
+        }
+
+        [Test]
         public void TextIsEscapedAndTheFileIsUtf8WithoutBomAndLf()
         {
             var results = new RunResults { RunId = "r" };

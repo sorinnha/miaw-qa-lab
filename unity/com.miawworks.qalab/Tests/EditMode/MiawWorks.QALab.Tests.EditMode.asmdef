@@ -9,6 +9,9 @@
     "precompiledReferences": ["nunit.framework.dll", "Newtonsoft.Json.dll"],
     "autoReferenced": false,
     "defineConstraints": ["UNITY_INCLUDE_TESTS"],
-    "versionDefines": [],
+    "versionDefines": [
+        { "name": "com.unity.modules.ai", "expression": "1.0.0", "define": "QALAB_AI" },
+        { "name": "com.unity.ugui", "expression": "1.0.0", "define": "QALAB_UGUI" }
+    ],
     "noEngineReferences": false
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using MiawWorks.QALab;
 using UnityEngine;
@@ -46,12 +47,16 @@ namespace QALab.Sandbox
         public bool IsVisible(Camera camera) =>
             SandboxSeeds.IsEnabled(BugId) && IsOverflowing && VisualLabelProbe.IsOnScreen(label.rectTransform);
 
-        /// <summary><c>Score: 9999</c>; with <paramref name="abbreviate"/>, <c>Score: 12.3K</c> from 10000.</summary>
+        /// <summary>
+        /// <c>Score: 9999</c>; with <paramref name="abbreviate"/>, <c>Score: 12.3K</c> from 10000. Rounded down,
+        /// so 999,999 shows 999.9K, never a misleading 1000K.
+        /// </summary>
         public static string Format(int score, bool abbreviate)
         {
             if (!abbreviate || score < 10000) return "Score: " + score.ToString(CultureInfo.InvariantCulture);
-            var value = score >= 1000000 ? (score / 1000000f).ToString("0.#", CultureInfo.InvariantCulture) + "M"
-                : (score / 1000f).ToString("0.#", CultureInfo.InvariantCulture) + "K";
+            var value = score >= 1000000
+                ? (Math.Floor(score / 100000.0) / 10).ToString("0.#", CultureInfo.InvariantCulture) + "M"
+                : (Math.Floor(score / 100.0) / 10).ToString("0.#", CultureInfo.InvariantCulture) + "K";
             return "Score: " + value;
         }
     }

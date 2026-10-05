@@ -53,7 +53,9 @@ namespace QALab.Sandbox
                 player.TeleportTo(new Vector3(SandboxLayout.GapCenterX, 1.1f, SandboxLayout.NorthWestRoomZ0 - 2f));
             }
             if (GUILayout.Button("SB08  GC burst now")) gcZone.RequestBurst();
-            if (GUILayout.Button("SB09  Look at Crate_07")) player.TeleportTo(new Vector3(29.5f, 1.1f, 22.5f));
+            // Beside the crate, not behind it: the follow camera then sees it at about 2% of the screen,
+            // with the player off the line of sight.
+            if (GUILayout.Button("SB09  Look at Crate_07")) player.TeleportTo(new Vector3(31.1f, 1.1f, 27.5f));
             if (GUILayout.Button("SB10  Black out the camera now")) cameraZone.RequestBlackout();
             if (GUILayout.Button("SB11  +10000 points")) score.AddPoints(10000);
             if (GUILayout.Button("SB12/SB16  Go to the ballistics range"))

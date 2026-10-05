@@ -129,7 +129,7 @@ namespace MiawWorks.QALab
                     else if (d.Skipped != null)
                     {
                         xml.WriteStartElement("skipped");
-                        xml.WriteAttributeString("message", d.Skipped);
+                        xml.WriteAttributeString("message", Clean(d.Skipped));
                         xml.WriteEndElement();
                     }
                     else if (d.Count > 0)
@@ -181,24 +181,48 @@ namespace MiawWorks.QALab
         {
             xml.WriteStartElement("property");
             xml.WriteAttributeString("name", name);
-            xml.WriteAttributeString("value", value ?? string.Empty);
+            xml.WriteAttributeString("value", Clean(value));
             xml.WriteEndElement();
+        }
+
+        /// <summary>
+        /// Exception messages can hold characters XML 1.0 forbids (e.g. U+0001), and XmlWriter throws on
+        /// them; results.xml must still be written, so they become '?'.
+        /// </summary>
+        public static string Clean(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return string.Empty;
+            var clean = new StringBuilder(text.Length);
+            for (var i = 0; i < text.Length; i++)
+            {
+                var c = text[i];
+                if (i + 1 < text.Length && XmlConvert.IsXmlSurrogatePair(text[i + 1], c))
+                {
+                    clean.Append(c).Append(text[i + 1]);
+                    i++;
+                }
+                else
+                {
+                    clean.Append(XmlConvert.IsXmlChar(c) ? c : '?');
+                }
+            }
+            return clean.ToString();
         }
 
         private static void StartCase(XmlWriter xml, string classname, string name)
         {
             xml.WriteStartElement("testcase");
             xml.WriteAttributeString("classname", classname);
-            xml.WriteAttributeString("name", name);
+            xml.WriteAttributeString("name", Clean(name));
             xml.WriteAttributeString("time", "0");
         }
 
         private static void Problem(XmlWriter xml, string element, string message, string type, string body)
         {
             xml.WriteStartElement(element);
-            xml.WriteAttributeString("message", message);
-            xml.WriteAttributeString("type", type);
-            xml.WriteString(body);
+            xml.WriteAttributeString("message", Clean(message));
+            xml.WriteAttributeString("type", Clean(type));
+            xml.WriteString(Clean(body));
             xml.WriteEndElement();
         }
     }

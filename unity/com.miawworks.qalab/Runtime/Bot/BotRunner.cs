@@ -104,6 +104,7 @@ namespace MiawWorks.QALab
         {
             if (!_running) return;
             Guard("End", () => _adapter.End(Context));
+            if (!_running) return;   // End threw: Guard already stopped the bot and wrote bot_stopped
             _running = false;
             _mover.Stop();
             _writer.Marker("bot_stopped", new JObject { ["reason"] = reason, ["steps"] = Context.Step });
