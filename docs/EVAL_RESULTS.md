@@ -85,11 +85,14 @@ It prints frames and labels per split. Copy any warning about thin test classes 
 ### Results per label
 Reproduce:
 ```
-qalab vision train-ml datasets\vision_v1                       # optional, for the ml row (H4)
 qalab eval vision datasets\vision_v1 --methods heuristic,vlm,ml,hybrid --provider gemini --label v1
 ```
 Fill `cost_per_1k_images` in `qalab.toml [vision]` from the provider's pricing page first, or the cost
-column stays n/a. Paste the table from `eval\vision_v1.md`:
+column stays n/a. Eval trains its own ML baseline (`qalab vision train-ml` is only for `vision analyze
+--method ml`). Paste both tables from `eval\vision_v1.md`: the main one below, and the per-label
+false positives (that one decides H1). If it shows a `heuristic (qalab.toml)` row, your configured
+thresholds differ from the tuned ones: report both. If it warns about unusable VLM answers, re-run
+before trusting the vlm and hybrid rows.
 
 | Method | Split | missing_texture P/R | black_screen P/R | ui_overflow P/R | placeholder_ui P/R | Macro F1 | FP/100 frames | VLM calls | p95 latency ms | Est. cost |
 |---|---|---|---|---|---|---|---|---|---|---|

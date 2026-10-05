@@ -147,13 +147,14 @@ Built in the cloud (D-029). It has only run on the sample run's 160×90 shots. I
 benchmark (`benchmarks\seeded_v1`). Steps in order:
 
 - [ ] YOU WRITE `magenta_ratio` (table above) until `pytest python/tests/vision -m youwrite -rxX` shows only `X`, then `/review-mine`, `/teach`, LEARNING.md.
-- [ ] Look at real frames first: `qalab vision analyze runs\<a benchmark run> --method heuristic` → `visual_findings.jsonl`. Open the shots of SB09 (Crate_07) and SB10. Spec 03's trap: URP bloom and tonemapping shift the magenta. If 000004-style frames are missed, write down the pixel colours you see and the decision in DECISIONS.md (don't loosen the rule silently).
+- [ ] Look at real frames first. Copy one benchmark run out of `benchmarks\seeded_v1` (findings written inside the benchmark would change later `eval triage` numbers), then `qalab vision analyze <the copy> --method heuristic` → `visual_findings.jsonl`. Open the shots of SB09 (Crate_07) and SB10. Spec 03's trap: URP bloom and tonemapping shift the magenta. If 000004-style frames are missed, write down the pixel colours you see and the decision in DECISIONS.md (don't loosen the rule silently).
 - [ ] Commit H1–H4 in `docs/EVAL_RESULTS.md` (adjust them if you disagree) **before** running.
 - [ ] `qalab vision dataset benchmarks\seeded_v1 --out datasets\vision_v1`. Copy the per-split counts and warnings into EVAL_RESULTS. Expect few `ui_overflow` frames before 80 s of a run (SB11 grows with the score).
-- [ ] Optional H4: `qalab vision train-ml datasets\vision_v1`.
+- [ ] Optional: `qalab vision train-ml datasets\vision_v1` saves a model for `vision analyze --method ml`. Eval trains its own, so H4 doesn't need it.
 - [ ] Set `cost_per_1k_images` in `qalab.toml [vision]` from your provider's pricing page, or leave it out (the cost column stays n/a).
 - [ ] `qalab eval vision datasets\vision_v1 --methods heuristic,vlm,ml,hybrid --provider gemini --label v1` (the exact command is in EVAL_RESULTS). Gemini's free tier is for sandbox frames only (D-021).
-- [ ] Paste the table, copy both charts to `docs/img/`, write the 6 error reasons, then say for each of H1–H4 whether it held, with the numbers. Then fill README §6.
+- [ ] Paste both tables, copy both charts to `docs/img/`, write the 6 error reasons, then say for each of H1–H4 whether it held, with the numbers. Then fill README §6.
+- [ ] Copy the printed tuned thresholds into `qalab.toml [vision] black_ratio / magenta_ratio`, so `vision analyze` and the pipeline run what was measured. Commit that change with a line in DECISIONS.
 - [ ] Acceptance: `scripts\run_pipeline.ps1 -Seed 42 -Duration 120 -Open`. `report.html` shows `visual:missing_texture` / `visual:black_screen` bugs with their screenshots (if seed 42's bot saw them).
 - [ ] Commit `docs/` only (`datasets/` and `eval/` stay out of git).
 - [ ] Release v0.4.0 (ask first).

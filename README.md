@@ -218,9 +218,10 @@ The full list, with alternatives and consequences, is in [docs/DECISIONS.md](doc
 - **No measured results yet.** The triage (M5) and vision (M6) evaluations are built but have only
   run on copies of the hand-made sample run, and the bot has never played. So there are no
   precision, recall or detection numbers.
-- **Vision is tuned on synthetic frames.** The heuristics' thresholds come from the sandbox's val
-  split; post-processing in a real game (bloom, tonemapping) can shift the magenta, and
-  `ui_overflow` has no heuristic at all (H1, H2).
+- **Vision is tuned on synthetic frames.** Eval tunes the heuristics' thresholds on the sandbox's val
+  split; `qalab vision analyze` uses the ones in `qalab.toml` (spec 03's starting values until the
+  tuned ones are copied there). Post-processing in a real game (bloom, tonemapping) can shift the
+  magenta, and `ui_overflow` has no heuristic at all (H1, H2).
 - **The Unity code hasn't run in Unity yet.**
   - It was written in cloud sessions without Unity. The engine-free part is compiled and tested in
     .NET, and the rest was only compiled against stand-in UnityEngine types.

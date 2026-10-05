@@ -150,7 +150,8 @@ qalab vision analyze runs\* --method hybrid --provider gemini   # heuristics + t
 | `hybrid` | heuristics first; the model only near UI actions/detector events and on every 5th other frame (`qalab.toml [vision]`) | a fraction of `vlm` |
 | `ml` | the labels the baseline was trained on (`--ml-model`, from `qalab vision train-ml`) | free |
 
-Each label with score ≥ 0.5 becomes a `visual:<label>` bug (`black_screen` major, others minor), with
+The heuristic thresholds live in `qalab.toml [vision]` (`black_ratio`, `magenta_ratio`);
+`qalab eval vision` prints tuned values for them. Each label with score ≥ 0.5 becomes a `visual:<label>` bug (`black_screen` major, others minor), with
 the clearest screenshot attached. `events.jsonl` is never changed: delete `visual_findings.jsonl` to
 triage without vision. The model only sees screenshots; use `heuristic` or a local model for
 unreleased games.
