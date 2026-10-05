@@ -22,10 +22,13 @@ first-run steps in `docs/progress/PC_CHECKLIST.md`.
 ## 1. Set up once
 
 ```powershell
-py -3.12 -m venv .venv ; .\.venv\Scripts\Activate.ps1 ; pip install -e ".\python[dev]"
-pip install -e ".\python[dev,gemini]"     # only if you'll use Gemini
+scripts\setup.ps1                 # add -Gemini if you'll use Gemini; it ends by running the tests
+.\.venv\Scripts\Activate.ps1
 qalab --help
 ```
+
+By hand instead: `py -3.12 -m venv .venv ; .\.venv\Scripts\Activate.ps1 ; pip install -e ".\python[dev]"`
+(`".\python[dev,gemini]"` for Gemini).
 
 On Linux/macOS: `python3 -m venv .venv && . .venv/bin/activate && pip install -e "./python[dev]"`.
 

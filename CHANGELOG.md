@@ -68,6 +68,7 @@ stay at version 0.1.0.
   - `qalab eval vision`: per-label P/R/F1, FP/100 frames, VLM calls, latency and cost, tuned on val and scored on test (D-029);
   - a non-fatal vision step in `run_pipeline.ps1` and the Jenkinsfile.
 - **Learning tasks written (D-030):** `normalize_message`, `cosine_top_k`, `pairwise_prf`, `magenta_ratio`, `hello_events`, SB02, the stuck detector and `TurnPolicy.Decide`, so triage, eval and vision run end to end from a fresh clone.
+- **One-command setup:** `scripts/setup.ps1` creates the venv, installs qalab (optionally with the Gemini SDK), creates `.env` from the template, validates the sample run and runs the tests.
 - **Engine-free C# checked outside Unity:** `tools/cs-check` builds it as netstandard2.1 / C# 9 and runs its NUnit tests on .NET 8.
 - **Scripts and CI:**
   - `find_unity.ps1`, `unity_tests.ps1`, `link_sandbox_package.py`;
