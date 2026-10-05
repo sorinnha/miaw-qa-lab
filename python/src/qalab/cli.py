@@ -11,13 +11,14 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from qalab.config import NO_DOTENV_ENV, load_config, load_dotenv
+from qalab.config import NO_DOTENV_ENV, Config, load_config, load_dotenv
 from qalab.io.runs import discover_runs, validate_labels_file, validate_run
-from qalab.llm.base import LLMError
+from qalab.llm.base import LLMError, LLMProvider
 from qalab.llm.factory import make_provider
 from qalab.report.html import rerender_html
 from qalab.triage.cluster import VARIANTS
 from qalab.triage.pipeline import TriageOptions, load_runs, run_triage, triage_clusters
+from qalab.vision.findings import validate_findings_file
 
 app = typer.Typer(no_args_is_help=True, help="Miaw QA Lab tools.")
 triage_app = typer.Typer(no_args_is_help=True, help="From run folders to ranked bug reports.")
@@ -25,9 +26,11 @@ report_app = typer.Typer(no_args_is_help=True, help="Re-render report files.")
 eval_app = typer.Typer(
     no_args_is_help=True, help="Score triage and vision against seeded ground truth."
 )
+vision_app = typer.Typer(no_args_is_help=True, help="Find visual bugs in screenshots (spec 03).")
 app.add_typer(triage_app, name="triage")
 app.add_typer(report_app, name="report")
 app.add_typer(eval_app, name="eval")
+app.add_typer(vision_app, name="vision")
 console = Console()
 
 EXIT_OK = 0
@@ -60,7 +63,7 @@ def _setup(verbose: Annotated[bool, typer.Option("--verbose", "-v")] = False) ->
 def validate(
     run_dirs: Annotated[list[Path], typer.Argument(help="Run folders or globs.")],
 ) -> None:
-    """Schema-check run.json, events.jsonl (and labels.json if present)."""
+    """Schema-check run.json, events.jsonl (and labels.json, visual_findings.jsonl if present)."""
     runs = discover_runs(run_dirs)
     if not runs:
         console.print("[red]no run folders found[/red]")
@@ -69,7 +72,8 @@ def validate(
     for run_dir in runs:
         report = validate_run(run_dir)
         labels_error = validate_labels_file(run_dir)
-        ok = report.ok and labels_error is None
+        findings_errors = validate_findings_file(run_dir)
+        ok = report.ok and labels_error is None and not findings_errors
         failed |= not ok
         status = "[green]ok[/green]" if ok else "[red]FAIL[/red]"
         console.print(f"{status} {run_dir}: {report.valid_events} events")
@@ -77,6 +81,8 @@ def validate(
             console.print(f"  run.json: {report.run_json_error}")
         for bad in report.invalid[:20]:
             console.print(f"  line {bad.line}: {bad.error}")
+        for error in findings_errors[:20]:
+            console.print(f"  visual_findings.jsonl {error}")
         if labels_error:
             console.print(f"  labels.json: {labels_error}")
     raise typer.Exit(EXIT_ERROR if failed else EXIT_OK)
@@ -253,5 +259,185 @@ def eval_triage(
         console.print(f"[red]error:[/red] {exc}")
         raise typer.Exit(EXIT_ERROR) from exc
     # soft_wrap: long table rows stay on one line, so the printed Markdown can be pasted as is.
+    console.print(to_markdown(result), soft_wrap=True, markup=False, highlight=False)
+    console.print("wrote " + ", ".join(str(p) for p in written))
+
+
+def _vision_provider(
+    name: str | None, model: str | None, no_cache: bool, config_path: Path | None
+) -> tuple[Config, LLMProvider | None]:
+    """The provider for vision commands: --provider, QALAB_PROVIDER or qalab.toml, cache-wrapped."""
+    from qalab.triage.prompts import load_prompt
+
+    config = load_config(config_path)
+    chosen = (name or os.environ.get("QALAB_PROVIDER") or config.llm.provider).lower()
+    same = chosen == config.llm.provider.lower()
+    return config, make_provider(
+        chosen,
+        model or os.environ.get("QALAB_MODEL") or (config.llm.model if same else None),
+        use_cache=not no_cache,
+        prompt_version=load_prompt("vision_v1").version,
+    )
+
+
+@vision_app.command("analyze")
+def vision_analyze(
+    run_dirs: Annotated[list[Path], typer.Argument(help="Run folders or globs.")],
+    method: Annotated[
+        str | None,
+        typer.Option("--method", help="heuristic | vlm | ml | hybrid (default: qalab.toml)"),
+    ] = None,
+    provider: ProviderOpt = None,
+    model: Annotated[str | None, typer.Option("--model")] = None,
+    ml_model: Annotated[
+        Path | None, typer.Option("--ml-model", help="Model from qalab vision train-ml.")
+    ] = None,
+    no_cache: Annotated[bool, typer.Option("--no-cache")] = False,
+    config: ConfigOpt = None,
+) -> None:
+    """Label every screenshot; writes visual_findings.jsonl into each run folder."""
+    from qalab.vision.analyze import METHODS, AnalyzeOptions, analyze_run
+    from qalab.vision.heuristics import Thresholds
+    from qalab.vision.ml import MlModel
+
+    try:
+        cfg = load_config(config)
+        chosen = (method or cfg.vision.method).lower()
+        if chosen not in METHODS:
+            raise ValueError(f"--method must be one of {', '.join(METHODS)}, not {chosen!r}")
+        llm = None
+        if chosen in ("vlm", "hybrid"):
+            cfg, llm = _vision_provider(provider, model, no_cache, config)
+        options = AnalyzeOptions(
+            method=chosen,  # type: ignore[arg-type]
+            provider=llm,
+            ml_model=MlModel.load(ml_model) if ml_model else None,
+            thresholds=Thresholds(
+                black_ratio=cfg.vision.black_ratio, magenta_ratio=cfg.vision.magenta_ratio
+            ),
+            hybrid_every_n=cfg.vision.hybrid_every_n,
+            hybrid_window_s=cfg.vision.hybrid_window_s,
+            max_retries=cfg.llm.max_retries,
+        )
+        runs = load_runs(run_dirs)
+        summaries = [analyze_run(loaded, options) for loaded in runs.values()]
+    except USER_ERRORS as exc:
+        console.print(f"[red]error:[/red] {exc}")
+        raise typer.Exit(EXIT_ERROR) from exc
+    for s in summaries:
+        found = ", ".join(f"{label}={n}" for label, n in sorted(s.labels.items())) or "nothing"
+        extra = f", {s.vlm_calls} VLM calls ({s.vlm_errors} failed)" if s.vlm_calls else ""
+        missing = f", {s.missing} missing files" if s.missing else ""
+        console.print(f"{s.run_id}: {s.frames} frames, found {found}{extra}{missing} -> {s.path}")
+
+
+@vision_app.command("dataset")
+def vision_dataset(
+    run_dirs: Annotated[list[Path], typer.Argument(help="Benchmark run folders or globs.")],
+    out: Annotated[Path, typer.Option("--out", help="Dataset folder.")] = Path(
+        "datasets/vision_v1"
+    ),
+    seed: Annotated[int, typer.Option("--seed", help="Seed for the run split.")] = 7,
+) -> None:
+    """Build the image dataset (split 70/15/15 by run) from benchmark runs and their labels."""
+    from qalab.eval.vision_dataset import build_dataset, dataset_stats
+
+    try:
+        frames = build_dataset(run_dirs, out, seed)
+    except USER_ERRORS as exc:
+        console.print(f"[red]error:[/red] {exc}")
+        raise typer.Exit(EXIT_ERROR) from exc
+    stats = dataset_stats(frames, seed)
+    for split, part in stats["splits"].items():  # type: ignore[union-attr]
+        labels = ", ".join(f"{k}={v}" for k, v in part["labels"].items())
+        console.print(f"{split}: {part['frames']} frames from {part['runs']} runs, {labels}")
+    for warning in stats["warnings"]:  # type: ignore[union-attr]
+        console.print(f"[yellow]warning:[/yellow] {warning}")
+    console.print(f"wrote {out / 'index.csv'}")
+
+
+@vision_app.command("train-ml")
+def vision_train_ml(
+    dataset_dir: Annotated[Path, typer.Argument(help="Folder from qalab vision dataset.")],
+    out: Annotated[Path | None, typer.Option("--out", help="Model file.")] = None,
+    seed: Annotated[int, typer.Option("--seed")] = 7,
+) -> None:
+    """Optional baseline: train the logistic-regression model on train, thresholds on val."""
+    import numpy as np
+
+    from qalab.eval.vision_dataset import load_dataset
+    from qalab.vision.images import load_rgb
+    from qalab.vision.ml import features, train
+
+    try:
+        frames = load_dataset(dataset_dir)
+        part = {s: [f for f in frames if f.split == s] for s in ("train", "val")}
+        if not part["train"]:
+            raise ValueError("the dataset has no train split")
+        x = {
+            s: np.array([features(load_rgb(dataset_dir / f.path)) for f in v])
+            for s, v in part.items()
+            if v
+        }
+        y = {s: [f.labels for f in v] for s, v in part.items()}
+        model = train(
+            x["train"], y["train"], x.get("val", x["train"]), y["val"] or y["train"], seed
+        )
+        target = out or dataset_dir / "ml_model.joblib"
+        model.save(target)
+    except USER_ERRORS as exc:
+        console.print(f"[red]error:[/red] {exc}")
+        raise typer.Exit(EXIT_ERROR) from exc
+    thresholds = ", ".join(f"{k}={v}" for k, v in model.thresholds.items())
+    console.print(f"trained on {len(part['train'])} frames; thresholds {thresholds} -> {target}")
+
+
+@eval_app.command("vision")
+def eval_vision(
+    dataset_dir: Annotated[Path, typer.Argument(help="Folder from qalab vision dataset.")],
+    methods: Annotated[
+        str, typer.Option("--methods", help="Comma-separated: heuristic,vlm,ml,hybrid.")
+    ] = "heuristic,vlm,hybrid",
+    provider: ProviderOpt = None,
+    model: Annotated[str | None, typer.Option("--model")] = None,
+    label: Annotated[
+        str, typer.Option("--label", help="Name of this run in the output files.")
+    ] = "default",
+    no_cache: Annotated[bool, typer.Option("--no-cache")] = False,
+    out: Annotated[Path, typer.Option("--out", help="Output folder.")] = Path("eval"),
+    config: ConfigOpt = None,
+) -> None:
+    """Per-label P/R/F1, macro F1, FP/100 frames, VLM calls and latency per method (H1–H4)."""
+    from qalab.eval.vision_eval import METHODS as EVAL_METHODS
+    from qalab.eval.vision_eval import VisionEvalOptions, evaluate_vision, to_markdown, write_result
+    from qalab.vision.heuristics import Thresholds
+
+    chosen = [m.strip() for m in methods.split(",") if m.strip()]
+    unknown = [m for m in chosen if m not in EVAL_METHODS]
+    if unknown:
+        console.print(
+            f"[red]error:[/red] unknown method(s) {', '.join(unknown)} "
+            f"(use {', '.join(EVAL_METHODS)})"
+        )
+        raise typer.Exit(EXIT_ERROR)
+    try:
+        cfg = load_config(config)
+        llm = None
+        if {"vlm", "hybrid"} & set(chosen):
+            cfg, llm = _vision_provider(provider, model, no_cache, config)
+        options = VisionEvalOptions(
+            methods=chosen,
+            provider=llm,
+            cost_per_1k_images=cfg.vision.cost_per_1k_images,
+            max_retries=cfg.llm.max_retries,
+            configured=Thresholds(
+                black_ratio=cfg.vision.black_ratio, magenta_ratio=cfg.vision.magenta_ratio
+            ),
+        )
+        result = evaluate_vision(dataset_dir, options)
+        written = write_result(result, dataset_dir, out, label)
+    except USER_ERRORS as exc:
+        console.print(f"[red]error:[/red] {exc}")
+        raise typer.Exit(EXIT_ERROR) from exc
     console.print(to_markdown(result), soft_wrap=True, markup=False, highlight=False)
     console.print("wrote " + ", ".join(str(p) for p in written))

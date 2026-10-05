@@ -7,8 +7,8 @@ thousands of log lines into a short list of unique, ranked bugs, with reports th
 
 > **Status:** in development, nothing released yet. Built: run recording (M1), triage with AI reports
 > and RAG (M2–M3), the seeded bot, detectors, screenshots and one-command pipeline (M4, not yet run in
-> Unity), triage evaluation (M5, not yet run on a recorded benchmark), the project scanner and game
-> adapter contracts (M7). Next: vision (M6) and measured results. See
+> Unity), triage evaluation (M5) and vision (M6), both not yet run on a recorded benchmark, the
+> project scanner and game adapter contracts (M7). Next: measured results and the real game. See
 > [Limitations](#8-limitations) and [docs/PLAN.md](docs/PLAN.md).
 
 ## 1. Problem
@@ -60,15 +60,23 @@ evidence.
   player), `perf_spike`, `exception_burst`, `tunneling` and `stuck` (a YOU WRITE task: it shows as
   skipped in results.xml until written), rate-limited per 4 m cell, each with a screenshot. A blocker
   or critical finding makes the player exit with code 1, so CI fails.
+- **Looks at the screenshots** (`qalab vision analyze`): flags `missing_texture` (magenta),
+  `black_screen` and `placeholder_ui` (white boxes) with pixel heuristics, and `ui_overflow` with a
+  vision-language model. A hybrid policy calls the model only where heuristics are blind: near UI
+  actions and events, and on a sparse sample of other frames. Findings join triage as visual bugs,
+  with the clearest screenshot attached.
 - **One command** (`scripts\run_pipeline.ps1 -Seed 42 -Duration 120 -Open`): builds the sandbox
-  player if needed, runs a bot playtest and a menu crawl, triages both and opens `report.html`.
+  player if needed, runs a bot playtest and a menu crawl, analyzes the screenshots, triages both runs
+  and opens `report.html`.
 - **Measures itself.** A sandbox project has 16 seeded bugs with known causes, so clustering and
   detection can be scored against ground truth:
   - `scripts\benchmark.ps1` records one bot playtest per seed (20 by default) with labels;
   - `qalab eval triage` scores clustering (pairwise precision, recall, F1 per variant) and reports
     (fallback rate, field completeness, grounding, repro steps, severity, component, retrieval
     hit@3, latency, tokens), and writes the tables and charts for `docs/EVAL_RESULTS.md` (D-028);
-  - vision is scored the same way in M6.
+  - `qalab vision dataset` splits the labelled screenshots by run, and `qalab eval vision` compares
+    heuristics, the VLM, a logistic-regression baseline and the hybrid: per-label P/R/F1, false
+    positives per 100 frames, VLM calls, latency and cost (D-029).
 
 Guides: [USER_GUIDE.md](docs/USER_GUIDE.md) (QC testers) · [GAME_INTEGRATION.md](docs/GAME_INTEGRATION.md)
 (adding it to a game) · [ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -101,24 +109,22 @@ flowchart LR
     cluster["normalize → stack → signature<br/>→ cluster → rank (P1–P4)"]
     context["context: events · bot actions<br/>logs · RAG docs · code"]
     llm["LLM draft (JSON schema, temp 0, cache)<br/>→ grounding checks → template fallback"]
-    vision["vision analyze"]:::planned
+    vision["vision analyze<br/>heuristics · VLM · ML · hybrid"]
     evalt["eval triage<br/>(pairwise P/R/F1 · report metrics)"]
-    evalv["eval vision"]:::planned
+    evalv["eval vision<br/>(per-label P/R/F1 · VLM calls)"]
     validate --> cluster --> context --> llm
   end
 
   run --> validate
-  run -.-> vision -.-> cluster
+  run --> vision -->|visual_findings.jsonl| cluster
   run -->|labels.json only| evalt
-  run -.->|labels.json only| evalv
+  run -->|labels.json only| evalv
   llm --> out[("report.html · bugs.json<br/>report.md · bugs_jira.csv")]
 
-  ci["GitHub Actions: ruff · pytest · cs-check · smoke<br/>Jenkinsfile: example nightly<br/>run_pipeline.ps1: build → playtest → triage"] -.-> py
-
-  classDef planned stroke-dasharray: 5 5,opacity:0.7;
+  ci["GitHub Actions: ruff · pytest · cs-check · smoke<br/>Jenkinsfile: example nightly<br/>run_pipeline.ps1: build → playtest → vision → triage"] -.-> py
 ```
 
-Dashed boxes are planned (M6). The Unity and Python sides share only the JSON Schemas in `schemas/`.
+The Unity and Python sides share only the JSON Schemas in `schemas/`.
 Both test against the same examples, so either side can change internally without breaking the other.
 
 ## 5. Quick start
@@ -167,9 +173,9 @@ multiplier, clustering thresholds, model names) live in `qalab.toml`; the rank w
 ## 6. Results
 
 <!-- Placeholder: filled in M5/M6 from docs/EVAL_RESULTS.md. Every number comes from `qalab eval`. -->
-*Not measured yet.* The triage evaluation is built (`scripts\benchmark.ps1`, `qalab eval triage`;
-metric definitions in D-028), but no benchmark has been recorded: that needs the sandbox running on
-the PC. Clustering precision, recall and F1 per variant (E1), local vs hosted model (E2), RAG on/off
+*Not measured yet.* The evaluations are built (`scripts\benchmark.ps1`, `qalab eval triage`,
+`qalab eval vision`; definitions in D-028 and D-029), but no benchmark has been recorded: that needs
+the sandbox running on the PC. Clustering precision, recall and F1 per variant (E1), local vs hosted model (E2), RAG on/off
 (E3), and visual detection (H1–H4) will be reported here from
 [docs/EVAL_RESULTS.md](docs/EVAL_RESULTS.md). Each number will come with the command that reproduces it.
 
@@ -209,9 +215,13 @@ The full list, with alternatives and consequences, is in [docs/DECISIONS.md](doc
 
 ## 8. Limitations
 
-- **No measured results yet.** The triage evaluation (M5) is built but has only run on copies of the
-  hand-made sample run; vision (M6) isn't built, and the bot has never played. So there are no
+- **No measured results yet.** The triage (M5) and vision (M6) evaluations are built but have only
+  run on copies of the hand-made sample run, and the bot has never played. So there are no
   precision, recall or detection numbers.
+- **Vision is tuned on synthetic frames.** Eval tunes the heuristics' thresholds on the sandbox's val
+  split; `qalab vision analyze` uses the ones in `qalab.toml` (spec 03's starting values until the
+  tuned ones are copied there). Post-processing in a real game (bloom, tonemapping) can shift the
+  magenta, and `ui_overflow` has no heuristic at all (H1, H2).
 - **The Unity code hasn't run in Unity yet.**
   - It was written in cloud sessions without Unity. The engine-free part is compiled and tested in
     .NET, and the rest was only compiled against stand-in UnityEngine types.
