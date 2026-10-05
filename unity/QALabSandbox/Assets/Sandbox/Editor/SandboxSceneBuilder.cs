@@ -17,10 +17,12 @@ namespace QALab.Sandbox.Editor
     /// the NavMesh and saves both scenes, so the level is reproducible and reviewable: change this file,
     /// rebuild, and commit the regenerated .unity files with it (never edit the scenes by hand).
     /// Geometry and camera follow docs/sandbox_design.md (the RAG ground truth): 2 m tiles T_00–T_399,
-    /// camera 6 m behind and 2.5 m above the player.
-    /// M1 contents: floor tiles with footstep surfaces, walls, 3 doors (Door_02 without hinge), crates,
-    /// the spawner, the player, the inventory HUD, the asset loader, combat math and the F1 menu.
-    /// M4 adds the GC zone, camera trigger, ballistics range, score label, ammo icon and T_17's missing collider.
+    /// camera 6 m behind and 2.5 m above the player. Positions come from <see cref="SandboxLayout"/>.
+    /// Contents: floor tiles with footstep surfaces, outer walls, 3 doors (Door_02 without hinge), crates
+    /// (Crate_07 loses its material, SB09), the spawner, the player, the inventory HUD, the asset loader,
+    /// combat math and the F1 menu; the south-east corridor and room over T_17 (SB06), the north-west room
+    /// behind the narrow gap (SB07), GcZone (SB08), the camera zone (SB10), the score label (SB11), the
+    /// ammo icon (SB12) and the ballistics range (SB16).
     /// </summary>
     public static class SandboxSceneBuilder
     {
@@ -30,8 +32,10 @@ namespace QALab.Sandbox.Editor
         public const string LevelScene = ScenesFolder + "/Sandbox_Level01.unity";
         public const string MenuScene = ScenesFolder + "/Sandbox_Menu.unity";
         // docs/sandbox_design.md, "Level geometry": a 40 × 40 m grid of 2 m tiles, T_00 to T_399.
-        private const float TileSize = 2f;
-        private const int TilesPerSide = 20;
+        private const float TileSize = SandboxLayout.TileSize;
+        private const int TilesPerSide = SandboxLayout.TilesPerSide;
+        private const float WallThickness = 0.3f;
+        private const float WallHeight = 3f;
         public const string NavMeshAsset = ScenesFolder + "/NavMesh-Sandbox_Level01.asset";
 
         [MenuItem("Tools/QA Lab/Rebuild Sandbox Scenes", priority = 20)]
@@ -69,7 +73,10 @@ namespace QALab.Sandbox.Editor
                     AddTile(floor, x, z);
                 }
             }
-            AddWalls(Child(level, "Walls"));
+            var walls = Child(level, "Walls");
+            AddWalls(walls);
+            AddSouthEastRoom(walls);
+            AddNorthWestRoom(walls);
             var doors = Child(level, "Doors");
             AddDoor(doors, "Door_01", new Vector3(4f, 1f, 10f), withHinge: true);
             var brokenDoor = AddDoor(doors, "Door_02", new Vector3(8f, 1f, 5.5f), withHinge: false);   // SB01
@@ -79,12 +86,21 @@ namespace QALab.Sandbox.Editor
             {
                 var crate = Box(crates, $"Crate_{i:00}", new Vector3(22f + (i % 4) * 2.5f, 0.5f, 24f + (i / 4) * 3f), Vector3.one, MaterialFor("Crate", new Color(0.55f, 0.4f, 0.25f)));
                 crate.isStatic = true;
+                if (i == 7) crate.AddComponent<SeededMissingMaterial>();   // SB09: magenta at runtime
             }
+            var launcher = AddBallisticsRange(level);
 
             var player = AddPlayer();
             AddCamera(player.transform);
             var spawner = AddSpawner(level);
             var hud = AddHud();
+            var score = AddScoreLabel(hud.gameObject);
+            AddAmmoPanel(hud.gameObject, launcher);
+            var zones = new GameObject("Zones");
+            var gcZone = AddZone(zones, "GcZone", SandboxLayout.GcZoneX0, SandboxLayout.GcZoneX1, SandboxLayout.GcZoneZ0,
+                SandboxLayout.GcZoneZ1, new Color(0.75f, 0.35f, 0.3f)).AddComponent<GcZone>();
+            var cameraZone = AddZone(zones, "CameraZone", SandboxLayout.CameraZoneX0, SandboxLayout.CameraZoneX1,
+                SandboxLayout.CameraZoneZ0, SandboxLayout.CameraZoneZ1, new Color(0.3f, 0.35f, 0.75f)).AddComponent<CameraZone>();
 
             var systems = new GameObject("Systems");
             var assetLoader = systems.AddComponent<AssetLoader>();
@@ -97,6 +113,10 @@ namespace QALab.Sandbox.Editor
             Wire(menu, "assetLoader", assetLoader);
             Wire(menu, "player", player.GetComponent<SandboxPlayer>());
             Wire(menu, "combat", combat);
+            Wire(menu, "gcZone", gcZone);
+            Wire(menu, "cameraZone", cameraZone);
+            Wire(menu, "score", score);
+            Wire(menu, "launcher", launcher);
 
             BakeNavMesh(level);
             EditorSceneManager.SaveScene(scene, LevelScene);
@@ -115,6 +135,10 @@ namespace QALab.Sandbox.Editor
                 new Vector3(TileSize, 0.5f, TileSize), MaterialFor(surface, SurfaceColor(surface)));
             tile.isStatic = true;
             tile.AddComponent<SurfaceTag>().Set(surface);
+            if (index == SandboxLayout.HoleTile)
+            {
+                tile.AddComponent<SeededMissingCollider>();   // SB06: the collider goes at runtime, the renderer stays
+            }
         }
 
         /// <summary>
@@ -148,6 +172,77 @@ namespace QALab.Sandbox.Editor
             Box(parent, "Wall_North", new Vector3(size / 2f, 1.5f, size + 0.25f), new Vector3(size, 3f, 0.5f), mat).isStatic = true;
             Box(parent, "Wall_West", new Vector3(-0.25f, 1.5f, size / 2f), new Vector3(0.5f, 3f, size), mat).isStatic = true;
             Box(parent, "Wall_East", new Vector3(size + 0.25f, 1.5f, size / 2f), new Vector3(0.5f, 3f, size), mat).isStatic = true;
+        }
+
+        /// <summary>
+        /// SB06: the south-east room (x 30–40, z 2–10) is entered only through the corridor along the south
+        /// wall (z 0–2) and a 2 m doorway at its south-east corner, so every path into it crosses T_17.
+        /// </summary>
+        private static void AddSouthEastRoom(GameObject parent)
+        {
+            var mat = MaterialFor("Wall", new Color(0.75f, 0.75f, 0.78f));
+            const float x0 = SandboxLayout.SouthEastX0, z1 = SandboxLayout.CorridorZ1, top = SandboxLayout.SouthEastRoomZ1;
+            const float size = SandboxLayout.LevelSize;
+            Wall(parent, "Room_SE_South", x0, SandboxLayout.SouthEastDoorX0, z1, z1 + WallThickness, mat);   // corridor's north side
+            Wall(parent, "Room_SE_West", x0, x0 + WallThickness, z1, top + WallThickness, mat);
+            Wall(parent, "Room_SE_North", x0, size, top, top + WallThickness, mat);
+        }
+
+        /// <summary>
+        /// SB07: the north-west room (x 0–10, z 30–40) has one 1.6 m doorway in its south wall. A post
+        /// (SeededNarrowGap) narrows it to 0.76 m; the NavMesh is baked with the post in place.
+        /// </summary>
+        private static void AddNorthWestRoom(GameObject parent)
+        {
+            var mat = MaterialFor("Wall", new Color(0.75f, 0.75f, 0.78f));
+            const float x1 = SandboxLayout.NorthWestRoomX1, z0 = SandboxLayout.NorthWestRoomZ0;
+            const float size = SandboxLayout.LevelSize, half = WallThickness / 2f;
+            Wall(parent, "Room_NW_South_A", 0f, SandboxLayout.GapOpeningX0, z0 - half, z0 + half, mat);
+            Wall(parent, "Room_NW_South_B", SandboxLayout.GapOpeningX1, x1 + WallThickness, z0 - half, z0 + half, mat);
+            Wall(parent, "Room_NW_East", x1, x1 + WallThickness, z0 - half, size, mat);
+            var post = Wall(parent, "GapPost_SB07", SandboxLayout.GapOpeningX0, SandboxLayout.GapX0, z0 - half, z0 + half,
+                MaterialFor("Post", new Color(0.6f, 0.6f, 0.65f)));
+            post.AddComponent<SeededNarrowGap>();
+        }
+
+        /// <summary>A static wall box covering x0–x1, z0–z1, from the floor to WallHeight.</summary>
+        private static GameObject Wall(GameObject parent, string name, float x0, float x1, float z0, float z1, Material mat)
+        {
+            var wall = Box(parent, name, new Vector3((x0 + x1) / 2f, WallHeight / 2f, (z0 + z1) / 2f),
+                new Vector3(x1 - x0, WallHeight, z1 - z0), mat);
+            wall.isStatic = true;
+            return wall;
+        }
+
+        /// <summary>
+        /// SB16: the launcher fires east along z = 35 at a 5 cm wall. The wall is part of the level (the
+        /// NavMesh walks around it); the launcher is not (the bot walks under the firing line).
+        /// </summary>
+        private static ProjectileLauncher AddBallisticsRange(GameObject level)
+        {
+            var range = new GameObject("BallisticsRange");
+            var wallMat = MaterialFor("RangeWall", new Color(0.85f, 0.8f, 0.5f));
+            var thin = Box(Child(level, "Range"), "ThinWall",
+                new Vector3(SandboxLayout.ThinWallX + SandboxLayout.ThinWallThicknessM / 2f, SandboxLayout.ThinWallHeightM / 2f,
+                    (SandboxLayout.ThinWallZ0 + SandboxLayout.ThinWallZ1) / 2f),
+                new Vector3(SandboxLayout.ThinWallThicknessM, SandboxLayout.ThinWallHeightM, SandboxLayout.ThinWallZ1 - SandboxLayout.ThinWallZ0),
+                wallMat);
+            thin.isStatic = true;
+            var launcher = Box(range, "ProjectileLauncher", new Vector3(SandboxLayout.LauncherX, SandboxLayout.LauncherY, SandboxLayout.LauncherZ),
+                new Vector3(0.3f, 0.3f, 0.6f), MaterialFor("Launcher", new Color(0.25f, 0.25f, 0.28f)));
+            launcher.transform.rotation = Quaternion.Euler(0f, 90f, 0f);   // forward = +x, towards the wall
+            return launcher.AddComponent<ProjectileLauncher>();
+        }
+
+        /// <summary>A floor zone: an empty object at its centre plus a flat coloured marker (no collider).</summary>
+        private static GameObject AddZone(GameObject parent, string name, float x0, float x1, float z0, float z1, Color color)
+        {
+            var zone = Child(parent, name);
+            zone.transform.position = new Vector3((x0 + x1) / 2f, 0f, (z0 + z1) / 2f);
+            var marker = Box(zone, name + "_Marker", new Vector3((x0 + x1) / 2f, 0.005f, (z0 + z1) / 2f),
+                new Vector3(x1 - x0, 0.01f, z1 - z0), MaterialFor(name, color));
+            Object.DestroyImmediate(marker.GetComponent<Collider>());
+            return zone;
         }
 
         /// <summary>A door panel; with a hinge it swings around the hinge child, without it SB01 fires.</summary>
@@ -265,11 +360,61 @@ namespace QALab.Sandbox.Editor
             return hud;
         }
 
+        /// <summary>
+        /// Score label, top-left: a fixed 136 px box that fits "Score: 9999" but not "Score: 10000" at 24 px
+        /// (SB11). The text may run past the box (horizontal overflow), so the overflow is visible.
+        /// </summary>
+        private static HudScore AddScoreLabel(GameObject canvas)
+        {
+            var box = UiRect(canvas, "ScoreBox", new Vector2(0f, 1f), new Vector2(88f, -30f), new Vector2(136f, 36f));
+            box.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.55f);
+            var textGo = UiRect(box, "ScoreLabel", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(136f, 36f));
+            var text = textGo.AddComponent<Text>();
+            text.text = "Score: 0";
+            text.alignment = TextAnchor.MiddleLeft;
+            text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            text.fontSize = 24;
+            text.color = Color.white;
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            var score = canvas.AddComponent<HudScore>();
+            Wire(score, "label", text);
+            return score;
+        }
+
+        /// <summary>Ammo icon and count, bottom-right, shown near the ballistics range (SB12 empties the icon).</summary>
+        private static void AddAmmoPanel(GameObject canvas, ProjectileLauncher launcher)
+        {
+            var panel = UiRect(canvas, "AmmoPanel", new Vector2(1f, 0f), new Vector2(-90f, 60f), new Vector2(140f, 56f));
+            panel.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.55f);
+            var iconGo = UiRect(panel, "AmmoIcon", new Vector2(0f, 0.5f), new Vector2(32f, 0f), new Vector2(40f, 40f));
+            var icon = iconGo.AddComponent<Image>();
+            icon.sprite = AssetDatabase.GetBuiltinExtraResource<Sprite>("UI/Skin/Knob.psd");
+            icon.color = new Color(0.95f, 0.75f, 0.2f);
+            var countGo = UiRect(panel, "AmmoCount", new Vector2(1f, 0.5f), new Vector2(-40f, 0f), new Vector2(70f, 40f));
+            var count = countGo.AddComponent<Text>();
+            count.text = "30";
+            count.alignment = TextAnchor.MiddleRight;
+            count.fontSize = 24;
+            count.color = Color.white;
+            count.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            panel.SetActive(false);
+            var ammo = canvas.AddComponent<HudAmmo>();
+            Wire(ammo, "panel", panel);
+            Wire(ammo, "icon", icon);
+            Wire(ammo, "count", count);
+            Wire(ammo, "launcher", launcher);
+        }
+
         private static void BakeNavMesh(GameObject level)
         {
 #if QALAB_AI_NAVIGATION
+            SetHumanoidAgentRadius(SandboxLayout.NavMeshAgentRadiusM);
             var surface = level.AddComponent<NavMeshSurface>();
             surface.collectObjects = CollectObjects.Children;
+            // 5 cm voxels: SB07's gap leaves a 16 cm strip for a 0.3 m agent, too thin for the default
+            // voxel size (radius / 3 = 10 cm) to keep it connected.
+            surface.overrideVoxelSize = true;
+            surface.voxelSize = 0.05f;
             // Render meshes, not physics colliders: a tile with a renderer but no collider (SB06, M4)
             // must still look walkable to the NavMesh, which is exactly how the bot falls through it.
             surface.useGeometry = UnityEngine.AI.NavMeshCollectGeometry.RenderMeshes;
@@ -279,11 +424,39 @@ namespace QALab.Sandbox.Editor
             AssetDatabase.DeleteAsset(NavMeshAsset);
             AssetDatabase.CreateAsset(surface.navMeshData, NavMeshAsset);
 #else
-            Debug.LogWarning("[QALab] AI Navigation package missing: install com.unity.ai.navigation, then rebuild the scenes (the M4 bot needs the NavMesh)");
+            Debug.LogWarning("[QALab] AI Navigation package missing: install com.unity.ai.navigation, then rebuild the scenes (the bot needs the NavMesh)");
 #endif
         }
 
-        // ---- Sandbox_Menu (the UI crawler's playground in M4) -------------------------------------
+        /// <summary>
+        /// The design doc's NavMesh agent radius (0.3 m) on the built-in Humanoid agent type, which
+        /// NavMeshSurface bakes with. Agent types live in ProjectSettings/NavMeshAreas.asset; there is no
+        /// public API to change them, so this edits the asset through SerializedObject.
+        /// </summary>
+        private static void SetHumanoidAgentRadius(float radius)
+        {
+            var assets = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/NavMeshAreas.asset");
+            var settings = assets != null && assets.Length > 0 ? new SerializedObject(assets[0]).FindProperty("m_Settings") : null;
+            if (settings == null || !settings.isArray)
+            {
+                Debug.LogError("[QALab] could not find the NavMesh agent settings: set the Humanoid agent radius to " + radius + " m by hand (Window > AI > Navigation > Agents)");
+                return;
+            }
+            for (var i = 0; i < settings.arraySize; i++)
+            {
+                var agent = settings.GetArrayElementAtIndex(i);
+                if (agent.FindPropertyRelative("agentTypeID").intValue != 0) continue;
+                agent.FindPropertyRelative("agentRadius").floatValue = radius;
+            }
+            settings.serializedObject.ApplyModifiedPropertiesWithoutUndo();
+            var actual = UnityEngine.AI.NavMesh.GetSettingsByID(0).agentRadius;
+            if (Mathf.Abs(actual - radius) > 0.001f)
+            {
+                Debug.LogError($"[QALab] Humanoid agent radius is {actual} m, expected {radius} m: SB07 won't behave as designed");
+            }
+        }
+
+        // ---- Sandbox_Menu (the UI crawler's playground) -------------------------------------------
 
         private static void BuildMenu()
         {
@@ -308,6 +481,7 @@ namespace QALab.Sandbox.Editor
             credits.SetActive(false);
 
             var menu = canvasGo.AddComponent<SandboxMainMenu>();
+            Wire(menu, "settings", canvasGo.AddComponent<SeededSettingsMenu>());   // SB15
             Wire(menu, "mainPanel", main);
             Wire(menu, "settingsPanel", settings);
             Wire(menu, "creditsPanel", credits);

@@ -12,5 +12,8 @@ namespace QALab.Sandbox
 
         public static void RegisterPlayer(UnityEngine.Transform player, MiawWorks.QALab.IBotMover mover) =>
             MiawWorks.QALab.QALab.RegisterPlayer(player, mover);
+
+        /// <summary>The registered player, or null (seed scripts check where it is).</summary>
+        public static UnityEngine.Transform Player => MiawWorks.QALab.QALab.Player;
     }
 }

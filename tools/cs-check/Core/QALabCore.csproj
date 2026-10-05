@@ -26,17 +26,35 @@
     <Compile Include="$(PackageRoot)/Core/QAEvent.cs" Link="Package/Core/QAEvent.cs" />
     <Compile Include="$(PackageRoot)/Core/EventWriter.cs" Link="Package/Core/EventWriter.cs" />
     <Compile Include="$(PackageRoot)/Core/RunInfo.cs" Link="Package/Core/RunInfo.cs" />
+    <Compile Include="$(PackageRoot)/Core/BuildStamp.cs" Link="Package/Core/BuildStamp.cs" />
     <Compile Include="$(PackageRoot)/Logging/LogLevels.cs" Link="Package/Logging/LogLevels.cs" />
     <Compile Include="$(PackageRoot)/Metrics/RingBuffer.cs" Link="Package/Metrics/RingBuffer.cs" />
     <Compile Include="$(PackageRoot)/Labels/SeedCatalogEntry.cs" Link="Package/Labels/SeedCatalogEntry.cs" />
     <Compile Include="$(PackageRoot)/Labels/LabelBook.cs" Link="Package/Labels/LabelBook.cs" />
+    <Compile Include="$(PackageRoot)/Labels/VisualLabels.cs" Link="Package/Labels/VisualLabels.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/DetectorNames.cs" Link="Package/Detectors/DetectorNames.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/IDetector.cs" Link="Package/Detectors/IDetector.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/RateLimiter.cs" Link="Package/Detectors/RateLimiter.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/DetectorHub.cs" Link="Package/Detectors/DetectorHub.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/ExceptionBurstCounter.cs" Link="Package/Detectors/ExceptionBurstCounter.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/ExceptionBurstDetector.cs" Link="Package/Detectors/ExceptionBurstDetector.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/PerfSpikeDetector.cs" Link="Package/Detectors/PerfSpikeDetector.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/FallDetector.cs" Link="Package/Detectors/FallDetector.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/StuckCalculator.cs" Link="Package/Detectors/StuckCalculator.cs" />
+    <Compile Include="$(PackageRoot)/Detectors/StuckDetector.cs" Link="Package/Detectors/StuckDetector.cs" />
+    <Compile Include="$(PackageRoot)/Capture/Shots.cs" Link="Package/Capture/Shots.cs" />
+    <Compile Include="$(PackageRoot)/Results/ExitCodes.cs" Link="Package/Results/ExitCodes.cs" />
+    <Compile Include="$(PackageRoot)/Results/JUnitWriter.cs" Link="Package/Results/JUnitWriter.cs" />
     <Compile Include="$(PackageRoot)/Bot/SeededRandom.cs" Link="Package/Bot/SeededRandom.cs" />
     <Compile Include="$(PackageRoot)/Bot/NamedRegistry.cs" Link="Package/Bot/NamedRegistry.cs" />
     <Compile Include="$(PackageRoot)/Bot/BotActionData.cs" Link="Package/Bot/BotActionData.cs" />
     <Compile Include="$(PackageEditor)/Scanner/ScanReport.cs" Link="Package/Editor/Scanner/ScanReport.cs" />
+    <Compile Include="$(PackageEditor)/EditorCommandLine.cs" Link="Package/Editor/EditorCommandLine.cs" />
+    <Compile Include="$(PackageEditor)/RunSummary.cs" Link="Package/Editor/RunSummary.cs" />
     <!-- The engine-free half of the "Game adapter template" sample (its Unity half compiles in the game). -->
     <Compile Include="$(AdapterSample)/IGameCommands.cs" Link="Sample/IGameCommands.cs" />
     <Compile Include="$(AdapterSample)/TurnPolicy.cs" Link="Sample/TurnPolicy.cs" />
+    <Compile Include="$(SandboxScripts)/SandboxLayout.cs" Link="Sandbox/SandboxLayout.cs" />
     <Compile Include="$(SandboxScripts)/SandboxSeedCatalog.cs" Link="Sandbox/SandboxSeedCatalog.cs" />
   </ItemGroup>
   <ItemGroup>

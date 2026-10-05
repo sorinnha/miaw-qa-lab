@@ -188,4 +188,73 @@ namespace MiawWorks.QALab.Tests
             StringAssert.Contains("-qalabScanOut", error);
         }
     }
+
+    /// <summary>The editor's -executeMethod flags and the QA Lab window's last-run summary (engine-free).</summary>
+    public class EditorHelperTests
+    {
+        [Test]
+        public void FlagValuesDefaultsAndErrors()
+        {
+            var args = new[] { "Unity.exe", "-batchmode", "-QALABBUILDOUT", "Builds/x.exe" };
+            Assert.AreEqual("Builds/x.exe", EditorCommandLine.Value(args, "-qalabBuildOut", "default", out var error));
+            Assert.IsNull(error);
+            Assert.AreEqual("default", EditorCommandLine.Value(new[] { "Unity.exe" }, "-qalabBuildOut", "default", out error));
+            Assert.IsNull(EditorCommandLine.Value(new[] { "-qalabBuildOut", "-logFile" }, "-qalabBuildOut", "default", out error));
+            Assert.AreEqual("-qalabBuildOut: missing value", error);
+        }
+
+        [Test]
+        public void SummaryListsProblemsFromResultsXml()
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "qalab-summary-" + Guid.NewGuid().ToString("N"));
+            var runs = Path.Combine(dir, "runs");
+            var runDir = Path.Combine(runs, "20261005T103000Z-s42");
+            Directory.CreateDirectory(runDir);
+            try
+            {
+                var results = new RunResults { RunId = "20261005T103000Z-s42", Exceptions = 2 };
+                results.Detectors.Add(new DetectorResult { Name = "fell_out_of_world", Count = 1, WorstSeverity = "critical" });
+                results.Detectors.Add(new DetectorResult { Name = "stuck", Skipped = "not implemented yet" });
+                results.Detectors.Add(new DetectorResult { Name = "perf_spike" });
+                JUnitWriter.WriteTo(Path.Combine(runDir, "results.xml"), results);
+
+                CollectionAssert.AreEqual(new[]
+                {
+                    "FAIL fell_out_of_world: 1 fell_out_of_world event(s), worst severity critical",
+                    "SKIP stuck: not implemented yet",
+                    "FAIL no_exceptions: 2 exception(s) logged",
+                }, RunSummary.Lines(Path.Combine(runDir, "results.xml")));
+
+                Assert.IsNull(RunSummary.ReportFor(runDir), "no report yet");
+                var reportDir = Path.Combine(dir, "reports", "20261005T103000Z-s42");
+                Directory.CreateDirectory(reportDir);
+                File.WriteAllText(Path.Combine(reportDir, "report.html"), "<html></html>");
+                Assert.AreEqual(Path.Combine(reportDir, "report.html"), RunSummary.ReportFor(runDir + Path.DirectorySeparatorChar));
+            }
+            finally
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+
+        [Test]
+        public void SummaryOfACleanRunAndOfNothing()
+        {
+            var path = Path.Combine(Path.GetTempPath(), "qalab-clean-" + Guid.NewGuid().ToString("N") + ".xml");
+            try
+            {
+                var results = new RunResults { RunId = "r" };
+                results.Detectors.Add(new DetectorResult { Name = "perf_spike" });
+                JUnitWriter.WriteTo(path, results);
+                CollectionAssert.AreEqual(new[] { "all 3 checks passed" }, RunSummary.Lines(path));
+                File.WriteAllText(path, "<not xml");
+                Assert.IsEmpty(RunSummary.Lines(path));
+                Assert.IsEmpty(RunSummary.Lines(null));
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+    }
 }

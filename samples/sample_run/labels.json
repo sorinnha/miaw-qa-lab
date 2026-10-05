@@ -83,9 +83,9 @@
       "match": {
         "detector": "fell_out_of_world",
         "near": [
-          26.0,
+          35.0,
           0.0,
-          14.0
+          1.0
         ],
         "radius": 4.0
       },

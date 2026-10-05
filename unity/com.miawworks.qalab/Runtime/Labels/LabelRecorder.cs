@@ -35,6 +35,20 @@ namespace MiawWorks.QALab
             book.Trigger(bugId, _clock.Seconds, _state.Scene);
         }
 
+        /// <summary>True during a benchmark run (screenshots get labels).</summary>
+        internal static bool IsRecording => _book != null;
+
+        /// <summary>A screenshot was saved: record its visual labels (benchmark only).</summary>
+        internal static void RecordShot(string path, double t, IEnumerable<string> labels, IEnumerable<string> bugIds)
+        {
+            var book = _book;
+            if (book == null)
+            {
+                return;
+            }
+            book.AddScreenshot(path, t, labels, bugIds, _state.Scene);
+        }
+
         internal static void Begin(bool benchmark, IClock clock, IMainThreadState state)
         {
             _clock = clock;

@@ -11,8 +11,8 @@ new game is in [GAME_INTEGRATION.md](GAME_INTEGRATION.md); the design is in [ARC
 | `qalab validate`, `qalab triage run`, reports (HTML, Markdown, Jira CSV) | Built (M2–M3) |
 | AI-written reports with Gemini or Ollama, RAG over design docs and code | Built (M3) |
 | ProjectScanner (missing scripts, broken references, materials) | Built (M7) |
-| Game adapter contracts and template | Built (M7); the bot runner that calls them is M4 |
-| Seeded bot, detectors, screenshots, one-command pipeline | Planned (M4) |
+| Game adapter contracts and template | Built (M7) |
+| Seeded bot, detectors, screenshots, results.xml, one-command pipeline | Built (M4). Not yet run in Unity: first run is on the PC checklist. The stuck detector is a learning task, skipped until written |
 | Vision (missing textures, black screens, broken UI) | Planned (M6) |
 
 Two learning tasks still gate the end-to-end triage run. Until `normalize_message` exists, every
@@ -32,8 +32,22 @@ On Linux/macOS: `python3 -m venv .venv && . .venv/bin/activate && pip install -e
 
 ## 2. Record a playtest
 
-**In the editor:** **Tools → QA Lab → Create or Select Settings**, tick **Auto-start in Play Mode**, press
-Play, play, stop. **Tools → QA Lab → Open Last Run Folder** opens the run.
+**In the editor:** **Tools → QA Lab → Window**. Create the settings if asked, pick the adapter
+(`manual` to play yourself, `navmesh_explorer` to let the bot play) and press **Play with QA Lab**. Stop
+Play Mode (or wait for the duration) to end the run. The window shows the last run's results and opens
+its folder and report. **F12** takes a screenshot (editor and development builds).
+
+**A bot playtest of a built player** (the sandbox):
+
+```powershell
+scripts\build_sandbox.ps1                                   # Builds\Sandbox\QALabSandbox.exe (close the editor first)
+scripts\run_playtest.ps1 -Seed 42 -Duration 120 -Benchmark  # prints the run folder
+scripts\run_pipeline.ps1 -Seed 42 -Duration 120 -Open       # build if needed, playtest + menu crawl, triage, open report.html
+```
+
+`run_playtest.ps1` passes the player's exit code through (below), plus 3 when no run folder was
+written and 4 when the player hung and was stopped. Other flags: `-Adapter ui_crawler -Scene Sandbox_Menu`,
+`-Seeds SB01,SB06`, `-ShotEvery 2`, `-Out <dir>`.
 
 **In a built player** (a development build gets script stack traces), add flags:
 
@@ -45,18 +59,44 @@ Play, play, stop. **Tools → QA Lab → Open Last Run Folder** opens the run.
 | `-qalabDuration <s>` | 120 | End the run after this many seconds |
 | `-qalabAdapter <name>` | `navmesh_explorer` | Bot adapter, or `manual` for a human player |
 | `-qalabScene <name>` | active scene | Scene to load first |
-| `-qalabShotEvery <s>` | 5 | Periodic screenshots, 0 = off (M4) |
+| `-qalabShotEvery <s>` | 5 | Periodic screenshots, 0 = off |
 | `-qalabMinLevel <lvl>` | `warning` | Lowest log level recorded (`info` gives more context) |
 | `-qalabSeeds <list>` | `all` | Sandbox only: which seeded bugs are on, e.g. `SB01,SB06` |
 | `-qalabBenchmark` | off | Also write `labels.json` (ground truth, sandbox only) |
 | `-qalabQuitOnEnd` | off | Quit the game when the run ends |
 
-Example: `QALabSandbox.exe -qalab -qalabOut runs -qalabSeed 42 -qalabDuration 120 -logFile runs\player.log`.
+Example: `QALabSandbox.exe -qalab -qalabOut runs -qalabSeed 42 -qalabDuration 120 -qalabQuitOnEnd -screen-fullscreen 0 -screen-width 1280 -screen-height 720 -logFile runs\player.log`.
+
+**Bots** (`-qalabAdapter`):
+- `navmesh_explorer`: walks to random reachable points on the baked NavMesh, preferring 4 m cells it
+  hasn't visited, and tries to interact with what's in range (20% of steps). Needs a baked NavMesh and a
+  registered player.
+- `ui_crawler`: clicks one random active, interactable uGUI control per step; skips names containing
+  Quit or Exit (the sandbox also skips Play, so a menu crawl stays in the menus).
+- a game's own adapter (GAME_INTEGRATION.md §4), or `manual` for no bot.
+
+**Detectors** watch every frame, bot or human:
+
+| Detector | Fires when | Severity |
+|---|---|---|
+| `fell_out_of_world` | the player is below the kill plane (lowest floor − 5 m, or the game's setting); the player is respawned | critical |
+| `stuck` | the bot asks the player to move but it moved < 0.5 m in 4 s | major |
+| `perf_spike` | a frame takes > 50 ms (not counting QA Lab's own screenshot frames or scene loads) | minor |
+| `exception_burst` | more than 20 exceptions within 1 s | major |
+| `tunneling` | a fast projectile with QA Lab's `TunnelingDetector` passed through a collider without hitting it | major |
+
+Each detector reports a given 4 m area at most once per 10 s, and every report comes with a screenshot.
+
+**Exit codes** with `-qalabQuitOnEnd`: **0** no blocker or critical finding, **1** a blocker or critical
+finding (e.g. the player fell out of the world), **2** QA Lab itself failed (see `results.xml`).
 
 **A run folder** (`<UTC time>-s<seed>`, for example `20261005T103000Z-s42`) holds:
-- `run.json`: build, scenes, seed, adapter, start and end. No `ended_at` means the game crashed or was killed, and triage flags a possible crash;
-- `events.jsonl`: one JSON event per line (logs, metrics, markers; actions, detectors and screenshots from M4). Lines can be slightly out of order; tools sort by `seq`. At most about 0.5 s of events is lost in a crash;
-- `labels.json`: benchmark runs only. It is ground truth for evaluation, and triage never reads it.
+- `run.json`: build (with the commit for players built by `build_sandbox.ps1`), scenes, seed, adapter, start and end, exit code. No `ended_at` means the game crashed or was killed, and triage flags a possible crash;
+- `events.jsonl`: one JSON event per line (logs, bot actions, detector findings, screenshots, metrics, markers). Lines can be slightly out of order; tools sort by `seq`. At most about 0.5 s of events is lost in a crash;
+- `shots/000001.png`, ...: screenshots (periodic, on every detector event, F12), long side ≤ 1280 px;
+- `results.xml`: JUnit summary for CI: one test case per detector (fails with the count), `no_exceptions`, and `no_internal_errors`;
+- `player.log`: the player's own log (`run_playtest.ps1` moves it in);
+- `labels.json`: benchmark runs only. It is ground truth for evaluation (seeded bugs, and which screenshots show which visual bug), and triage never reads it.
 
 The formats are fixed by `schemas/*.json` and described in `docs/specs/00_contracts.md`.
 
@@ -169,8 +209,10 @@ The menu item is greyed out in Play Mode.
 
 The sandbox has seeded bugs SB01–SB16 with known causes (`docs/specs/01_unity_qalab.md`). With
 `-qalabBenchmark`, each triggered seed is recorded in `labels.json`, so evaluation can measure clustering
-and detection against ground truth (M5). F1 in Play Mode opens a menu to trigger any seed by hand. Seed
-ids never appear in log text, and triage never opens `labels.json`; a test enforces this.
+and detection against ground truth (M5). Visual seeds (SB09–SB12) count only when a screenshot shows
+them, and each screenshot lists its visual labels (M6). F1 in Play Mode opens a menu to trigger any seed
+by hand or walk to it. Seed ids never appear in log text, and triage never opens `labels.json`; a test
+enforces this.
 
 ## 9. CI
 
@@ -194,5 +236,9 @@ ids never appear in log text, and triage never opens `labels.json`; a test enfor
 | `GEMINI_API_KEY is not set` (exit 2) | Put the key in `.env` at the repo root, or use `--provider none`. |
 | `qalab validate` reports bad lines | The run was written by an older package version, or the file was edited by hand: the message names the field. |
 | No run folder after Play | Auto-start is off; or the editor runs tests (auto-start is skipped there). |
+| `run_playtest.ps1` exit 3 | The player wrote no run folder: read the `player-*.log` it names (QA Lab didn't start, or the player crashed on load). |
+| The bot stands still | No baked NavMesh in the scene, or the game never called `QALab.RegisterPlayer`. The Console says which adapter started. |
+| `detector 'stuck' is not implemented yet` | The stuck detector is a learning task (PLAN.md M4); the rest of the run is fine. |
+| No `fell_out_of_world` although the player fell | The game respawned the player first: set `QALab.KillPlaneY` above the game's own respawn height. |
 | A bug you expected is missing | Its level is below `-qalabMinLevel`, or it was grouped with another cluster: check `qalab triage clusters`. |
 | Two different bugs in one report | Try `--cluster exact`; if they share message and top frames, they are one signature by design. |

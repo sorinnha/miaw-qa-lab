@@ -7,9 +7,9 @@
 // Agent label: 'windows && unity'. The agent's Unity version must match
 // unity/QALabSandbox/ProjectSettings/ProjectVersion.txt, or set UNITY_EXE in the agent's environment.
 //
-// Stages whose scripts arrive in later milestones skip themselves until the files exist:
-// build_sandbox.ps1 and run_playtest.ps1 (M4), qalab vision (M6). Without playtest runs, triage runs on
-// samples/sample_run as a dry run.
+// Stages whose scripts may be missing skip themselves until the files exist (qalab vision arrives in M6).
+// Without playtest runs, triage runs on samples/sample_run as a dry run. run_playtest.ps1 finds each
+// player's run folder in that player's own log, so the parallel playtests can share runs\nightly.
 pipeline {
     agent { label 'windows && unity' }
 
@@ -115,7 +115,7 @@ pipeline {
                 script {
                     def runs = 'runs\\nightly\\*'
                     if (!fileExists('runs/nightly')) {
-                        echo 'No playtest runs yet (M4 scripts missing): triaging samples/sample_run as a dry run.'
+                        echo 'No playtest runs (the Playtests stage was skipped): triaging samples/sample_run as a dry run.'
                         runs = 'samples\\sample_run'
                     }
                     def code = powershell(returnStatus: true,

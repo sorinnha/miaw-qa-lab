@@ -7,7 +7,8 @@ namespace QALab.Sandbox
     /// Capsule player: CharacterController movement (WASD, 4.5 m/s, gravity −20 m/s²), footsteps every
     /// 0.6 m on the surface below, and respawn at the last checkpoint below the kill plane (y = −10),
     /// as "Player movement" in docs/sandbox_design.md says. Implements
-    /// <see cref="IBotMover"/> so the M4 bot can drive it through the same code.
+    /// <see cref="IBotMover"/> so the bot drives it through the same code. QA Lab's fall detector (kill
+    /// plane: the lowest floor − 5 m) respawns the player before its own −10 m plane does.
     /// </summary>
     [RequireComponent(typeof(CharacterController))]
     public sealed class SandboxPlayer : MonoBehaviour, IBotMover
@@ -97,8 +98,19 @@ namespace QALab.Sandbox
             return "Grass";
         }
 
-        /// <summary>Respawns happen here from now on. Nothing calls it yet: checkpoint zones come with the fall seed (SB06, M4).</summary>
+        /// <summary>Respawns happen here from now on (the start position until something sets another).</summary>
         public void SetCheckpoint(Vector3 position) => _checkpoint = position;
+
+        /// <summary>F1 menu: put the player somewhere (next to a seeded bug) without walking there.</summary>
+        public void TeleportTo(Vector3 position)
+        {
+            // A CharacterController overrides transform changes while enabled, so turn it off to teleport.
+            _controller.enabled = false;
+            transform.position = position;
+            _controller.enabled = true;
+            _verticalSpeed = 0f;
+            _botTarget = null;
+        }
 
         // ---- IBotMover (driven by the M4 bot) -------------------------------------------------------
 
@@ -113,14 +125,6 @@ namespace QALab.Sandbox
             return interactor != null && interactor.RequestInteractNearest(out objectName);
         }
 
-        public void Respawn()
-        {
-            // A CharacterController overrides transform changes while enabled, so turn it off to teleport.
-            _controller.enabled = false;
-            transform.position = _checkpoint;
-            _controller.enabled = true;
-            _verticalSpeed = 0f;
-            _botTarget = null;
-        }
+        public void Respawn() => TeleportTo(_checkpoint);
     }
 }

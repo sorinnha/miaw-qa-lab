@@ -16,7 +16,7 @@ Until M4–M6 are done, pitch only what is built. The section "What's actually b
 >
 > To measure it honestly I seeded 16 known bugs. Clustering reaches [F1] and visual detection [recall]. On my own game it found [N] real issues.
 
-## What's actually built (as of 2026-10-04)
+## What's actually built (as of 2026-10-05)
 
 These are things you can open and explain. Decisions are in `docs/DECISIONS.md` (D-xxx).
 
@@ -36,11 +36,15 @@ These are things you can open and explain. Decisions are in `docs/DECISIONS.md` 
 | Seeded sandbox | `unity/QALabSandbox/Assets/Sandbox/Scripts/SeededBugs/*`, `SandboxSeedCatalog.cs` | Real NullReferenceExceptions from plain objects; one code path per seed; catalog rules checked to be disjoint | D-017, D-020, D-023 |
 | ProjectScanner | `Editor/Scanner/ProjectScanner.cs`, `Editor/Scanner/ScanReport.cs`, `scripts/scan_project.ps1` | Missing vs unassigned reference via instance id; scenes opened additively and closed; exit codes for CI | D-024 |
 | Bot contracts | `Runtime/Bot/IBotAdapter.cs`, `BotContext.cs`, `BotAdapterRegistry.cs`, `SeededRandom.cs`, `Samples~/GameAdapterTemplate/` (`TurnPolicy.Decide` is yours) | Strategy + registry; one snake_case name rule shared with `-qalabAdapter`; seeded RNG; action events become repro steps | D-024 |
+| Bot runner + bots | `Runtime/Bot/BotRunner.cs`, `NavMeshExplorerAdapter.cs`, `UICrawlerAdapter.cs` | Host-owned runner, fixed order per frame; decisions every 0.25 s, move target re-issued every frame; explorer picks the least-visited of 6 reachable random targets; crawler logs the click before running it | D-025 |
+| Detectors + results | `Runtime/Detectors/DetectorHub.cs`, `RateLimiter.cs`, `FallDetector.cs`, `PerfSpikeDetector.cs`, `ExceptionBurstCounter.cs`, `StuckCalculator.cs` (yours), `TunnelingDetector.cs`, `Runtime/Results/JUnitWriter.cs` | Rules in plain C# fed a `DetectorFrame`; rate limit per 4 m cell (same cells as triage); a throwing detector is switched off, a stub is skipped; exit 2 beats 1 | D-025 |
+| Screenshots + labels | `Runtime/Capture/Shots.cs` (planner), `ScreenshotService.cs`, `Labels/VisualLabelProbe.cs`, sandbox `SeededBugs/*` visual seeds | End-of-frame capture, one shot per frame, path reserved before the file exists; visual ground truth only when a shot shows it | D-025, D-026 |
+| Pipeline scripts | `scripts/build_sandbox.ps1`, `run_playtest.ps1`, `run_pipeline.ps1`, `Editor/BuildRunner.cs` | Run folder found from the player's own log (safe in parallel); exit codes passed through; commit stamped into builds | D-027 |
 | C# outside Unity | `tools/cs-check/` | netstandard2.1 + C# 9 like Unity, NUnit on .NET 8 in CI; what it does and doesn't prove | D-006, D-018 |
 | CI | `.github/workflows/python-ci.yml`, `scripts/ci_smoke.py`, `ci/Jenkinsfile` | Windows + Ubuntu, smoke triage with the fake provider; Jenkinsfile is an example | D-015, D-016 |
 
-**Not built yet (don't claim it):**
-- the bot runner and built-in adapters, detectors, screenshots, JUnit output, `run_pipeline.ps1` (M4);
+**Not built or not run yet (don't claim it):**
+- the M4 code has not run in Unity: no real bot run, no detection numbers, no screenshot spike result yet;
 - evaluation numbers (M5);
 - vision (M6);
 - the real-game run (M7).
@@ -109,18 +113,21 @@ These are things you can open and explain. Decisions are in `docs/DECISIONS.md` 
 32. *A test was flaky in CI. What did you do?* A multi-threaded test assumed the producers would still be running when the drain started. I reproduced it with a forced delay and rewrote it with a handshake (no timing assumptions); it passed 40/40.
 33. *Why test Unity C# outside Unity?* Fast feedback in CI with no license. netstandard2.1 + C# 9 catches APIs Unity doesn't have. It can't check Unity APIs, scenes or serialization, so those stay as EditMode/PlayMode tests.
 34. *Missing vs unassigned in your scanner, and why unassigned is only info?* Instance id ≠ 0 with a null value means a deleted target; id 0 means never set, often optional. Unity's built-in components and its own packages (uGUI, TextMeshPro) have many optional slots, so only scripts outside `Packages/com.unity.*` get the info line.
+35. *How do you make a random bot find a hole in the floor?* The hole is one 2 m tile at the edge of a 40 m level; a rough estimate (not a measurement) said uniform random targets would cross it in only a few percent of trips. Two changes: coverage bias (least-visited cell among 6 reachable candidates, with chosen targets counting as visits so an unreachable pocket stops attracting the bot), and a level layout where the tile lies in the only corridor to a side room. Then measure the per-seed detection rate in the benchmark instead of trusting one run.
+36. *What happens when one of your own detectors throws?* The hub switches it off for the run and keeps the game going. A `NotImplementedException` (a stub) is reported as skipped; anything else is an internal error, exit code 2, listed in results.xml. A QA tool must never be the reason a playtest dies.
 
 ### C++ refresh (they list it as nice-to-have)
 
-35. RAII, `unique_ptr` vs `shared_ptr`, references vs pointers, virtual functions and vtables, `std::map` vs `std::unordered_map` (asked in a past R&D interview).
+37. RAII, `unique_ptr` vs `shared_ptr`, references vs pointers, virtual functions and vtables, `std::map` vs `std::unordered_map` (asked in a past R&D interview).
 
 ## Design patterns you used (covers the gap from your last interview)
 
 | Pattern | Where in QA Lab |
 |---|---|
-| Strategy | `IBotAdapter` (contract built, runner in M4), `LLMProvider`, clustering variants |
+| Strategy | `IBotAdapter` (NavMesh explorer, UI crawler, game adapters), `LLMProvider`, clustering variants |
 | Adapter | Game adapters wrap a game's own commands for the bot |
-| Observer | Unity log callback, `activeSceneChanged` (built); detectors reporting to `DetectorHub` (M4) |
+| Observer | Unity log callback, `activeSceneChanged`; detectors reporting to `DetectorHub` |
+| Decorator | `BotRunner`'s tracking mover wraps the game's `IBotMover` (remembers and re-issues the target) |
 | Factory / Registry | `BotAdapterRegistry` over `NamedRegistry<T>`, `llm/factory.py` |
 | Facade | `QALab` static API |
 | Producer–consumer | Event queue → main-thread flush |

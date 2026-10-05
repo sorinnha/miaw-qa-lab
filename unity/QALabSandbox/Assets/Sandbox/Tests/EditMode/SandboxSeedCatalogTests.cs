@@ -70,6 +70,10 @@ namespace QALab.Sandbox.Tests
         [TestCase("SB01")]
         [TestCase("SB03")]
         [TestCase("SB04")]
+        [TestCase("SB06")]
+        [TestCase("SB08")]
+        [TestCase("SB09")]
+        [TestCase("SB10")]
         [TestCase("SB13")]
         [TestCase("SB14")]
         public void EntryMatchesTheSampleLabels(string id)
@@ -97,7 +101,7 @@ namespace QALab.Sandbox.Tests
             foreach (JObject bug in (JArray)sample["seeded_bugs"])
             {
                 var id = (string)bug["bug_id"];
-                if (!book.IsKnown(id)) continue;   // M4 seeds and still-open YOU WRITE entries
+                if (!book.IsKnown(id)) continue;   // still-open YOU WRITE entries
                 foreach (var trigger in (JArray)bug["triggers"])
                 {
                     book.Trigger(id, (double)trigger["t"], (string)trigger["scene"]);
@@ -106,7 +110,57 @@ namespace QALab.Sandbox.Tests
             }
             var actual = book.ToJson((string)sample["run_id"]);
             Json.AssertSame(expected.ToString(), actual["seeded_bugs"].ToString());
-            Assert.GreaterOrEqual(expected.Count, 5);
+            Assert.GreaterOrEqual(expected.Count, 9);
+        }
+
+        [Test]
+        public void EverySeedFromTheSpecHasAnEntry()
+        {
+            var ids = new List<string>();
+            foreach (var entry in SandboxSeedCatalog.All()) ids.Add(entry.BugId);
+            ids.AddRange(SandboxSeedCatalog.Stubbed());
+            ids.Sort(System.StringComparer.Ordinal);
+            var expected = new List<string>();
+            for (var i = 1; i <= 16; i++) expected.Add("SB" + i.ToString("00"));
+            CollectionAssert.AreEqual(expected, ids);
+        }
+
+        [Test]
+        public void DetectorAndVisualSeedsUseTheContractVocabulary()
+        {
+            foreach (var entry in SandboxSeedCatalog.All())
+            {
+                if (entry.Type == "detector")
+                {
+                    CollectionAssert.Contains(DetectorNames.BuiltIn, entry.Match.Detector, entry.BugId);
+                }
+                if (entry.Type == "visual")
+                {
+                    Assert.IsTrue(VisualLabels.IsKnown(entry.Match.VisualLabel), entry.BugId);
+                }
+                if (entry.Match.Near != null)
+                {
+                    Assert.AreEqual(3, entry.Match.Near.Length, entry.BugId);
+                    Assert.IsNotNull(entry.Match.Radius, entry.BugId + ": near needs a radius");
+                    Assert.IsTrue(entry.Match.Near[0] >= 0f && entry.Match.Near[0] <= SandboxLayout.LevelSize, entry.BugId);
+                    Assert.IsTrue(entry.Match.Near[2] >= 0f && entry.Match.Near[2] <= SandboxLayout.LevelSize, entry.BugId);
+                }
+            }
+        }
+
+        [Test]
+        public void LevelSeedsSitWhereTheBuilderPutsThem()
+        {
+            // D-022: T_17 is row 0, column 17 of 2 m tiles: x 34–36, z 0–2.
+            CollectionAssert.AreEqual(new[] { 35f, 0f, 1f }, SandboxSeedCatalog.SB06().Match.Near);
+            Assert.AreEqual(34f, SandboxLayout.TileCenterX(SandboxLayout.HoleTile) - SandboxLayout.TileSize / 2f);
+            // SB07: wider than the NavMesh agent, narrower than the player, or there is no bug.
+            Assert.Greater(SandboxLayout.GapWidthM, 2f * SandboxLayout.NavMeshAgentRadiusM);
+            Assert.Less(SandboxLayout.GapWidthM, 2f * SandboxLayout.PlayerRadiusM);
+            // T_17 must be in the south-east corridor, the only way into the south-east room.
+            Assert.Greater(SandboxLayout.TileCenterX(SandboxLayout.HoleTile), SandboxLayout.SouthEastX0);
+            Assert.Less(SandboxLayout.TileCenterX(SandboxLayout.HoleTile), SandboxLayout.SouthEastDoorX0);
+            Assert.Less(SandboxLayout.TileCenterZ(SandboxLayout.HoleTile), SandboxLayout.CorridorZ1);
         }
 
         // One log event per seed as the sandbox scripts produce it in a real run: each stack is the call
@@ -130,6 +184,10 @@ namespace QALab.Sandbox.Tests
                 "UnityEngine.Debug:LogError (object)\nQALab.Sandbox.MathUtil:SafeDivide (single,single,string)\nQALab.Sandbox.DamageCalculator:Compute (QALab.Sandbox.Weapon)\nQALab.Sandbox.CombatDriver:Update ()"),
             ("SB14", "Movement speed: division by zero in SafeDivide",
                 "UnityEngine.Debug:LogError (object)\nQALab.Sandbox.MathUtil:SafeDivide (single,single,string)\nQALab.Sandbox.SpeedModel:GetSpeed ()\nQALab.Sandbox.CombatDriver:Update ()"),
+            // Thrown in the Apply button's click handler; ExecuteEvents catches and logs it, so the stack
+            // ends at the event system (the UI crawler's frames are never part of it).
+            ("SB15", "InvalidOperationException: Cannot apply settings: there are no pending changes",
+                "QALab.Sandbox.SeededSettingsMenu.Apply ()\nQALab.Sandbox.SandboxMainMenu.ApplySettings ()\nUnityEngine.Events.InvokableCall.Invoke ()\nUnityEngine.Events.UnityEvent.Invoke ()\nUnityEngine.UI.Button.Press ()\nUnityEngine.UI.Button.OnPointerClick (UnityEngine.EventSystems.PointerEventData eventData)\nUnityEngine.EventSystems.ExecuteEvents.Execute (UnityEngine.EventSystems.IPointerClickHandler handler, UnityEngine.EventSystems.BaseEventData eventData)\nUnityEngine.EventSystems.ExecuteEvents.Execute[T] (UnityEngine.GameObject target, UnityEngine.EventSystems.BaseEventData eventData, UnityEngine.EventSystems.ExecuteEvents+EventFunction`1[T1] functor)"),
         };
 
         // Spec 00 "match": every key given must match the event (stack_contains = substring of the

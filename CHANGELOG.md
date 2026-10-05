@@ -47,16 +47,30 @@ stay at version 0.1.0.
 - **Bot contracts (M7 polish):**
   - `IBotAdapter`, `BotContext`, `BotAdapterRegistry` (snake_case names, the same rule as `-qalabAdapter`) and `SeededRandom`;
   - a "Game adapter template" package sample whose decision rule, `TurnPolicy.Decide`, is the M7 learning task.
+- **Bot, detectors, screenshots (M4):**
+  - `BotRunner` (decisions every 0.25 s, the move target re-issued every frame, a failing adapter stops the bot but not the run);
+  - built-in bots `navmesh_explorer` (reachable random targets, biased to less-visited cells) and `ui_crawler` (random uGUI clicks with a blocklist);
+  - `DetectorHub` (rate limit per detector and 4 m cell, screenshot per report) with `fell_out_of_world` (respawns the player), `perf_spike`, `exception_burst`, the `TunnelingDetector` component, and `stuck` as the M4 learning task (skipped until written);
+  - `ScreenshotService` (`ScreenCapture`, camera render in batch mode, long side ≤ 1280 px, F12), with visual labels from `IVisualSeed`s in benchmark runs;
+  - `results.xml` (JUnit) and player exit codes 0/1/2; the commit stamped into builds;
+  - `QALab.ReportDetector`, `QALab.KillPlaneY`, `QALab.RequestScreenshot`;
+  - editor: `BuildRunner` and the QA Lab window.
+- **Sandbox (M4):** seeds SB06–SB12, SB15 and SB16 (the south-east corridor over T_17, a too-narrow doorway, GcZone, a magenta crate, a camera blackout zone, an overflowing score, an empty ammo icon, a failing Settings Apply, a ballistics range), positions shared through `SandboxLayout`, and F1 buttons for each.
 - **Engine-free C# checked outside Unity:** `tools/cs-check` builds it as netstandard2.1 / C# 9 and runs its NUnit tests on .NET 8.
 - **Scripts and CI:**
   - `find_unity.ps1`, `unity_tests.ps1`, `link_sandbox_package.py`;
+  - `build_sandbox.ps1`, `run_playtest.ps1` and `run_pipeline.ps1` (build → bot playtest + menu crawl → triage → report, M4);
   - GitHub Actions running ruff, pytest on Windows and Ubuntu, a smoke triage with the fake provider, and cs-check;
   - an example `ci/Jenkinsfile`.
-- **Docs:** `USER_GUIDE.md`, `GAME_INTEGRATION.md`, `ARCHITECTURE.md`, decisions D-001–D-024, and a single PC checklist (`docs/progress/PC_CHECKLIST.md`).
+- **Docs:** `USER_GUIDE.md`, `GAME_INTEGRATION.md`, `ARCHITECTURE.md`, decisions D-001–D-027, and a single PC checklist (`docs/progress/PC_CHECKLIST.md`).
+
+### Changed
+
+- The sample run's SB06 fall moved to tile T_17's real position, (35, 1) (D-022, D-026).
 
 ### Not built yet
 
-- M4: bot runner, NavMesh explorer and UI crawler, detectors, screenshots, JUnit results, build/playtest/pipeline scripts.
+- M4 on the PC: the first Unity run of the bot, detectors and screenshots, the screenshot spike, the stuck detector (learning task).
 - M5: triage evaluation on the 20-seed benchmark.
 - M6: vision.
 - M7 on the PC: real-game integration, demo video, measured README results.

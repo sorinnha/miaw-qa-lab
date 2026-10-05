@@ -1,7 +1,7 @@
 {
     "name": "MiawWorks.QALab",
     "rootNamespace": "MiawWorks.QALab",
-    "references": [],
+    "references": ["UnityEngine.UI", "Unity.InputSystem"],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
@@ -9,6 +9,11 @@
     "precompiledReferences": ["Newtonsoft.Json.dll"],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        { "name": "com.unity.modules.ai", "expression": "1.0.0", "define": "QALAB_AI" },
+        { "name": "com.unity.modules.physics", "expression": "1.0.0", "define": "QALAB_PHYSICS" },
+        { "name": "com.unity.ugui", "expression": "1.0.0", "define": "QALAB_UGUI" },
+        { "name": "com.unity.inputsystem", "expression": "1.0.0", "define": "QALAB_INPUT_SYSTEM" }
+    ],
     "noEngineReferences": false
 }

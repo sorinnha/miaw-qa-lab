@@ -33,12 +33,12 @@ def test_union_find() -> None:
 
 def test_detector_cells_merge_only_same_detector_and_scene(runs: dict[str, LoadedRun]) -> None:
     loaded = next(iter(runs.values()))
-    fell = make_cluster(loaded, SB06_FELL, cell=(6, 3))
+    fell = make_cluster(loaded, SB06_FELL, cell=(8, 0))
     perf = make_cluster(loaded, SB08_PERF, cell=(4, 2))
     assert len(merge_detector_cells([fell, perf], eps_m=3.0)) == 2
     # Two fell_out_of_world clusters 2 m apart (different cells) become one.
-    near = make_cluster(loaded, SB06_FELL, signature="aaaaaaaaaaaa", cell=(7, 3))
-    near.members[0].event = near.members[0].event.model_copy(update={"pos": (28.2, -12.0, 14.1)})
+    near = make_cluster(loaded, SB06_FELL, signature="aaaaaaaaaaaa", cell=(9, 0))
+    near.members[0].event = near.members[0].event.model_copy(update={"pos": (37.2, -5.6, 1.1)})
     merged = merge_detector_cells([fell, near], eps_m=3.0)
     assert len(merged) == 1 and merged[0].count == 2
     assert merged[0].signature == min(fell.signature, "aaaaaaaaaaaa")
