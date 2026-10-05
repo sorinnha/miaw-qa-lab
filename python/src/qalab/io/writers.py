@@ -10,7 +10,7 @@ from typing import Any
 
 from qalab.io.runs import LoadedRun
 from qalab.models.bug import BugReport
-from qalab.triage.cluster import Cluster
+from qalab.triage.cluster import Cluster, ClusterMember
 
 
 def write_json(path: Path, data: Any) -> None:
@@ -71,12 +71,22 @@ def copy_screenshot(run: LoadedRun, relative: str, out_dir: Path) -> str | None:
     return target_rel.as_posix()
 
 
+def _finding_score(member: ClusterMember) -> float:
+    """A visual finding's confidence (``details.score``); 0 for every other event."""
+    details = (member.event.data or {}).get("details")
+    return float(details.get("score", 0.0)) if isinstance(details, dict) else 0.0
+
+
 def copy_attachments(
     report: BugReport, cluster: Cluster, runs: Mapping[str, LoadedRun], out_dir: Path
 ) -> BugReport:
-    """Rewrite ``attachments`` to paths relative to the reports folder (files copied there)."""
+    """Rewrite ``attachments`` to paths relative to the reports folder (files copied there).
+
+    The best-scoring visual finding's screenshot comes first (spec 03); otherwise time order. A
+    sort with ``reverse=True`` is still stable, so equal scores keep their order.
+    """
     copied: list[str] = []
-    for member in cluster.members:
+    for member in sorted(cluster.members, key=_finding_score, reverse=True):
         shot = (member.event.data or {}).get("screenshot")
         if shot and member.event.run_id in runs:
             new_path = copy_screenshot(runs[member.event.run_id], shot, out_dir)

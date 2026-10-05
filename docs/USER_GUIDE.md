@@ -13,7 +13,8 @@ new game is in [GAME_INTEGRATION.md](GAME_INTEGRATION.md); the design is in [ARC
 | ProjectScanner (missing scripts, broken references, materials) | Built (M7) |
 | Game adapter contracts and template | Built (M7) |
 | Seeded bot, detectors, screenshots, results.xml, one-command pipeline | Built (M4). Not yet run in Unity: first run is on the PC checklist. The stuck detector is a learning task, skipped until written |
-| Vision (missing textures, black screens, broken UI) | Planned (M6) |
+| Benchmark and `qalab eval triage` (clustering and report scores against seeded ground truth) | Built (M5). Needs a recorded benchmark; `pairwise_prf` is a learning task, so scoring stops with `NotImplementedError` until it is written |
+| Vision: `qalab vision analyze` (missing textures, black screens, white placeholder boxes, UI overflow), visual bugs in reports, `qalab eval vision` | Built (M6). Needs real screenshots to tune; `magenta_ratio` is a learning task, so `--method heuristic` and `hybrid` stop with `NotImplementedError` until it is written (`--method vlm` works) |
 
 Two learning tasks still gate the end-to-end triage run. Until `normalize_message` exists, every
 `qalab triage run` stops with `NotImplementedError: YOU WRITE`. Until `cosine_top_k` exists, so does a
@@ -135,6 +136,26 @@ Exit codes: **0** done with no P1 bug, **3** done with at least one P1 (CI fails
 `qalab triage clusters runs\*` prints the clusters and scores without writing reports; use it to check
 grouping. `qalab report html out\report` re-renders `report.html` from `bugs.json`.
 
+**Visual bugs.** Run vision before triage, and triage picks its findings up:
+
+```powershell
+qalab vision analyze runs\* --method heuristic          # free and offline; writes visual_findings.jsonl per run
+qalab vision analyze runs\* --method hybrid --provider gemini   # heuristics + the model where they are blind
+```
+
+| `--method` | What it finds | Cost |
+|---|---|---|
+| `heuristic` | `missing_texture` (magenta pixels), `black_screen`, `placeholder_ui` (solid white boxes) | free, milliseconds per frame |
+| `vlm` | all four labels, including `ui_overflow` (text out of its box) | one model call per frame |
+| `hybrid` | heuristics first; the model only near UI actions/detector events and on every 5th other frame (`qalab.toml [vision]`) | a fraction of `vlm` |
+| `ml` | the labels the baseline was trained on (`--ml-model`, from `qalab vision train-ml`) | free |
+
+The heuristic thresholds live in `qalab.toml [vision]` (`black_ratio`, `magenta_ratio`);
+`qalab eval vision` prints tuned values for them. Each label with score ≥ 0.5 becomes a `visual:<label>` bug (`black_screen` major, others minor), with
+the clearest screenshot attached. `events.jsonl` is never changed: delete `visual_findings.jsonl` to
+triage without vision. The model only sees screenshots; use `heuristic` or a local model for
+unreleased games.
+
 ## 5. Read the report
 
 `report.html` is a single offline file. The top row counts bugs per priority. The filter box searches id,
@@ -213,6 +234,24 @@ and detection against ground truth (M5). Visual seeds (SB09–SB12) count only w
 them, and each screenshot lists its visual labels (M6). F1 in Play Mode opens a menu to trigger any seed
 by hand or walk to it. Seed ids never appear in log text, and triage never opens `labels.json`; a test
 enforces this.
+
+**Score the tool on the sandbox** (M5):
+
+```powershell
+scripts\benchmark.ps1 -Seeds (1..20) -Duration 120          # one explorer run + one 30 s menu crawl per seed
+qalab eval triage benchmarks\seeded_v1 --provider none      # E1: clustering P/R/F1 per variant
+qalab eval triage benchmarks\seeded_v1 --variants none --reports --docs docs\sandbox_design.md --label rag-on
+```
+
+`benchmarks\seeded_v1\manifest.json` records the seeds, durations, commit, machine and every run's exit
+code. Each `qalab eval triage` writes to `eval\`:
+- `triage_<label>.json`: every number;
+- `triage_<label>.md`: the tables for `docs/EVAL_RESULTS.md`;
+- charts;
+- `reports_<label>\`: the reports that were scored.
+
+`--design-doc docs\sandbox_design.md` scores the component field when RAG is off (no `--docs`). The
+metric definitions are in DECISIONS D-028.
 
 ## 9. CI
 

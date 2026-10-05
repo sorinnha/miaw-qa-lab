@@ -56,21 +56,32 @@ stay at version 0.1.0.
   - `QALab.ReportDetector`, `QALab.KillPlaneY`, `QALab.RequestScreenshot`;
   - editor: `BuildRunner` and the QA Lab window.
 - **Sandbox (M4):** seeds SB06–SB12, SB15 and SB16 (the south-east corridor over T_17, a too-narrow doorway, GcZone, a magenta crate, a camera blackout zone, an overflowing score, an empty ammo icon, a failing Settings Apply, a ballistics range), positions shared through `SandboxLayout`, and F1 buttons for each.
+- **Triage evaluation (M5):**
+  - `qalab eval triage`: pairwise precision/recall/F1 and cluster-count error per clustering variant (E1);
+  - report quality (field completeness, grounding, repro-step match, severity agreement, component, retrieval hit@k, latency, tokens) for E2/E3;
+  - JSON, Markdown tables and charts;
+  - `scripts/benchmark.ps1` with a `manifest.json` (D-028).
+- **Vision (M6):**
+  - `qalab vision analyze` with four methods: heuristics (black ratio, magenta ratio, white boxes), a VLM through the provider layer, an optional logistic-regression baseline, and a hybrid;
+  - findings become `visual:<label>` bugs in triage, with the best screenshot first;
+  - `qalab vision dataset` (split by run), `qalab vision train-ml`;
+  - `qalab eval vision`: per-label P/R/F1, FP/100 frames, VLM calls, latency and cost, tuned on val and scored on test (D-029);
+  - a non-fatal vision step in `run_pipeline.ps1` and the Jenkinsfile.
 - **Engine-free C# checked outside Unity:** `tools/cs-check` builds it as netstandard2.1 / C# 9 and runs its NUnit tests on .NET 8.
 - **Scripts and CI:**
   - `find_unity.ps1`, `unity_tests.ps1`, `link_sandbox_package.py`;
   - `build_sandbox.ps1`, `run_playtest.ps1` and `run_pipeline.ps1` (build → bot playtest + menu crawl → triage → report, M4);
   - GitHub Actions running ruff, pytest on Windows and Ubuntu, a smoke triage with the fake provider, and cs-check;
   - an example `ci/Jenkinsfile`.
-- **Docs:** `USER_GUIDE.md`, `GAME_INTEGRATION.md`, `ARCHITECTURE.md`, decisions D-001–D-027, and a single PC checklist (`docs/progress/PC_CHECKLIST.md`).
+- **Docs:** `USER_GUIDE.md`, `GAME_INTEGRATION.md`, `ARCHITECTURE.md`, decisions D-001–D-029, and a single PC checklist (`docs/progress/PC_CHECKLIST.md`).
 
 ### Changed
 
-- The sample run's SB06 fall moved to tile T_17's real position, (35, 1) (D-022, D-026).
+- The sample run's SB06 fall moved to tile T_17's real position, (35, 1) (D-022, D-026), and its SB06/SB08 events now carry what the detectors write (`kill_plane_y`, `threshold_ms`).
 
 ### Not built yet
 
 - M4 on the PC: the first Unity run of the bot, detectors and screenshots, the screenshot spike, the stuck detector (learning task).
-- M5: triage evaluation on the 20-seed benchmark.
-- M6: vision.
+- M5 on the PC: recording the 20-seed benchmark, the E1–E3 numbers, `pairwise_prf` (learning task).
+- M6 on the PC: the vision dataset from the benchmark, H1–H4 numbers, `magenta_ratio` (learning task).
 - M7 on the PC: real-game integration, demo video, measured README results.

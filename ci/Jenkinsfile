@@ -7,7 +7,8 @@
 // Agent label: 'windows && unity'. The agent's Unity version must match
 // unity/QALabSandbox/ProjectSettings/ProjectVersion.txt, or set UNITY_EXE in the agent's environment.
 //
-// Stages whose scripts may be missing skip themselves until the files exist (qalab vision arrives in M6).
+// Stages whose inputs are missing skip themselves. A failed vision step marks the build UNSTABLE, not failed:
+// triage still runs on logs and detectors.
 // Without playtest runs, triage runs on samples/sample_run as a dry run. run_playtest.ps1 finds each
 // player's run folder in that player's own log, so the parallel playtests can share runs\nightly.
 pipeline {
@@ -102,11 +103,13 @@ pipeline {
 
         stage('Vision') {
             when {
-                expression { fileExists('python/src/qalab/vision/__init__.py') && fileExists('runs/nightly') }
+                expression { fileExists('runs/nightly') }
             }
             steps {
-                // Arguments as planned in spec 04; M6 fixes the final command line.
-                powershell "& ${env.QALAB} vision analyze 'runs\\nightly\\*'; exit \$LASTEXITCODE"
+                // Method and provider from qalab.toml [vision] / [llm]; findings land in each run folder.
+                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                    powershell "& ${env.QALAB} vision analyze 'runs\\nightly\\*'; exit \$LASTEXITCODE"
+                }
             }
         }
 

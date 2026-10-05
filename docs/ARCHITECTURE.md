@@ -18,9 +18,9 @@ principles. Reasons for specific choices are in `docs/DECISIONS.md`.
 | Triage | Python | Deduplicate, rank and explain bugs with evidence | 02 | Built (M2–M3) |
 | RAG | Python | Design-doc and code context for reports | 02 | Built (M3) |
 | LLM layer | Python | Pluggable providers (fake, Ollama, Gemini), structured output, cache | 02 | Built (M3) |
-| Vision | Python | Heuristics / VLM / ML / hybrid glitch detection | 03 | Planned (M6) |
-| Eval | Python | Benchmarks against seeded ground truth | 02, 03 | Planned (M5–M6) |
-| Scripts + CI | PowerShell, YAML, Groovy | Unity tests, scanner, build, playtest, one-command pipeline, CI | 04 | Built except `benchmark.ps1` (M5) |
+| Vision | Python | Heuristics / VLM / ML / hybrid glitch detection; findings join triage as `visual:<label>` events | 03 | Built (M6), not yet run on real sandbox frames |
+| Eval | Python | Benchmarks against seeded ground truth: `qalab eval triage` (E1–E3, D-028) | 02, 03 | Built (M5 triage, M6 vision), not yet run on a recorded benchmark |
+| Scripts + CI | PowerShell, YAML, Groovy | Unity tests, scanner, build, playtest, one-command pipeline, benchmark, CI | 04 | Built (M4–M5) |
 
 ## Design principles
 
@@ -44,6 +44,15 @@ triage.cluster.Cluster ──► triage.context.build_context ──► ClusterC
       ▼                                                        │
 models.bug.BugReport ◄─────────────────────────────────────────┘
 llm: base.LLMProvider ← fake | ollama | gemini; cache.CachedProvider wraps them all.
+
+vision (inference, never labels.json): heuristics · vlm (provider + llm_vision schema) · ml · hybrid
+  → analyze.analyze_run → <run>/visual_findings.jsonl → io.runs.load_run adds visual:<label> events
+
+eval (the only package that opens labels.json):
+  ground_truth.build_ground_truth (catalog match rules → event → seeded bug)
+  triage_eval: triage.pipeline functions → score_clusters (metrics.pairwise_prf) · score_reports
+  → eval/triage_<label>.json / .md / charts
+  vision_dataset (split by run) → vision_eval: tune on val, score on test → eval/vision_<label>.*
 ```
 
 See `docs/DECISIONS.md` for the reasoning behind specific choices.

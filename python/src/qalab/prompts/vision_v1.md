@@ -1,4 +1,4 @@
-{# prompt_version: vision-v1 · Jinja2 · first draft, refine in M6 and record changes in DECISIONS.md #}
+{# prompt_version: vision-v1 · Jinja2 · first used in M6 (D-029); bump the version when the wording changes #}
 ## system
 You are a game QA tester. You check one screenshot from an automated playtest of a simple 3D Unity game for rendering or UI bugs.
 
@@ -16,4 +16,4 @@ Rules:
 5. Return only JSON that matches the schema.
 
 ## user
-Scene: {{ scene }}. Time: {{ t }} s. Which of the listed bugs, if any, are visible in this screenshot?
+Screenshot: {{ shot }}. Scene: {{ scene }}. Time: {{ t }} s. Which of the listed bugs, if any, are visible in this screenshot?

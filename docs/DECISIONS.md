@@ -197,3 +197,115 @@ One entry per real choice: what we decided, why, what else we considered, and wh
 - **`run_playtest.ps1` finds its run folder in the player's own log** (`[QALab] recording run <id> to <dir>`), not by listing new folders, so parallel playtests (the Jenkinsfile runs three) can't pick each other's folder. The log is moved into the run folder as `player.log` (spec 00). Exit codes: the player's 0/1/2, plus 3 (no run folder) and 4 (timeout, player stopped). The last output line is the run folder.
 - **`run_pipeline.ps1`** builds if the player is missing, runs the explorer in Sandbox_Level01 and then a 30 s UI-crawler run in Sandbox_Menu (`-MenuCrawl 0` skips it) so SB15 can be found in the same command, triages both runs into `reports\<run_id>\`, and exits 3 on a P1. Player exit 1 (a critical detector) is a finding and 2 still leaves data, so only 3+ stops it. The vision step runs only if this `qalab` has `vision analyze` (M6). The provider comes from `qalab.toml` unless `-Provider` is given.
 - **Checked here:** all three scripts parse in PowerShell 7.4, and `run_pipeline.ps1` ran end to end under pwsh on Linux with a fake player (a shell script that writes a copy of the sample run and the log line) and the real `qalab` (temporary implementations of the two open Python YOU WRITE functions, restored afterwards): two run folders with `player.log`, a report, exit 3. Not checked: Unity, the real player, Windows paths.
+
+## D-028 · 2026-10-05 · M5 triage evaluation: ground truth and metric definitions (M5)
+- **Ground truth per event:**
+  - an event is seeded bug X's when X's catalog rule matches it and X is listed in *that run's* `labels.json` (a seed that never fired in a run is not ground truth for it);
+  - a rule matches when every key it sets matches (spec 00): `stack_contains`, `message_regex`, `detector`, and `near` + `radius`;
+  - `near` is measured on the ground plane (x, z): a fall is reported below the floor (y −5.6), while the catalog's `near` is at floor height;
+  - an event that matches two seeds is *ambiguous*: it is counted and left out (the catalog tests keep the rules disjoint, so this should be 0);
+  - visual rules (`visual_label`) never match an event: M6 scores them from labelled screenshots;
+  - runs without `labels.json` are listed and add no ground truth. Only `qalab.eval` opens `labels.json`.
+- **E1, clustering:**
+  - pairwise precision, recall and F1 over the clustered events that have ground truth;
+  - events matching no seed are counted (`unlabelled_events`) but not scored: they may be real bugs the sandbox didn't seed;
+  - pairs are counted (`n(n−1)/2` per group), never enumerated, so 20 runs stay fast;
+  - with no predicted pairs, precision is 1.0 (nothing merged wrongly); with no true pairs, recall is 1.0;
+  - also reported: cluster-count error (clusters holding labelled events − true bugs: > 0 split, < 0 merged), and, for error analysis, which bugs were split and which clusters mix bugs.
+- **E2/E3, reports.** Two subsets:
+  - content metrics use the *labelled* reports, whose cluster is mostly (> 50 %) one seeded bug;
+  - cost metrics use every report the model was asked for (*attempted*: LLM drafts plus template fallbacks after failed drafts), so a model whose drafts fail isn't flattered by leaving its failures out. With `--provider none` nothing is attempted, so they're `n/a`.
+  - *fallback rate* (attempted): the share that fell back to the template;
+  - *field completeness* (labelled): the share of the 6 narrative fields with real content, plus at least one step (7 items). Blank, "unknown", "n/a", "none" and "tbd" count as empty; the template writes "unknown" when it can't know a field;
+  - *grounding rate* (attempted): the share that are LLM drafts with no grounding failure (unknown evidence, action or doc ids). A fallback counts as not grounded. A test ties the matched wording to `report_llm`'s, so a reworded reason can't silently make this 100%;
+  - *repro-step match*: among clusters with bot actions before the first occurrence, the share of reports with at least one `bot_log` step whose action refs all exist;
+  - *severity agreement*: exact match with the catalog's `expected_severity`, and within one level;
+  - *component correct*: the report's component names one of the backticked components on the feature's `Component:` line in the design doc. Case-insensitive and one way ("door" alone doesn't name `SeededDoor`). `--design-doc` gives that doc without sending it to the model, so RAG-off runs are scored too;
+  - *retrieval hit@k* (labelled, spec 02 §10): the share of seeded bugs whose feature heading (the catalog's `feature` is an exact H2 heading of the design doc) is among the top-k chunks retrieved for one of their clusters. A bug split into two clusters counts once. The chunks are recorded as the reports get them, so retrieval doesn't run a second time;
+  - *latency p50/p95* (attempted): uncached calls only. *Tokens* (attempted): in + out per report, fallbacks included.
+- **Not automated:** whether "expected" matches the design doc needs a human judgment, so EVAL_RESULTS keeps it as a manual column (10 reports, read by Sora).
+- **Outputs:**
+  - `eval/triage_<label>.json` holds everything;
+  - `.md` holds the EVAL_RESULTS tables, to paste as they are;
+  - two charts: `_e1_prf.png` and `_reports.png`;
+  - `eval/reports_<label>/` holds the reports themselves, for the error analysis.
+  - `frame_embed` is skipped with `--provider none`, which has no embeddings. A variant whose provider fails (unreachable, quota) is listed as `failed: <reason>`, and the other variants are still written;
+  - the header lists the seeds `labels.json` says fired (visual seeds included) and, separately, the seeds at least one event matched: only the second list is what triage could find.
+- **`benchmark.ps1`:**
+  - writes `manifest.json` (seeds, durations, git sha, machine, every run with its exit code), UTF-8 without a BOM;
+  - CPU/RAM lookups are optional, so a CIM failure can't lose the manifest;
+  - each playtest runs in its own try/catch: a failed one makes the script exit 1 but doesn't stop the other seeds;
+  - a timed-out playtest's partial folder (no labels.json) moves to `_failed\`, which eval doesn't scan;
+  - re-running some seeds into the same folder replaces those seeds' manifest entries and keeps the rest;
+  - **scope:** each seed records the 120 s explorer run *and* a 30 s menu crawl (40 runs for 20 seeds, not spec 04's 20), so SB15, which lives in the menu, can be found. `-MenuCrawl 0` gives the spec's 20.
+- **Checked here, not measured:**
+  - `benchmark.ps1` ran under pwsh on Linux with the fake player from D-027 (copies of the sample run), with temporary implementations of the open YOU WRITE functions, restored afterwards;
+  - `qalab eval triage` on that output reproduced EXPECTED.md: `exact` splits SB14, `frame_tfidf` gives 8 clusters for 8 bugs, `tfidf_only` merges SB01 + SB04;
+  - that proves the plumbing, not the tool: there are no benchmark numbers until Sora records `seeded_v1` on the PC.
+
+## D-029 · 2026-10-05 · M6 vision: methods, dataset and evaluation discipline (M6)
+- **Inference and ground truth stay apart:**
+  - `qalab.vision` (analyze, heuristics, VLM, ML, hybrid, findings) never opens `labels.json`, and the leakage test covers `qalab vision analyze`;
+  - dataset building and scoring read labels, so they live in `qalab.eval` (`vision_dataset`, `vision_eval`); `qalab vision dataset` is a thin CLI wrapper around them.
+- **Heuristics** run on a 640 px copy:
+  - `black_ratio` is the share of pixels with luma < 16;
+  - `magenta_ratio` is the YOU WRITE task. Its docstring warns about the uint8 trap: `r - b` wraps around in uint8, so cast to int16 first;
+  - white boxes: near-white connected components with area, fill and aspect rules;
+  - score: 1.0 at or above the threshold, else under 0.5 in proportion to the statistic. Triage keeps labels with score ≥ 0.5, so the threshold decides;
+  - `ui_overflow` is not attempted (a known gap, tested by H2).
+- **No OpenCV (deviation from spec 03):**
+  - connected components come from `scipy.ndimage.label`, already installed with scikit-learn, instead of a 50+ MB package for one function. Its default is 4-connectivity (OpenCV's is 8); a solid box is one component either way;
+  - the ML features use Sobel edge density instead of Canny, for the same reason.
+- **VLM:**
+  - a 768 px PNG, prompt `vision_v1`, the `llm_vision` JSON schema, temperature 0, ≤ 2 retries;
+  - a frame whose answers stay unusable gets no labels, and the error is counted, not raised;
+  - the cache key covers the prompt text, the image hash, the model and the prompt version. The prompt names the screenshot path, so the same pixels under another path (a dataset copy vs the run folder) are a new call. Spec 03's key leaves the text out; naming the path is harmless for a real model and lets `FakeProvider` answer from a lookup table in offline tests;
+- **ML baseline (optional, H4):**
+  - 53 features: 3 × 16-bin HSV histograms, edge density, mean and std luma, and the shares of near-white and near-black pixels;
+  - one balanced logistic regression per label, its threshold picked on val; a label with no train positives gets no model;
+  - saved with joblib. That is a pickle, so only load model files you made yourself;
+  - `predict` rescales each probability so the label's val-tuned threshold maps to 0.5 (`calibrated`). Triage keeps scores ≥ 0.5, so `--method ml` keeps exactly what eval measured.
+- **Hybrid** (spec 03):
+  - heuristics first. The VLM runs only when nothing fired AND the frame is within the window of a UI action (`ui_path`) or a non-visual detector event, or it is the 1st of every N remaining frames;
+  - the policy restarts for each run.
+- **Dataset:**
+  - `index.csv` adds `event_gap_s` (so the hybrid can be simulated offline) and `method` (screen capture vs camera render) to spec 03's columns;
+  - seeded 70/15/15 split by run, with at least one val run and one test run once there are 3 runs;
+  - `stats.json` warns when a label has fewer than 10 test frames.
+- **Evaluation discipline:**
+  - the black and magenta thresholds come from fixed grids, picked on val; ties go to the value closest to the spec's starting threshold;
+  - the hybrid's N and window are also picked on val: the cheapest setting that keeps ≥ 90% of the VLM-only macro recall (H3), else the best recall;
+  - every reported number is on test, plus a `real` split when the dataset has one (M7);
+  - the VLM is asked once per frame, and the hybrid is simulated from those answers instead of asking again (temperature 0). Val frames go to the VLM only when the hybrid needs tuning;
+  - the ML model trains on train, picks thresholds on val, and reports train vs test macro F1 as an overfitting check.
+- **Metrics:**
+  - multi-label precision, recall and F1 per label, `n/a` when undefined;
+  - macro F1 and macro recall over the labels that have positives in the split;
+  - FP per 100 frames, summed over all labels, plus a per-label table (H1 is about two labels);
+  - latency p50/p95 per frame and per method, on that split: the heuristics' own time, the ML model's features plus prediction, uncached VLM calls, and for the hybrid the heuristics plus the VLM where it called it;
+  - VLM frames with no usable answer (rate limits, bad JSON) are counted per split and flagged in the Markdown: they score as "nothing found";
+  - estimated cost only when `[vision] cost_per_1k_images` is set by hand (never invented).
+- **Outputs:**
+  - `eval/vision_<label>.json` holds everything. Spec 03 says `vision_<date>.json`; the JSON carries `created_at`, and the label names the experiment instead;
+  - `.md` holds the EVAL_RESULTS table;
+  - two charts: `_prf.png` and `_hybrid_tradeoff.png`;
+  - `_errors/` holds thumbnails of 3 false positives and 3 misses of the lead method: the hybrid when it ran, else the VLM, the heuristics, then the ML baseline.
+- **Thresholds the tool really uses:** `qalab vision analyze` reads `[vision] black_ratio` and `magenta_ratio` from `qalab.toml` (spec 03's starting values until changed). Eval prints the val-tuned values and, when the configured ones differ, adds a `heuristic (qalab.toml)` row, so EVAL_RESULTS also shows what the shipped settings do.
+- **Triage integration:**
+  - findings with score ≥ 0.5 become in-memory `visual:<label>` detector events that share their screenshot's seq. `events.jsonl` is never edited;
+  - severities: `black_screen` major, the others minor;
+  - they cluster like detector events;
+  - the best-scoring screenshot is attached first.
+  - In eval, a visual event counts as seed X only when `labels.json` says its screenshot shows X with that label. A false positive on a clean frame never counts as finding the bug. Ground truth is keyed by (run, seq, visual label), because two labels on one frame share the screenshot's seq;
+  - `qalab vision analyze` counts (and prints) only labels with score ≥ 0.5, the ones triage keeps; the findings file still holds the low scores.
+- **Pipeline:**
+  - `run_pipeline.ps1` and the Jenkinsfile run `qalab vision analyze` with `qalab.toml`'s method. The default, `heuristic`, is offline and free;
+  - a vision failure is a warning (Jenkins: UNSTABLE), and triage still runs.
+- **Dependencies:**
+  - `pillow`, `scipy` and `joblib` are listed in the core dependencies because qalab imports them. All three were already installed through matplotlib and scikit-learn;
+  - the unused `vision` extra (OpenCV) was removed.
+- **Checked here, not measured:**
+  - with a temporary `magenta_ratio` (restored afterwards), the sample shots match EXPECTED.md: 000004 is `missing_texture`, 000005 is `black_screen`;
+  - `evaluate_vision` ran end to end on a 3-run copy of the sample run with the fake VLM;
+  - the fake-player pipeline wrote `visual_findings.jsonl`, and triage made 10 clusters (8 + 2 visual);
+  - there are no numbers on real sandbox frames until Sora records the benchmark.
