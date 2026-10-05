@@ -72,8 +72,8 @@ evidence.
   detection can be scored against ground truth:
   - `scripts\benchmark.ps1` records one bot playtest per seed (20 by default) with labels;
   - `qalab eval triage` scores clustering (pairwise precision, recall, F1 per variant) and reports
-    (field completeness, grounding, repro steps, severity, component, retrieval hit@3, latency,
-    tokens), and writes the tables and charts for `docs/EVAL_RESULTS.md` (D-028);
+    (fallback rate, field completeness, grounding, repro steps, severity, component, retrieval
+    hit@3, latency, tokens), and writes the tables and charts for `docs/EVAL_RESULTS.md` (D-028);
   - `qalab vision dataset` splits the labelled screenshots by run, and `qalab eval vision` compares
     heuristics, the VLM, a logistic-regression baseline and the hybrid: per-label P/R/F1, false
     positives per 100 frames, VLM calls, latency and cost (D-029).

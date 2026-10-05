@@ -212,25 +212,32 @@ One entry per real choice: what we decided, why, what else we considered, and wh
   - pairs are counted (`n(n−1)/2` per group), never enumerated, so 20 runs stay fast;
   - with no predicted pairs, precision is 1.0 (nothing merged wrongly); with no true pairs, recall is 1.0;
   - also reported: cluster-count error (clusters holding labelled events − true bugs: > 0 split, < 0 merged), and, for error analysis, which bugs were split and which clusters mix bugs.
-- **E2/E3, reports.** Scored over reports whose cluster is mostly (> 50 %) one seeded bug:
-  - *field completeness*: the share of the 6 narrative fields that aren't blank, plus at least one step (7 items);
-  - *grounding rate*: the share of LLM-written reports with no grounding failure (unknown evidence, action or doc ids). Template reports are grounded by construction, so they're left out;
+- **E2/E3, reports.** Two subsets:
+  - content metrics use the *labelled* reports, whose cluster is mostly (> 50 %) one seeded bug;
+  - cost metrics use every report the model was asked for (*attempted*: LLM drafts plus template fallbacks after failed drafts), so a model whose drafts fail isn't flattered by leaving its failures out. With `--provider none` nothing is attempted, so they're `n/a`.
+  - *fallback rate* (attempted): the share that fell back to the template;
+  - *field completeness* (labelled): the share of the 6 narrative fields with real content, plus at least one step (7 items). Blank, "unknown", "n/a", "none" and "tbd" count as empty; the template writes "unknown" when it can't know a field;
+  - *grounding rate* (attempted): the share that are LLM drafts with no grounding failure (unknown evidence, action or doc ids). A fallback counts as not grounded. A test ties the matched wording to `report_llm`'s, so a reworded reason can't silently make this 100%;
   - *repro-step match*: among clusters with bot actions before the first occurrence, the share of reports with at least one `bot_log` step whose action refs all exist;
   - *severity agreement*: exact match with the catalog's `expected_severity`, and within one level;
   - *component correct*: the report's component names one of the backticked components on the feature's `Component:` line in the design doc. Case-insensitive and one way ("door" alone doesn't name `SeededDoor`). `--design-doc` gives that doc without sending it to the model, so RAG-off runs are scored too;
-  - *retrieval hit@k*: the share of clusters whose top-k retrieved chunk headings include the bug's feature (the catalog's `feature` is an exact H2 heading of the design doc);
-  - *latency p50/p95*: uncached LLM calls only. *Tokens*: in + out per LLM report.
+  - *retrieval hit@k* (labelled, spec 02 §10): the share of seeded bugs whose feature heading (the catalog's `feature` is an exact H2 heading of the design doc) is among the top-k chunks retrieved for one of their clusters. A bug split into two clusters counts once. The chunks are recorded as the reports get them, so retrieval doesn't run a second time;
+  - *latency p50/p95* (attempted): uncached calls only. *Tokens* (attempted): in + out per report, fallbacks included.
 - **Not automated:** whether "expected" matches the design doc needs a human judgment, so EVAL_RESULTS keeps it as a manual column (10 reports, read by Sora).
 - **Outputs:**
   - `eval/triage_<label>.json` holds everything;
   - `.md` holds the EVAL_RESULTS tables, to paste as they are;
   - two charts: `_e1_prf.png` and `_reports.png`;
   - `eval/reports_<label>/` holds the reports themselves, for the error analysis.
-  - `frame_embed` is skipped with `--provider none`, which has no embeddings.
+  - `frame_embed` is skipped with `--provider none`, which has no embeddings. A variant whose provider fails (unreachable, quota) is listed as `failed: <reason>`, and the other variants are still written;
+  - the header lists the seeds `labels.json` says fired (visual seeds included) and, separately, the seeds at least one event matched: only the second list is what triage could find.
 - **`benchmark.ps1`:**
   - writes `manifest.json` (seeds, durations, git sha, machine, every run with its exit code), UTF-8 without a BOM;
   - CPU/RAM lookups are optional, so a CIM failure can't lose the manifest;
-  - a playtest that leaves no run folder makes it exit 1 but doesn't stop the other seeds.
+  - each playtest runs in its own try/catch: a failed one makes the script exit 1 but doesn't stop the other seeds;
+  - a timed-out playtest's partial folder (no labels.json) moves to `_failed\`, which eval doesn't scan;
+  - re-running some seeds into the same folder replaces those seeds' manifest entries and keeps the rest;
+  - **scope:** each seed records the 120 s explorer run *and* a 30 s menu crawl (40 runs for 20 seeds, not spec 04's 20), so SB15, which lives in the menu, can be found. `-MenuCrawl 0` gives the spec's 20.
 - **Checked here, not measured:**
   - `benchmark.ps1` ran under pwsh on Linux with the fake player from D-027 (copies of the sample run), with temporary implementations of the open YOU WRITE functions, restored afterwards;
   - `qalab eval triage` on that output reproduced EXPECTED.md: `exact` splits SB14, `frame_tfidf` gives 8 clusters for 8 bugs, `tfidf_only` merges SB01 + SB04;

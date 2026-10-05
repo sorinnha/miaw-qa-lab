@@ -6,6 +6,8 @@
     (-Duration s), then, unless -MenuCrawl 0, the UI crawler in Sandbox_Menu (-MenuCrawl s). Runs land
     in <Out>\<run_id>\. Then writes <Out>\manifest.json: seeds, durations, git sha, machine and every
     run with its exit code. Builds the player first if it's missing.
+    Re-running some seeds into the same -Out replaces those seeds' manifest entries and keeps the
+    others. A timed-out playtest's partial run folder is moved to <Out>\_failed\ (eval ignores it).
     Evaluate with:  qalab eval triage <Out>
     Exit code: 0 every playtest left a run folder, 1 one or more didn't (they're listed in the manifest).
 .EXAMPLE
@@ -42,15 +44,49 @@ $runs = @()
 $failed = 0
 foreach ($seed in $Seeds) {
     foreach ($p in $playtests) {
-        # The last output line is the run folder; $LASTEXITCODE still holds the script's exit code.
-        $runDir = & (Join-Path $PSScriptRoot "run_playtest.ps1") -Seed $seed -Duration $p.Duration `
-            -Adapter $p.Adapter -Scene $p.Scene -Benchmark -Out $Out | Select-Object -Last 1
-        $code = $LASTEXITCODE
+        $runDir = $null
+        $code = $null
+        $problem = $null
+        try {
+            # The last output line is the run folder; $LASTEXITCODE still holds the script's exit code.
+            $runDir = & (Join-Path $PSScriptRoot "run_playtest.ps1") -Seed $seed -Duration $p.Duration `
+                -Adapter $p.Adapter -Scene $p.Scene -Benchmark -Out $Out | Select-Object -Last 1
+            $code = $LASTEXITCODE
+        } catch {
+            # One broken playtest must not stop the other seeds or lose the manifest.
+            $problem = $_.Exception.Message
+            Write-Host "benchmark: seed $seed, $($p.Adapter): $problem" -ForegroundColor Red
+        }
         $runId = $null
-        if ($code -lt 3 -and $runDir) { $runId = Split-Path $runDir -Leaf } else { $failed++ }
-        $runs += [ordered]@{ seed = $seed; adapter = $p.Adapter; scene = $p.Scene; duration_s = $p.Duration; run_id = $runId; exit_code = $code }
+        if ($null -eq $problem -and $code -lt 3 -and $runDir) {
+            $runId = Split-Path $runDir -Leaf
+        } else {
+            $failed++
+            if ($runDir -and (Test-Path $runDir -PathType Container)) {
+                # A partial run has no labels.json; set it aside so eval doesn't cluster it.
+                $failedDir = Join-Path $Out "_failed"
+                New-Item -ItemType Directory -Force -Path $failedDir | Out-Null
+                Move-Item -Force -Path $runDir -Destination $failedDir
+            }
+        }
+        $runs += [ordered]@{ seed = $seed; adapter = $p.Adapter; scene = $p.Scene; duration_s = $p.Duration; run_id = $runId; exit_code = $code; error = $problem }
     }
 }
+
+# Merge with an earlier manifest: re-run seeds replace their entries, other seeds stay.
+$manifestPath = Join-Path $Out "manifest.json"
+$createdAt = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+$allRuns = @($runs)
+if (Test-Path $manifestPath) {
+    try {
+        $previous = Get-Content -Raw -Path $manifestPath | ConvertFrom-Json
+        if ($previous.created_at) { $createdAt = $previous.created_at }
+        $allRuns = @($previous.runs | Where-Object { $Seeds -notcontains [int]$_.seed }) + $runs
+    } catch {
+        Write-Host "benchmark: could not read the old manifest.json, writing a new one ($($_.Exception.Message))" -ForegroundColor Yellow
+    }
+}
+$allSeeds = @($allRuns | ForEach-Object { [int]$_.seed } | Sort-Object -Unique)
 
 $sha = $null
 try { $sha = (git -C $repo rev-parse HEAD 2>$null).Trim() } catch { $sha = $null }
@@ -65,8 +101,9 @@ try {
 }
 $manifest = [ordered]@{
     name = Split-Path $Out -Leaf
-    created_at = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-    seeds = $Seeds
+    created_at = $createdAt
+    updated_at = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+    seeds = $allSeeds
     duration_s = $Duration
     menu_crawl_s = $MenuCrawl
     git_sha = $sha
@@ -75,11 +112,11 @@ $manifest = [ordered]@{
         cpu = $cpu
         ram_gb = $ramGb
     }
-    runs = $runs
+    runs = $allRuns
 }
 $json = $manifest | ConvertTo-Json -Depth 5
 # UTF-8 without BOM (Windows PowerShell's Set-Content -Encoding utf8 would add one).
-[IO.File]::WriteAllText((Join-Path $Out "manifest.json"), $json + "`n", (New-Object Text.UTF8Encoding $false))
+[IO.File]::WriteAllText($manifestPath, $json + "`n", (New-Object Text.UTF8Encoding $false))
 
 $minutes = [math]::Round(((Get-Date) - $started).TotalMinutes, 1)
 $ok = $runs.Count - $failed

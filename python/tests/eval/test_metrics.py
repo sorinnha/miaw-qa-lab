@@ -67,6 +67,12 @@ def test_twenty_thousand_items_are_counted_not_enumerated() -> None:
     assert 0.0 < precision < 1.0 and 0.0 < recall < 1.0
 
 
+@pytest.mark.youwrite
+def test_no_correct_pair_gives_zero_f1_not_a_division_error() -> None:
+    # Predicted pair {0, 2} is a wrong merge and true pair {0, 1} is missed: P = R = 0, so F1 = 0.
+    assert pairwise_prf(["a", "a", "b"], ["x", "y", "x"]) == (0.0, 0.0, 0.0)
+
+
 def test_cluster_count_error_sign() -> None:
     assert cluster_count_error(9, 8) == 1  # one bug split
     assert cluster_count_error(7, 8) == -1  # two bugs merged

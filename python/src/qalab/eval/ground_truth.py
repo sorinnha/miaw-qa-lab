@@ -19,6 +19,13 @@ from qalab.models.labels import Labels, MatchRule, SeededBug
 LABELS_FILE = "labels.json"
 EventKey = tuple[str, int]  # (run_id, seq)
 
+# "## Doors" → "Doors"
+_H2 = re.compile(r"^## (.+?)\s*$")
+# "Components: `SeededDoor`, `Interactor`." → " `SeededDoor`, `Interactor`."
+_COMPONENT_LINE = re.compile(r"Components?:([^\n]*)")
+# " `SeededDoor`, `Interactor`." → ["SeededDoor", "Interactor"]
+_BACKTICKED = re.compile(r"`([^`]+)`")
+
 
 def load_labels(run_dir: Path) -> Labels | None:
     """The run's ``labels.json``, or None when the run was not a benchmark run."""
@@ -128,13 +135,13 @@ def feature_components(design_doc: str) -> dict[str, list[str]]:
     components: dict[str, list[str]] = {}
     current: str | None = None
     for line in design_doc.splitlines():
-        heading = re.match(r"^## (.+?)\s*$", line)
+        heading = _H2.match(line)
         if heading:
             current = heading.group(1)
             components[current] = []
             continue
         if current is None:
             continue
-        for sentence in re.findall(r"Components?:([^\n]*)", line):
-            components[current].extend(re.findall(r"`([^`]+)`", sentence))
+        for sentence in _COMPONENT_LINE.findall(line):
+            components[current].extend(_BACKTICKED.findall(sentence))
     return components
