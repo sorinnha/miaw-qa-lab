@@ -5,7 +5,8 @@
     1. scripts\build_sandbox.ps1, when Builds\Sandbox\QALabSandbox.exe is missing (or -Rebuild).
     2. scripts\run_playtest.ps1: the NavMesh explorer in Sandbox_Level01 for -Duration seconds, then
        (unless -MenuCrawl 0) the UI crawler in Sandbox_Menu for -MenuCrawl seconds. Same seed, -Benchmark.
-    3. qalab vision analyze on both runs (skipped until the vision module exists, M6).
+    3. qalab vision analyze on both runs (method from qalab.toml [vision]); its findings join triage as
+       visual bugs. A vision failure is a warning, not a stop: triage still runs on logs and detectors.
     4. qalab triage run on both runs -> reports\<run_id>\ (report.html, report.md, bugs.json, bugs_jira.csv).
     5. -Open opens report.html.
     The provider comes from qalab.toml unless -Provider is given (fake: no model, offline).
@@ -63,19 +64,16 @@ foreach ($p in $playtests) {
     $runs += $runDir
 }
 
-# 3. Vision (M6): only when this qalab has the command. Windows PowerShell 5.1 turns a native
-# command's redirected stderr into a terminating error under "Stop", so probe with "Continue".
+# 3. Vision (M6). Windows PowerShell 5.1 turns a native command's stderr into a terminating error
+# under "Stop", so this step runs with "Continue". Without findings, triage still has logs and detectors.
 $ErrorActionPreference = "Continue"
-& $qalab vision analyze --help *> $null
-$hasVision = ($LASTEXITCODE -eq 0)
+$visionArgs = @("vision", "analyze") + $runs
+if ($Provider) { $visionArgs += @("--provider", $Provider) }
+& $qalab @visionArgs
+$vision = $LASTEXITCODE
 $ErrorActionPreference = "Stop"
-if ($hasVision) {
-    $visionArgs = @("vision", "analyze") + $runs
-    if ($Provider) { $visionArgs += @("--provider", $Provider) }
-    & $qalab @visionArgs
-    if ($LASTEXITCODE -ne 0) { Fail "qalab vision analyze failed (exit $LASTEXITCODE)" }
-} else {
-    Write-Host "run_pipeline: vision skipped (qalab vision arrives in M6)"
+if ($vision -ne 0) {
+    Write-Host "run_pipeline: vision failed (exit $vision); triaging without visual findings" -ForegroundColor Yellow
 }
 
 # 4. Triage
