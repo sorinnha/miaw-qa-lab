@@ -14,8 +14,12 @@ from typer.testing import CliRunner
 from qalab.cli import app
 from qalab.eval.ground_truth import build_ground_truth, load_labels
 from qalab.io.runs import load_run
+from qalab.io.writers import copy_attachments
 from qalab.llm.fake import FakeProvider
 from qalab.models.visual import FoundLabel, VisualFinding
+from qalab.triage.cluster import Cluster, ClusterMember
+from qalab.triage.context import build_context
+from qalab.triage.report_llm import generate_report
 from qalab.vision.analyze import AnalyzeOptions, analyze_run
 from qalab.vision.findings import (
     FINDINGS_FILE,
@@ -101,6 +105,37 @@ def test_load_run_adds_visual_events_after_their_screenshot(tmp_path: Path) -> N
     assert (run_dir / "events.jsonl").read_text("utf-8").count("visual:") == 0, (
         "events.jsonl is never edited"
     )
+
+
+def test_the_report_leads_with_the_clearest_screenshot(tmp_path: Path) -> None:
+    run_dir = copy_run(tmp_path, "20261005T103000Z-s42")
+    write_findings(
+        run_dir,
+        [
+            _finding("shots/000002.png", ("black_screen", 0.6), run_id="20261005T103000Z-s42"),
+            _finding("shots/000005.png", ("black_screen", 0.97), run_id="20261005T103000Z-s42"),
+        ],
+    )
+    loaded = load_run(run_dir)
+    members = [
+        ClusterMember.from_event(e)
+        for e in loaded.events
+        if e.kind == "detector" and e.detector().detector == "visual:black_screen"
+    ]
+    cluster = Cluster(
+        signature="0123456789ab",
+        kind="visual",
+        members=members,
+        detector="visual:black_screen",
+        detector_severity="major",
+    )
+    runs = {loaded.run.run_id: loaded}
+    report = generate_report(cluster, build_context(cluster, runs), "QAL-0001", None)
+    report = copy_attachments(report, cluster, runs, tmp_path / "out")
+    assert report.attachments == [
+        "shots/20261005T103000Z-s42/000005.png",
+        "shots/20261005T103000Z-s42/000002.png",
+    ], "score 0.97 first, although 000002 came earlier"
 
 
 def test_visual_ground_truth_needs_the_labelled_screenshot(tmp_path: Path) -> None:
