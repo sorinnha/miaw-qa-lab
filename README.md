@@ -56,8 +56,8 @@ evidence.
   - every choice comes from a seeded RNG, so a seed gives the same random sequence. Physics and timing
     still vary, so the action log, where every action becomes a "step to reproduce", is the repro record.
 - **Watches for problems while it plays.** Detectors report `fell_out_of_world` (and respawn the
-  player), `perf_spike`, `exception_burst`, `tunneling` and `stuck`, rate-limited per 4 m cell, each
-  with a screenshot. A blocker or critical finding makes the player exit with code 1, so CI fails.
+  player), `perf_spike`, `exception_burst`, `tunneling` and `stuck` (a YOU WRITE task: it shows as skipped
+  in results.xml until written), rate-limited per 4 m cell, each with a screenshot. A blocker or critical finding makes the player exit with code 1, so CI fails.
 - **One command** (`scripts\run_pipeline.ps1 -Seed 42 -Duration 120 -Open`): builds the sandbox
   player if needed, runs a bot playtest and a menu crawl, triages both and opens `report.html`.
 - **Measures itself.** A sandbox project has 16 seeded bugs with known causes, so clustering and

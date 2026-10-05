@@ -71,7 +71,7 @@ Example: `QALabSandbox.exe -qalab -qalabOut runs -qalabSeed 42 -qalabDuration 12
 - `navmesh_explorer`: walks to random reachable points on the baked NavMesh, preferring 4 m cells it
   hasn't visited, and tries to interact with what's in range (20% of steps). Needs a baked NavMesh and a
   registered player.
-- `ui_crawler`: clicks one random visible, interactable uGUI control per step; skips names containing
+- `ui_crawler`: clicks one random active, interactable uGUI control per step; skips names containing
   Quit or Exit (the sandbox also skips Play, so a menu crawl stays in the menus).
 - a game's own adapter (GAME_INTEGRATION.md §4), or `manual` for no bot.
 
