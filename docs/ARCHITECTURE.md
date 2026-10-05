@@ -19,8 +19,8 @@ principles. Reasons for specific choices are in `docs/DECISIONS.md`.
 | RAG | Python | Design-doc and code context for reports | 02 | Built (M3) |
 | LLM layer | Python | Pluggable providers (fake, Ollama, Gemini), structured output, cache | 02 | Built (M3) |
 | Vision | Python | Heuristics / VLM / ML / hybrid glitch detection | 03 | Planned (M6) |
-| Eval | Python | Benchmarks against seeded ground truth | 02, 03 | Planned (M5–M6) |
-| Scripts + CI | PowerShell, YAML, Groovy | Unity tests, scanner, build, playtest, one-command pipeline, CI | 04 | Built except `benchmark.ps1` (M5) |
+| Eval | Python | Benchmarks against seeded ground truth: `qalab eval triage` (E1–E3, D-028) | 02, 03 | Triage built (M5), not yet run on a recorded benchmark; vision planned (M6) |
+| Scripts + CI | PowerShell, YAML, Groovy | Unity tests, scanner, build, playtest, one-command pipeline, benchmark, CI | 04 | Built (M4–M5) |
 
 ## Design principles
 
@@ -44,6 +44,11 @@ triage.cluster.Cluster ──► triage.context.build_context ──► ClusterC
       ▼                                                        │
 models.bug.BugReport ◄─────────────────────────────────────────┘
 llm: base.LLMProvider ← fake | ollama | gemini; cache.CachedProvider wraps them all.
+
+eval (the only package that opens labels.json):
+  ground_truth.build_ground_truth (catalog match rules → event → seeded bug)
+  triage_eval: triage.pipeline functions → score_clusters (metrics.pairwise_prf) · score_reports
+  → eval/triage_<label>.json / .md / charts
 ```
 
 See `docs/DECISIONS.md` for the reasoning behind specific choices.

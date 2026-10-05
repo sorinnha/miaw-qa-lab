@@ -197,3 +197,48 @@ One entry per real choice: what we decided, why, what else we considered, and wh
 - **`run_playtest.ps1` finds its run folder in the player's own log** (`[QALab] recording run <id> to <dir>`), not by listing new folders, so parallel playtests (the Jenkinsfile runs three) can't pick each other's folder. The log is moved into the run folder as `player.log` (spec 00). Exit codes: the player's 0/1/2, plus 3 (no run folder) and 4 (timeout, player stopped). The last output line is the run folder.
 - **`run_pipeline.ps1`** builds if the player is missing, runs the explorer in Sandbox_Level01 and then a 30 s UI-crawler run in Sandbox_Menu (`-MenuCrawl 0` skips it) so SB15 can be found in the same command, triages both runs into `reports\<run_id>\`, and exits 3 on a P1. Player exit 1 (a critical detector) is a finding and 2 still leaves data, so only 3+ stops it. The vision step runs only if this `qalab` has `vision analyze` (M6). The provider comes from `qalab.toml` unless `-Provider` is given.
 - **Checked here:** all three scripts parse in PowerShell 7.4, and `run_pipeline.ps1` ran end to end under pwsh on Linux with a fake player (a shell script that writes a copy of the sample run and the log line) and the real `qalab` (temporary implementations of the two open Python YOU WRITE functions, restored afterwards): two run folders with `player.log`, a report, exit 3. Not checked: Unity, the real player, Windows paths.
+
+## D-028 · 2026-10-05 · M5 triage evaluation: ground truth and metric definitions (M5)
+- **Ground truth per event:**
+  - an event is seeded bug X's when X's catalog rule matches it and X is listed in *that run's* `labels.json` (a seed that never fired in a run is not ground truth for it);
+  - a rule matches when every key it sets matches (spec 00): `stack_contains`, `message_regex`, `detector`, and `near` + `radius`;
+  - `near` is measured on the ground plane (x, z): a fall is reported below the floor (y −5.6), while the catalog's `near` is at floor height;
+  - an event that matches two seeds is *ambiguous*: it is counted and left out (the catalog tests keep the rules disjoint, so this should be 0);
+  - visual rules (`visual_label`) never match an event: M6 scores them from labelled screenshots;
+  - runs without `labels.json` are listed and add no ground truth. Only `qalab.eval` opens `labels.json`.
+- **E1, clustering:**
+  - pairwise precision, recall and F1 over the clustered events that have ground truth;
+  - events matching no seed are counted (`unlabelled_events`) but not scored: they may be real bugs the sandbox didn't seed;
+  - pairs are counted (`n(n−1)/2` per group), never enumerated, so 20 runs stay fast;
+  - with no predicted pairs, precision is 1.0 (nothing merged wrongly); with no true pairs, recall is 1.0;
+  - also reported: cluster-count error (clusters holding labelled events − true bugs: > 0 split, < 0 merged), and, for error analysis, which bugs were split and which clusters mix bugs.
+- **E2/E3, reports.** Two subsets:
+  - content metrics use the *labelled* reports, whose cluster is mostly (> 50 %) one seeded bug;
+  - cost metrics use every report the model was asked for (*attempted*: LLM drafts plus template fallbacks after failed drafts), so a model whose drafts fail isn't flattered by leaving its failures out. With `--provider none` nothing is attempted, so they're `n/a`.
+  - *fallback rate* (attempted): the share that fell back to the template;
+  - *field completeness* (labelled): the share of the 6 narrative fields with real content, plus at least one step (7 items). Blank, "unknown", "n/a", "none" and "tbd" count as empty; the template writes "unknown" when it can't know a field;
+  - *grounding rate* (attempted): the share that are LLM drafts with no grounding failure (unknown evidence, action or doc ids). A fallback counts as not grounded. A test ties the matched wording to `report_llm`'s, so a reworded reason can't silently make this 100%;
+  - *repro-step match*: among clusters with bot actions before the first occurrence, the share of reports with at least one `bot_log` step whose action refs all exist;
+  - *severity agreement*: exact match with the catalog's `expected_severity`, and within one level;
+  - *component correct*: the report's component names one of the backticked components on the feature's `Component:` line in the design doc. Case-insensitive and one way ("door" alone doesn't name `SeededDoor`). `--design-doc` gives that doc without sending it to the model, so RAG-off runs are scored too;
+  - *retrieval hit@k* (labelled, spec 02 §10): the share of seeded bugs whose feature heading (the catalog's `feature` is an exact H2 heading of the design doc) is among the top-k chunks retrieved for one of their clusters. A bug split into two clusters counts once. The chunks are recorded as the reports get them, so retrieval doesn't run a second time;
+  - *latency p50/p95* (attempted): uncached calls only. *Tokens* (attempted): in + out per report, fallbacks included.
+- **Not automated:** whether "expected" matches the design doc needs a human judgment, so EVAL_RESULTS keeps it as a manual column (10 reports, read by Sora).
+- **Outputs:**
+  - `eval/triage_<label>.json` holds everything;
+  - `.md` holds the EVAL_RESULTS tables, to paste as they are;
+  - two charts: `_e1_prf.png` and `_reports.png`;
+  - `eval/reports_<label>/` holds the reports themselves, for the error analysis.
+  - `frame_embed` is skipped with `--provider none`, which has no embeddings. A variant whose provider fails (unreachable, quota) is listed as `failed: <reason>`, and the other variants are still written;
+  - the header lists the seeds `labels.json` says fired (visual seeds included) and, separately, the seeds at least one event matched: only the second list is what triage could find.
+- **`benchmark.ps1`:**
+  - writes `manifest.json` (seeds, durations, git sha, machine, every run with its exit code), UTF-8 without a BOM;
+  - CPU/RAM lookups are optional, so a CIM failure can't lose the manifest;
+  - each playtest runs in its own try/catch: a failed one makes the script exit 1 but doesn't stop the other seeds;
+  - a timed-out playtest's partial folder (no labels.json) moves to `_failed\`, which eval doesn't scan;
+  - re-running some seeds into the same folder replaces those seeds' manifest entries and keeps the rest;
+  - **scope:** each seed records the 120 s explorer run *and* a 30 s menu crawl (40 runs for 20 seeds, not spec 04's 20), so SB15, which lives in the menu, can be found. `-MenuCrawl 0` gives the spec's 20.
+- **Checked here, not measured:**
+  - `benchmark.ps1` ran under pwsh on Linux with the fake player from D-027 (copies of the sample run), with temporary implementations of the open YOU WRITE functions, restored afterwards;
+  - `qalab eval triage` on that output reproduced EXPECTED.md: `exact` splits SB14, `frame_tfidf` gives 8 clusters for 8 bugs, `tfidf_only` merges SB01 + SB04;
+  - that proves the plumbing, not the tool: there are no benchmark numbers until Sora records `seeded_v1` on the PC.

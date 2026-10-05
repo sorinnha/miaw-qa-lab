@@ -22,8 +22,12 @@ from qalab.triage.pipeline import TriageOptions, load_runs, run_triage, triage_c
 app = typer.Typer(no_args_is_help=True, help="Miaw QA Lab tools.")
 triage_app = typer.Typer(no_args_is_help=True, help="From run folders to ranked bug reports.")
 report_app = typer.Typer(no_args_is_help=True, help="Re-render report files.")
+eval_app = typer.Typer(
+    no_args_is_help=True, help="Score triage and vision against seeded ground truth."
+)
 app.add_typer(triage_app, name="triage")
 app.add_typer(report_app, name="report")
+app.add_typer(eval_app, name="eval")
 console = Console()
 
 EXIT_OK = 0
@@ -180,3 +184,74 @@ def report_html(
         raise typer.Exit(EXIT_ERROR)
     target = rerender_html(reports_dir)
     console.print(f"wrote {target}")
+
+
+@eval_app.command("triage")
+def eval_triage(
+    benchmark_dir: Annotated[
+        Path, typer.Argument(help="Folder of benchmark runs (with labels.json).")
+    ],
+    variants: Annotated[
+        str, typer.Option("--variants", help="E1: comma-separated clustering variants, or 'none'.")
+    ] = ",".join(VARIANTS),
+    reports: Annotated[
+        bool, typer.Option("--reports/--no-reports", help="E2/E3: also write and score reports.")
+    ] = False,
+    label: Annotated[
+        str, typer.Option("--label", help="Name of this setting in the output files.")
+    ] = "default",
+    docs: Annotated[list[Path] | None, typer.Option("--docs", help="Design docs (RAG on).")] = None,
+    design_doc: Annotated[
+        Path | None,
+        typer.Option(
+            "--design-doc",
+            help="Design doc for scoring 'component correct' only, never sent to the model "
+            "(default: the first --docs file). Lets RAG-off runs be scored too.",
+        ),
+    ] = None,
+    repo: Annotated[
+        Path | None, typer.Option("--repo", help="Game source for code context.")
+    ] = None,
+    provider: ProviderOpt = None,
+    model: Annotated[str | None, typer.Option("--model")] = None,
+    report_variant: ClusterOpt = "frame_tfidf",
+    max_reports: Annotated[int | None, typer.Option("--max-reports")] = None,
+    no_cache: Annotated[bool, typer.Option("--no-cache")] = False,
+    out: Annotated[Path, typer.Option("--out", help="Output folder.")] = Path("eval"),
+    config: ConfigOpt = None,
+) -> None:
+    """Clustering P/R/F1 per variant (E1) and, with --reports, report quality (E2, E3)."""
+    from qalab.eval.triage_eval import run_triage_eval, safe_label, to_markdown, write_result
+
+    chosen = (
+        []
+        if variants.strip().lower() == "none"
+        else [v.strip() for v in variants.split(",") if v.strip()]
+    )
+    unknown = [v for v in chosen if v not in VARIANTS]
+    if unknown:
+        console.print(
+            f"[red]error:[/red] unknown variant(s) {', '.join(unknown)} (use {', '.join(VARIANTS)})"
+        )
+        raise typer.Exit(EXIT_ERROR)
+    try:
+        options = _options(
+            out / f"reports_{safe_label(label)}",
+            provider,
+            model,
+            report_variant,
+            max_reports,
+            docs,
+            repo,
+            no_cache,
+            config,
+        )
+        design_doc = design_doc or (docs[0] if docs else None)
+        result = run_triage_eval(benchmark_dir, chosen, options, reports, label, design_doc)  # type: ignore[arg-type]
+        written = write_result(result, out, label)
+    except USER_ERRORS as exc:
+        console.print(f"[red]error:[/red] {exc}")
+        raise typer.Exit(EXIT_ERROR) from exc
+    # soft_wrap: long table rows stay on one line, so the printed Markdown can be pasted as is.
+    console.print(to_markdown(result), soft_wrap=True, markup=False, highlight=False)
+    console.print("wrote " + ", ".join(str(p) for p in written))
