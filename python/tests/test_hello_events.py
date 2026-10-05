@@ -83,3 +83,14 @@ def test_docstring_shows_the_real_expected_output() -> None:
     doc = _load_script().__doc__ or ""
     for line in EXPECTED_OUTPUT.splitlines():
         assert f"    {line}\n" in doc, line
+
+
+def test_a_truncated_last_line_is_skipped_and_reported(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # A crashed run can end with half a line; the counts of the complete lines still come out.
+    events = tmp_path / "events.jsonl"
+    events.write_text('{"kind":"log","level":"error"}\n{"kind":"me', encoding="utf-8")
+    per_kind, per_level = _load_script().count_events(events)
+    assert dict(per_kind) == {"log": 1} and dict(per_level) == {"error": 1}
+    assert "skipped line 2: not JSON" in capsys.readouterr().err

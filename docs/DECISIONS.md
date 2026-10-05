@@ -326,3 +326,18 @@ One entry per real choice: what we decided, why, what else we considered, and wh
   - LEARNING.md tracks studying and re-writing each one from memory, which is what makes them explainable;
   - the `youwrite` pytest marker, `-IncludeYouWrite` in `unity_tests.ps1` and the CI filter `TestCategory!=YouWrite` stay as harmless infrastructure for new tasks;
   - earlier decisions that describe these functions as stubs (D-006, D-015, D-025, D-028, D-029) describe how things stood then.
+
+## D-031 · 2026-10-05 · Number normalization rejects a digit before the number, too (spec 02 §2)
+- **Why:**
+  - a fresh-context review of the learning tasks (D-030) found that `NUMBER` only refused a letter before the number, so a digit could start a match: `Wave10 failed` became `Wave1<n> failed`, while `Wave9 failed` stayed;
+  - one bug could split into clusters by wave number;
+  - normalization wasn't idempotent: `obj_abcdef12G` → `obj_abcdef1<n>G` → `obj_<id><n>G`.
+- **Change:** `(?<![A-Za-z\d])\d+(?:\.\d+)?`. A number glued to a name stays part of the name, as `Vector3` already did. Spec 02's table gains the row `Wave10 failed` → unchanged.
+- **Checked:**
+  - every spec 02 row still holds;
+  - the sample run's clusters are unchanged (9 under `exact`, 8 under `frame_tfidf`);
+  - a seeded fuzz test (3000 messages built from ids, hex, quotes and glued numbers) finds the old pattern non-idempotent and the new one idempotent.
+- **Same review, smaller fixes:**
+  - `hello_events.py` skips a line that isn't JSON (the half line a crash can leave) and reports it on stderr;
+  - `StuckCalculator` starts over on a NaN time or a time earlier than its newest sample, so its memory can't grow;
+  - docstrings describe the code instead of hinting at a task.

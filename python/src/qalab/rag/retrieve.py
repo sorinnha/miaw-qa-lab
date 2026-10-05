@@ -52,12 +52,11 @@ class Retriever(Protocol):
 def cosine_top_k(query: np.ndarray, matrix: np.ndarray, k: int) -> list[tuple[int, float]]:
     """Return the ``k`` rows of ``matrix`` most similar to ``query``, best first.
 
-    Learning task, written by Claude at Sora's request (D-030). Both ``query`` (shape ``(d,)``)
-    and every row of ``matrix`` (shape
-    ``(n, d)``) are already L2-normalized, so cosine similarity is just the dot product:
-    ``scores = matrix @ query`` gives one score per row. Then pick the ``k`` highest scores
-    (``np.argsort`` sorts ascending; think about how to get the largest ones first) and return
-    ``[(row_index, score), ...]`` with plain ``int`` and ``float`` values, best first.
+    (Learning task, written by Claude at Sora's request, D-030.) Both ``query`` (shape ``(d,)``) and
+    every row of ``matrix`` (shape ``(n, d)``) are already L2-normalized, so cosine similarity is
+    just the dot product: ``scores = matrix @ query`` gives one score per row. ``np.argsort`` sorts
+    ascending, so sorting ``-scores`` puts the highest first. Returns ``[(row_index, score), ...]``
+    with plain ``int`` and ``float`` values, best first; equal scores keep their row order.
     Edge cases: ``k`` larger than ``n`` returns ``n`` pairs; an empty matrix returns ``[]``.
     No thresholding here: the caller drops scores below ``min_score``.
 

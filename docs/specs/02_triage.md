@@ -56,7 +56,7 @@ Apply in this order (Python `re`):
 | 2 | Hex address | `\b0x[0-9a-fA-F]+\b` | `<hex>` |
 | 3 | Quoted value | `'[^']*'` and `"[^"]*"` | `<str>` |
 | 4 | Hex id after `_` (must contain a digit) | `(?<=_)(?=[0-9a-f]*\d)[0-9a-f]{6,}\b` | `<id>` |
-| 5 | Number not preceded by a letter | `(?<![A-Za-z])\d+(?:\.\d+)?` | `<n>` |
+| 5 | Number not preceded by a letter or digit | `(?<![A-Za-z\d])\d+(?:\.\d+)?` | `<n>` |
 | 6 | Whitespace | `\s+` → one space, then strip | — |
 
 Test cases (Claude Code writes these tests first):
@@ -72,6 +72,7 @@ Test cases (Claude Code writes these tests first):
 | `enemy_9b03d27f spawned` | `enemy_<id> spawned` |
 | `Door_02 is locked` | `Door_<n> is locked` |
 | `Vector3 was NaN` | unchanged |
+| `Wave10 failed` | unchanged (a letter-led name, like `Vector3`) |
 | `Player at (26.4, -12.0, 14.1)` | `Player at (<n>, -<n>, <n>)` |
 | `NullReferenceException: Object reference not set to an instance of an object` | unchanged |
 | `Texture "Grass_01" not found` | `Texture <str> not found` |

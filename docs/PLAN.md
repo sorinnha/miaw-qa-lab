@@ -217,3 +217,4 @@ Write the hypotheses first. Record tables, 2 charts, conclusions and limitations
 | 2026-10-05 | Vision uses `scipy.ndimage` connected components and Sobel edges instead of OpenCV; `pillow`, `scipy`, `joblib` listed as core dependencies (already installed through matplotlib/scikit-learn); the `vision` extra removed (D-029) | No new package for one function each |
 | 2026-10-05 | Vision step in `run_pipeline.ps1` and the Jenkinsfile is non-fatal (warning / UNSTABLE) (D-029) | Triage on logs and detectors must not depend on the newest component |
 | 2026-10-05 | All eight YOU WRITE tasks written by Claude at Sora's explicit request; they become study tasks (read, re-write from memory, `/teach`) (D-030) | A repo that works on download; interview honesty kept by saying who wrote them |
+| 2026-10-05 | `scripts/setup.ps1`: one-command setup after download | Sora asked for a repo to download and use |

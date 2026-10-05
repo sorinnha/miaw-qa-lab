@@ -31,7 +31,7 @@ namespace QALab.Sandbox
         {
             if (index >= 0 && index < Size) return _slots[index];
 
-            // Label first: if logging ever threw, the ground truth would still say the seed fired.
+            // Label first, like every seed: the label's time is then never later than the log event's.
             LabelRecorder.Trigger("SB02");
             Debug.LogError($"Inventory slot {index} out of range (size {Size})");
             return null;

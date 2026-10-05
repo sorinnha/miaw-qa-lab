@@ -1,5 +1,7 @@
 """Spec 02 §2 table for ``normalize_message`` (an M2 learning task, D-030)."""
 
+import random
+
 import pytest
 
 from qalab.triage.normalize import normalize_message
@@ -23,6 +25,7 @@ ROWS = [
     ("enemy_9b03d27f spawned", "enemy_<id> spawned"),
     ("Door_02 is locked", "Door_<n> is locked"),
     ("Vector3 was NaN", "Vector3 was NaN"),
+    ("Wave10 failed", "Wave10 failed"),  # not "Wave1<n>": the lookbehind rejects digits too
     ("Player at (26.4, -12.0, 14.1)", "Player at (<n>, -<n>, <n>)"),
     (
         "NullReferenceException: Object reference not set to an instance of an object",
@@ -43,6 +46,38 @@ def test_normalize_table(raw: str, expected: str) -> None:
 def test_normalize_is_idempotent(raw: str) -> None:
     once = normalize_message(raw)
     assert normalize_message(once) == once
+
+
+@pytest.mark.parametrize("raw", ["obj_abcdef12G", "Wave10 x99 7.5", "id_00ff00a1 slot_12"])
+def test_digits_after_digits_stay_idempotent(raw: str) -> None:
+    once = normalize_message(raw)
+    assert normalize_message(once) == once
+
+
+def test_random_messages_are_idempotent() -> None:
+    # Seeded fuzz: random strings built from pieces the patterns care about (ids after "_", numbers
+    # glued to names, hex, quotes). The old NUMBER pattern failed this; the fixed one passes.
+    pieces = [
+        "_",
+        "abcdef",
+        "a1b2c3",
+        "12",
+        "7",
+        "G",
+        " ",
+        "Wave",
+        "0x1f",
+        "'q'",
+        "7.5",
+        "-",
+        "(",
+        ")",
+    ]
+    rng = random.Random(7)
+    for _ in range(3000):
+        raw = "".join(rng.choice(pieces) for _ in range(rng.randint(0, 8)))
+        once = normalize_message(raw)
+        assert normalize_message(once) == once, raw
 
 
 @pytest.mark.parametrize(

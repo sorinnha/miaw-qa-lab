@@ -129,13 +129,17 @@ Both test against the same examples, so either side can change internally withou
 
 ## 5. Quick start
 
+One command after downloading (Windows PowerShell; needs Python 3.12+):
+
 ```powershell
-py -3.12 -m venv .venv ; .\.venv\Scripts\Activate.ps1 ; pip install -e ".\python[dev]"
-qalab validate samples\sample_run
+scripts\setup.ps1              # venv, install, .env from the template, validate the sample, run the tests
+.\.venv\Scripts\Activate.ps1
 ```
 
-On Linux/macOS: `python3 -m venv .venv && . .venv/bin/activate && pip install -e "./python[dev]"`, then
-the same commands with `/`.
+`scripts\setup.ps1 -Gemini` also installs the Gemini SDK. By hand instead:
+`py -3.12 -m venv .venv ; .\.venv\Scripts\Activate.ps1 ; pip install -e ".\python[dev]"`. On Linux/macOS:
+`python3 -m venv .venv && . .venv/bin/activate && pip install -e "./python[dev]"`, then the same
+commands with `/`.
 
 **Offline, no model** (deterministic fake provider, the one the tests use):
 
