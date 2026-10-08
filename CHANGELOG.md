@@ -79,6 +79,9 @@ stay at version 0.1.0.
 
 ### Changed
 
+- Project metadata names the publisher, Miaw Works, with its website (miaw-works.dev) and contact email:
+  README header and contact section, `pyproject.toml` authors and URLs, Unity `package.json` author and
+  `documentationUrl`.
 - The sample run's SB06 fall moved to tile T_17's real position, (35, 1) (D-022, D-026), and its SB06/SB08 events now carry what the detectors write (`kill_plane_y`, `threshold_ms`).
 
 ### Not built yet

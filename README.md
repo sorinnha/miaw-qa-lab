@@ -1,5 +1,8 @@
 # Miaw QA Lab
 
+**By [Miaw Works](https://miaw-works.dev)**, an independent game studio and QA tools lab ·
+[miaw-works.dev/qa-lab](https://miaw-works.dev/qa-lab/) · miaw@miaw-works.dev
+
 [![python-ci](https://github.com/sorinnha/miaw-qa-lab/actions/workflows/python-ci.yml/badge.svg)](https://github.com/sorinnha/miaw-qa-lab/actions/workflows/python-ci.yml)
 
 AI-assisted game QA for Unity. A C# package records what happens during a playtest. A Python tool turns
@@ -296,5 +299,10 @@ computer engineering student) with Claude Code as a pair programmer:
 - **The record:** `docs/DECISIONS.md` keeps the reasoning, `docs/LEARNING.md` what was learned.
 
 Every number in this README will come from a script in this repo; none is filled in by hand.
+
+## 12. Contact
+
+Miaw QA Lab is made by [Miaw Works](https://miaw-works.dev). Questions, pilots on a real Unity
+project, or bug reports: **miaw@miaw-works.dev**, or open an issue.
 
 License: MIT

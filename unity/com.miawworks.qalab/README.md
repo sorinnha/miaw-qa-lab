@@ -1,5 +1,7 @@
 # QA Lab (Unity package)
 
+By [Miaw Works](https://miaw-works.dev) · miaw@miaw-works.dev
+
 Writes a QA Lab run folder during a playtest (contract: `docs/specs/00_contracts.md` in the
 repository), optionally with a seeded bot playing and detectors watching. Enable it with `-qalab` on
 the player's command line, or with the QA Lab window (Tools > QA Lab > Window, "Play with QA Lab") in
